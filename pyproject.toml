@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "access-it"
+version = "0.1.0"
+description = "Personal project aimed at predicting the results of amateur-level French cycling races (Access category)."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Yoann Robert", email = "yoann.robert44@gmail.com" }]
+
+dependencies = [
+    "httpx",
+    "beautifulsoup4",
+    "pydantic",
+    "sqlalchemy",
+    "psycopg[binary]",
+    "pandas",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "jupyter"]
+app = ["streamlit", "fastapi", "uvicorn", "plotly"]
+ml = ["scikit-learn", "xgboost", "mlflow"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
