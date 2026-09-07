@@ -7,6 +7,10 @@ from pathlib import Path
 
 DEFAULT_CACHE = Path.home() / ".access-it" / "cache"
 CACHE_DIR = Path(os.getenv("ACCESS_IT_CACHE") or DEFAULT_CACHE)
+RACES_PARQUET_FILE = DEFAULT_CACHE / "races.parquet"
+REGCOM_PARQUET_FILE = DEFAULT_CACHE / "regional_committees.parquet"
+DEPCOM_PARQUET_FILE = DEFAULT_CACHE / "departemental_committees.parquet"
+CLUBS_PARQUET_FILE = DEFAULT_CACHE / "clubs.parquet"
 
 
 def create_cache_dir() -> None:
@@ -34,7 +38,7 @@ def write_sidecar_file(season: int, code: str, meta: dict) -> None:
     )
 
 
-def get_sidecar_data(season: int, code: str):
+def read_sidecar_data(season: int, code: str):
     return json.loads(get_sidecar_file(season, code).read_text(encoding="utf-8"))
 
 
@@ -51,7 +55,7 @@ def write_html_file(season: int, code: str, response: httpx.Response) -> None:
 
 
 def read_html_file(season: int, code: str) -> str:
-    meta = get_sidecar_data(season, code)
+    meta = read_sidecar_data(season, code)
     encoding = meta["encoding"]
     return get_html_file(season, code).read_bytes().decode(encoding)
 
