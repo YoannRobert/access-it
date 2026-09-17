@@ -1,4 +1,5 @@
 import httpx
+from datetime import datetime
 from access_it.common.text import normalize_string_and_fold_case
 
 
@@ -50,10 +51,12 @@ def get_committees(client: httpx.Client):
 def get_clubs(
         client: httpx.Client,
         departemental_committees: dict[int, dict[str, str]] | None = None
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, str, int, int, str]]:
     if departemental_committees is None:
         departemental_committees = get_committees(client=client)[1]
     clubs = {}
+    this_year = datetime.now().year
+    alternative_names = ""
     page = 1
     max_pages = 100
     while True and page <= max_pages:
@@ -79,7 +82,10 @@ def get_clubs(
                     club_id = club_data['extra_data']['id_ffc']
                     clubs[club_id] = {
                         "name": club_name,
-                        "departemental_committee_id": dep_committee_id
+                        "departemental_committee_id": dep_committee_id,
+                        "min_year": this_year,
+                        "max_year": this_year,
+                        "alternative_names": alternative_names
                     }
         except KeyError:
             break
