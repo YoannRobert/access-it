@@ -62,5 +62,33 @@ def extract_former_organization_pages_from_existing_ones(client: httpx.Client, s
         for code in org_codes:
             extract_organization_page(client=client, season=season_int, code=code)
 
-if __name__ == "__main__":
-    extract_unlisted_organizations()
+
+def extract_former_organization_pages_using_bruteforce(
+        client: httpx.Client,
+        start_year: int = 2023,
+        margin: int = 0
+    ):
+    known_organization_codes = [
+        p.name.removesuffix(".meta.json")
+        for p in CACHE_DIR.rglob("*.meta.json")
+    ]
+    organizer_ids = sorted(list(set([c[1:8] for c in known_organization_codes])))
+    max_index_by_organizer = {
+        organizer_id: max(
+            [
+                int(c[8:])
+                for c in known_organization_codes
+                if c.startswith("C" + organizer_id)
+            ]
+        )
+        for organizer_id in organizer_ids
+    }
+    seasons = range(start_year, datetime.now(timezone.utc).year + 1)
+    for season_int in seasons:
+        for organizer_id in organizer_ids:
+            organization_codes = [
+                f"C{organizer_id}{i:03d}"
+                for i in range(1, max_index_by_organizer[organizer_id] + margin)
+            ]
+            for organization_code in organization_codes:
+                extract_organization_page(client=client, season=season_int, code=organization_code)
