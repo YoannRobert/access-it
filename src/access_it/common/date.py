@@ -9,6 +9,10 @@ MONTH_CONVERT = {
 def convert_date(date: str | None) -> str | None:
     if date is None:
         return None
+    date = date.lower().strip()
+    if all([date.find(w) != -1 for w in ["du ", "au "]]):
+        date = date.replace("du ", "").replace("au ", "")
+        date = " ".join(date.split()[0:4])
     date = date.split(maxsplit=1)[1].replace(" ", "-")
     for month, num in MONTH_CONVERT.items():
         date = date.replace(month, num)
