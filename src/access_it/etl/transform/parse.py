@@ -40,6 +40,16 @@ def parse_clubs_in_organisation_page(html: str) -> list[str]:
     return club_texts
 
 
+def get_page_elements(bs: BeautifulSoup) -> dict[str, str]:
+    data = {}
+    for blk in bs.find_all(name="div", class_="info-principale"):
+        key = blk.find(name="div", class_="titreValeur-titre")
+        value = blk.find(name="div", class_="titreValeur-valeur")
+        if key and value:
+            data[key.get_text(strip=True)] = value.get_text(strip=True)
+    return data
+
+
 def parse_organisation_page(html: str) -> dict[str, Any]:
     bs = BeautifulSoup(html, features="html.parser")
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
@@ -60,11 +70,7 @@ def parse_organisation_page(html: str) -> dict[str, Any]:
         "UCIID": "uci_id",
         "CLUB": "club"
     }
-    for blk in bs.find_all(name="div", class_="info-principale"):
-        key = blk.find(name="div", class_="titreValeur-titre")
-        value = blk.find(name="div", class_="titreValeur-valeur")
-        if key and value:
-            data[key.get_text(strip=True)] = value.get_text(strip=True)
+    data = data | get_page_elements(bs)
     try:
         rankings = get_rankings(html)
     except ValueError:
