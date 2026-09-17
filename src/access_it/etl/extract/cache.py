@@ -29,6 +29,10 @@ def get_sidecar_file(season: int, code: str) -> Path:
     return get_season_cache_dir(season) / f"{code}.meta.json"
 
 
+def sidecar_exists(s: int, c: str) -> bool:
+    return get_sidecar_file(s, c).exists()
+
+
 def write_sidecar_file(season: int, code: str, meta: dict) -> None:
     create_season_cache_dir(season)
     sidecar_file = get_sidecar_file(season, code)
@@ -60,15 +64,24 @@ def read_html_file(season: int, code: str) -> str:
     return get_html_file(season, code).read_bytes().decode(encoding)
 
 
-def write_sidecar_and_html_files(season: int, code: str, response: httpx.Response) -> None:
+def write_sidecar_and_html_files(
+        season: int,
+        code: str,
+        response: httpx.Response,
+        kept: bool = False,
+        force_404: bool = False
+    ) -> None:
+    kept = kept and not force_404
     meta = {
-        "status": response.status_code,
+        "status": 404 if force_404 else response.status_code,
+        "kept": kept,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "url": str(response.url),
         "encoding": response.encoding
     }
     write_sidecar_file(season, code, meta)
-    write_html_file(season, code, response)
+    if kept:
+        write_html_file(season, code, response)
 
 
 if __name__ == "__main__":

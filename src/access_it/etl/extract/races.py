@@ -1,47 +1,66 @@
 import httpx
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from access_it.etl.extract.cache import CACHE_DIR, get_sidecar_file, write_sidecar_and_html_files
-from access_it.etl.extract.client import BASE_URL, make_client, get
+from access_it.etl.extract.cache import CACHE_DIR, write_sidecar_and_html_files, sidecar_exists
+from access_it.etl.extract.client import BASE_URL, get
 from access_it.etl.extract.listing import is_this_organization_excluded, is_this_organization_included
+from access_it.etl.transform.parse import get_text_safe
 
 
-def extract_unlisted_organizations(client: httpx.Client, start_year: int = 2023):
-    seasons = range(start_year, datetime.now(timezone.utc).year + 1)
-    saved_organization_codes = sorted([p.stem for p in CACHE_DIR.rglob("*.html")])
+def extract_organization_page(client: httpx.Client, season: int, code: str):
 
     results_base_url = f"{BASE_URL}/resultats/resultat"
+    season_int = int(season)
+    season_str = f"{season_int:4d}"
+    org_ref = f"{season_str}/{code}"
+    if sidecar_exists(season_int, code):
+        print(f"{org_ref} already exists")
+        return
+
+    url = f"{results_base_url}/{season_str}/{code}"
+    race_response = get(client=client, url=url)
+
+    # any error
+    if not isinstance(race_response, httpx.Response):
+        print(f"{org_ref} network error")
+        return
+
+    # 404 error
+    dst_url = str(race_response.url)
+    page_not_found = dst_url.find("error") != -1 and dst_url.find("404") != -1
+    if page_not_found:
+        write_sidecar_and_html_files(season_int, code, race_response, force_404=True)
+        print(f"{org_ref} page not found")
+        return
+
+    # No errors
+    html = race_response.text
+    bs = BeautifulSoup(html, features="html.parser")
+    name = get_text_safe(bs.find(name="h1", class_="titre"))
+    discipline = get_text_safe(bs.find(name="div", class_="discipline"))
+    excluded = is_this_organization_excluded(name) or discipline != "Route"
+    included = is_this_organization_included(name)
+    # Races not kept:
+    if excluded or not included:
+        write_sidecar_and_html_files(season_int, code, race_response, kept=False)
+        print(f"{org_ref} excluded race: {name}")
+        return
+    # Races kept:
+    write_sidecar_and_html_files(season_int, code, race_response, kept=True)
+    print(f"{org_ref}: cached.")
+
+
+def extract_former_organization_pages_from_existing_ones(client: httpx.Client, start_year: int = 2023):
+    saved_sidecar_files = [
+        [p.parent.name, p.name.removesuffix(".meta.json")]
+        for p in CACHE_DIR.rglob("*.meta.json")
+    ]
+    saved_sidecar_files = sorted(saved_sidecar_files)
+    seasons = range(start_year, datetime.now(timezone.utc).year + 1)
+    org_codes = list(set([org_code for _, org_code in saved_sidecar_files]))
     for season_int in seasons:
-        season_str = str(season_int)
-        for code in saved_organization_codes:
-            if get_sidecar_file(season_int, code).exists():
-                print(f"{season_str}/{code}: already exists.")
-                continue
-            url = f"{results_base_url}/{season_str}/{code}"
-            race_response = get(client=client, url=url)
-            if not isinstance(race_response, httpx.Response):
-                print(f"{season_str}/{code}: network error.")
-                continue
-            dst_url = str(race_response.url)
-            page_not_found = dst_url.find("error") != -1 and dst_url.find("404") != -1
-            if page_not_found:
-                print(f"{season_str}/{code}: page not found.")
-                continue
-
-            html = race_response.text
-            bs = BeautifulSoup(html, features="html.parser")
-            name = bs.find(name="h1", class_="titre")
-            if not isinstance(name, Tag):
-                continue
-            name = name.get_text(strip=True)
-            excluded = is_this_organization_excluded(name)
-            included = is_this_organization_included(name)
-            if excluded or not included:
-                print(f"excluded race: {name}")
-                continue
-            write_sidecar_and_html_files(season_int, code, race_response)
-            print(f"{season_str}/{code}: cached.")
-
+        for code in org_codes:
+            extract_organization_page(client=client, season=season_int, code=code)
 
 if __name__ == "__main__":
     extract_unlisted_organizations()

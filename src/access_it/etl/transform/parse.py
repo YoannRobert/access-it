@@ -2,14 +2,12 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 
-def parse_organisation_page(html: str):
-
-    def get_text_safe(tag: Tag | None) -> str | None:
-        if tag is None:
-            page_element = None
-        else:
-            page_element = tag.get_text(strip=True)
-        return page_element
+def get_text_safe(tag: Tag | None) -> str | None:
+    if tag is None:
+        page_element = None
+    else:
+        page_element = tag.get_text(strip=True)
+    return page_element
 
     bs = BeautifulSoup(html, features="html.parser")
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))

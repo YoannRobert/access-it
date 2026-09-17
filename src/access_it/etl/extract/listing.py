@@ -2,7 +2,7 @@ import httpx
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from datetime import datetime, timezone
-from access_it.etl.extract.client import BASE_URL, make_client, get
+from access_it.etl.extract.client import BASE_URL, get
 from access_it.etl.extract.cache import (
     get_sidecar_file, read_sidecar_data, write_sidecar_file, write_html_file
 )
@@ -81,7 +81,9 @@ def get_organisation_list(client: httpx.Client, dept: int | None = None, max_pag
         page += 1
 
 
-def is_this_organization_excluded(name: str) -> bool:
+def is_this_organization_excluded(name: str | None) -> bool:
+    if name is None:
+        return False
     excluded = False
     excluding_patterns = [
         "elite",
@@ -106,7 +108,9 @@ def is_this_organization_excluded(name: str) -> bool:
     return excluded
 
 
-def is_this_organization_included(name: str) -> bool:
+def is_this_organization_included(name: str | None) -> bool:
+    if name is None:
+        return False
     included = False
     including_patterns = [
         "access", "acess", "acces", "accce", "acc",
