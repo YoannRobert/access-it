@@ -1,5 +1,13 @@
+import json
+import re
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag
+from pathlib import Path
+from typing import Any
+from access_it.common.text import normalize_string_and_fold_case
+from access_it.common.date import convert_date
+from access_it.etl.extract.cache import CACHE_DIR
 
 
 def get_text_safe(tag: Tag | None) -> str | None:
@@ -9,42 +17,84 @@ def get_text_safe(tag: Tag | None) -> str | None:
         page_element = tag.get_text(strip=True)
     return page_element
 
+
+def get_race_html_files() -> list[Path]:
+    return sorted(CACHE_DIR.rglob("*.html"))
+
+
+def parse_clubs_in_organisation_page(html: str) -> list[str]:
+    try:
+        rankings = get_rankings(html)
+    except ValueError:
+        rankings = []
+    club_texts = []
+    for ranking in rankings:
+        for row in ranking["resultats"]:
+            if "CLUB" in row:
+                if (
+                        row["CLUB"] is not None
+                        and row["CLUB"] != ""
+                        and row["CLUB"] not in club_texts
+                ):
+                    club_texts.append(row["CLUB"])
+    return club_texts
+
+
+def parse_organisation_page(html: str) -> dict[str, Any]:
     bs = BeautifulSoup(html, features="html.parser")
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
-    date = get_text_safe(bs.find(name="div", class_="date"))
+    date = convert_date(get_text_safe(bs.find(name="div", class_="date")))
     title = get_text_safe(bs.find(name="h1", class_="titre"))
     departement = get_text_safe(bs.find(name="div", class_="localisation"))
-    data = {
+    data: dict[str, Any] = {
         "discipline": discipline,
         "date": date,
         "title": title,
-        "departement": departement
+        "departement": departement,
+        "rankings": {}
+    }
+    translations = {
+        "RANG": "rank",
+        "NOM": "last_name",
+        "PRENOM": "first_name",
+        "UCIID": "uci_id",
+        "CLUB": "club"
     }
     for blk in bs.find_all(name="div", class_="info-principale"):
         key = blk.find(name="div", class_="titreValeur-titre")
         value = blk.find(name="div", class_="titreValeur-valeur")
         if key and value:
             data[key.get_text(strip=True)] = value.get_text(strip=True)
-    rankings = get_rankings(html)
+    try:
+        rankings = get_rankings(html)
+    except ValueError:
+        rankings = []
     for ranking in rankings:
-        if not "rankings" in data.keys():
-            data["rankings"] = {}
         ranking_id = ranking["uid"]
-        ranking_name = bs.find(name="a", grille=ranking_id).get_text(strip=True)
+        ranking_name = bs.find(name="a", grille=ranking_id)
+        if not isinstance(ranking_name, Tag):
+            continue
+        ranking_name = ranking_name.get_text(strip=True)
+        normalized_ranking_name = normalize_string_and_fold_case(ranking_name).strip()
         if (
             len(rankings) > 1
-            and (
-                sorting_key(ranking_name).startswith("femme") or
-                sorting_key(ranking_name).startswith("dame")
-                )
+            and any([normalized_ranking_name.startswith(n) for n in ["femme", "dame"]])
         ):
             continue
         try:
-            ranking_data = pd.DataFrame(ranking["resultats"])[["RANG", "NOM", "PRENOM", "UCIID", "CLUB"]]
-            data["rankings"][ranking_id] = {
-                "name": ranking_name,
-                "data": ranking_data
-            }
+            cols = ["RANG", "NOM", "PRENOM", "UCIID", "CLUB"]
+            ranking_data = [
+                {translations[k]: int(row[k]) if k == "RANG" else row[k] for k in cols}
+                for row in ranking["resultats"]
+            ]
+            data["rankings"][ranking_id] = {"name": ranking_name, "data": ranking_data}
         except KeyError:
             pass
     return data
+
+
+def get_rankings(html: str) -> list[dict]:
+    m = re.compile(pattern=r"var resultatsJson = (\{.*?\});", flags=re.S).search(html)
+    if m is None:
+        raise ValueError("resultatsJson not found")
+    return json.loads(m.group(1))["grilles"]
