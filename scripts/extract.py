@@ -4,8 +4,8 @@ from access_it.etl.extract.cache import (
     REGCOM_PARQUET_FILE, DEPCOM_PARQUET_FILE, CLUBS_PARQUET_FILE
 )
 from access_it.etl.extract.client import make_client
-from access_it.etl.extract.listing import get_organisation_list
 from access_it.etl.extract.races import (
+    extract_organization_pages_from_search_url,
     extract_former_organization_pages_from_existing_ones,
     extract_former_organization_pages_using_bruteforce
 )
@@ -22,7 +22,7 @@ with make_client() as client:
         44, 49, 53, 85, 72,  # Pays de La Loire
         22, 29, 35, 56,  # Bretagne
     ]:
-        get_organisation_list(client=client, dept=dept)
+        extract_organization_pages_from_search_url(client=client, dept=dept)
     extract_former_organization_pages_from_existing_ones(client=client)
     extract_former_organization_pages_using_bruteforce(client=client)
 
