@@ -86,6 +86,8 @@ def fill_missing_uci_ids_deep_mode(df: pd.DataFrame) -> pd.DataFrame:
 def correct_wrong_uci_ids(data: list[dict]) -> list[dict]:
     corrections = [
         ("25e7949a45ba0148", 52, "10137846680", "10051737861"),
+        ("163378aa7e736570", 7, "10137846680", "10051737861"),
+        ("e226c6b3c04081ba", 2, "10137846680", "10051737861"),
         ("46729e14b576fd3a", 1, "10025630818", "10165044369"),
         ("fd3d489f5e2e2c76", 16, "10025630818", "10165044369"),
         ("e7bf6f878a51c77e", 28, "", "10145288705"),
@@ -93,6 +95,8 @@ def correct_wrong_uci_ids(data: list[dict]) -> list[dict]:
         ("a0e48493fb6fc308", 12, "", "10158245881"),
         ("1361d0b2d93516e9", 34, "", "10025488651"),
         ("797041cd80520893", 28, "", "10127344816"),
+        ("16d947c7ec2eeebe", 46, "", "10145307596"),
+        ("7bc45e816a53236d", 64, "", "10145307596")
     ]
     for d in data:
         for race_id, rank, wrong_uci_id, correct_uci_id in corrections:
