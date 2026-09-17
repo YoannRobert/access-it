@@ -11,6 +11,7 @@ RACES_PARQUET_FILE = DEFAULT_CACHE / "races.parquet"
 REGCOM_PARQUET_FILE = DEFAULT_CACHE / "regional_committees.parquet"
 DEPCOM_PARQUET_FILE = DEFAULT_CACHE / "departemental_committees.parquet"
 CLUBS_PARQUET_FILE = DEFAULT_CACHE / "clubs.parquet"
+RIDER_X_RACE_DATA_PARQUET_FILE = DEFAULT_CACHE / "rider_x_race.parquet"
 
 
 def create_cache_dir() -> None:

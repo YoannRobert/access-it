@@ -47,7 +47,7 @@ def extract_organization_page(client: httpx.Client, season: int, code: str):
         return
     # Races kept:
     write_sidecar_and_html_files(season_int, code, race_response, kept=True)
-    print(f"{org_ref}: cached.")
+    print(f"{org_ref}: cached")
 
 
 def extract_former_organization_pages_from_existing_ones(client: httpx.Client, start_year: int = 2023):
