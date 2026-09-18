@@ -1,5 +1,6 @@
 import pandas as pd
 from access_it.etl.transform.clubs import INDIVIDUAL_NAME, FOREIGN_NAME
+from access_it.etl.transform.riders import get_rider_id
 
 
 def fill_missing_values_by_groups(
@@ -142,3 +143,17 @@ def add_missing_foreign_labels(data: list[dict]) -> list[dict]:
         ("3dfce1e035f3e7ca", 37)
     ]
     return apply_corrections_for_missing_club_labels(data, corrections, FOREIGN_NAME)
+
+
+def create_ranking_table(
+        rider_x_race_data: pd.DataFrame,
+        rider_db: pd.DataFrame
+    ) -> pd.DataFrame:
+    df = rider_x_race_data.copy()
+    df["rider_id"] = [
+        get_rider_id(rider_db, uci_id, last_name, first_name)
+        for uci_id, last_name, first_name in zip(
+            df["uci_id"], df["last_name"], df["first_name"]
+        )
+    ]
+    return df[["race_id", "rider_id", "rank"]]
