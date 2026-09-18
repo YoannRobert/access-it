@@ -11,6 +11,7 @@ CACHE_DIR = Path(os.getenv("ACCESS_IT_CACHE") or DEFAULT_CACHE)
 RACES_PARQUET_FILE = DEFAULT_CACHE / "races.parquet"
 REGCOM_PARQUET_FILE = DEFAULT_CACHE / "regional_committees.parquet"
 DEPCOM_PARQUET_FILE = DEFAULT_CACHE / "departemental_committees.parquet"
+DEPARTEMENTS_PARQUET_FILE = DEFAULT_CACHE / "departements.parquet"
 CLUBS_PARQUET_FILE = DEFAULT_CACHE / "clubs.parquet"
 RIDER_X_RACE_DATA_PARQUET_FILE = DEFAULT_CACHE / "rider_x_race.parquet"
 RIDERS_PARQUET_FILE = DEFAULT_CACHE / "riders.parquet"
