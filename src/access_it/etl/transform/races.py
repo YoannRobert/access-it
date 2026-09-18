@@ -1,4 +1,6 @@
 import hashlib
+import pandas as pd
+
 from access_it.etl.extract.cache import read_html_file
 from access_it.etl.transform.categories import (
     find_ranking_categories, convert_categories_from_dict_to_list
@@ -44,3 +46,16 @@ def get_race_data() -> list[dict]:
         data_split = split_organization_into_races(data)
         races_data.extend(data_split)
     return races_data
+
+
+def create_race_table(races_data: list[dict], departements: pd.DataFrame) -> pd.DataFrame:
+    df = pd.DataFrame(races_data)
+    d, n, c = "departement", "departement_name", "departement_code"
+    df[c] = df[d].apply(lambda x: departements.loc[departements[n] == x][c].values[0])
+    df["categories"] = df["categories"].apply(lambda x: ",".join(x))
+    columns = [
+       'race_id', 'title', 'categories', 'season',
+       'discipline', 'date', c, 'organization_code',
+       'race_type', 'organizer', 'duration', 'race_code'
+    ]
+    return df[columns]
