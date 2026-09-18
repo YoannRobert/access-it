@@ -24,7 +24,7 @@ def define_rider_id(uci_id: str | None, last_name: str, first_name: str) -> str:
 def split_race_data_into_rider_data(races_data: list[dict]) -> list[dict]:
     rider_x_race_data: list[dict] = []
     for race_data in races_data:
-        season = race_data["Saison"]
+        season = race_data["season"]
         race_id = race_data["race_id"]
         for rider_data in race_data["ranking_data"]:
             rider_data["race_id"] = race_id

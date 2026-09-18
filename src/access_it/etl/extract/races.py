@@ -42,7 +42,7 @@ def extract_organization_page(
     bs = BeautifulSoup(html, features="html.parser")
     name = get_text_safe(bs.find(name="h1", class_="titre"))
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
-    duration = get_page_elements(bs)["Durée"]
+    duration = get_page_elements(bs)["duration"]
     excluded = is_this_organization_excluded(name)
     included = (
         is_this_organization_included(name)

@@ -12,8 +12,8 @@ def split_organization_into_races(organization_data: dict) -> list[dict]:
     del race_data_org["rankings"]
     rankings = organization_data["rankings"]
     ranking_categories = find_ranking_categories(organization_data)
-    season = organization_data["Saison"]
-    code = organization_data["N° d'épreuve"]
+    season = organization_data["season"]
+    code = organization_data["organization_code"]
     for ranking_id in ranking_categories.keys():
         ranking = rankings[ranking_id]
         categories = convert_categories_from_dict_to_list(ranking_categories[ranking_id])

@@ -10,6 +10,21 @@ from access_it.common.date import convert_date
 from access_it.etl.extract.cache import CACHE_DIR
 
 
+TRANSLATIONS = {
+    "RANG": "rank",
+    "NOM": "last_name",
+    "PRENOM": "first_name",
+    "UCIID": "uci_id",
+    "CLUB": "club",
+    "N° d'épreuve": "organization_code",
+    "Saison": "season",
+    "Type de compétition": "race_type",
+    "Organisateur": "organizer",
+    "Durée": "duration",
+    "Code épreuve": "race_code"
+}
+
+
 def get_text_safe(tag: Tag | None) -> str | None:
     if tag is None:
         page_element = None
@@ -45,8 +60,11 @@ def get_page_elements(bs: BeautifulSoup) -> dict[str, str]:
     for blk in bs.find_all(name="div", class_="info-principale"):
         key = blk.find(name="div", class_="titreValeur-titre")
         value = blk.find(name="div", class_="titreValeur-valeur")
+        key = get_text_safe(key)
+        value = get_text_safe(value)
+        key2 = TRANSLATIONS[key]
         if key and value:
-            data[key.get_text(strip=True)] = value.get_text(strip=True)
+            data[key2] = value
     return data
 
 
@@ -62,13 +80,6 @@ def parse_organisation_page(html: str) -> dict[str, Any]:
         "title": title,
         "departement": departement,
         "rankings": {}
-    }
-    translations = {
-        "RANG": "rank",
-        "NOM": "last_name",
-        "PRENOM": "first_name",
-        "UCIID": "uci_id",
-        "CLUB": "club"
     }
     data = data | get_page_elements(bs)
     try:
@@ -90,7 +101,7 @@ def parse_organisation_page(html: str) -> dict[str, Any]:
         try:
             cols = ["RANG", "NOM", "PRENOM", "UCIID", "CLUB"]
             ranking_data = [
-                {translations[k]: int(row[k]) if k == "RANG" else row[k] for k in cols}
+                {TRANSLATIONS[k]: int(row[k]) if k == "RANG" else row[k] for k in cols}
                 for row in ranking["resultats"]
             ]
             data["rankings"][ranking_id] = {"name": ranking_name, "data": ranking_data}
