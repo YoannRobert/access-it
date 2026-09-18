@@ -30,7 +30,7 @@ with make_client() as client:
     clubs = get_clubs(client, departemental_committees=dep_committees)
     reg_committees = [{"id": cr_id} | cr_data for cr_id, cr_data in reg_committees.items()]
     dep_committees = [{"id": cd_id} | cd_data for cd_id, cd_data in dep_committees.items()]
-    clubs = [{"id": cl_id} | cl_data | cst_club_dat for cl_id, cl_data in clubs.items()]
+    clubs = [{"club_id": cl_id} | cl_data | cst_club_dat for cl_id, cl_data in clubs.items()]
     pd.DataFrame(reg_committees).to_parquet(REGCOM_PARQUET_FILE, index=False)
     pd.DataFrame(dep_committees).to_parquet(DEPCOM_PARQUET_FILE, index=False)
     pd.DataFrame(clubs).to_parquet(CLUBS_PARQUET_FILE, index=False)

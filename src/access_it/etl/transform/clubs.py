@@ -56,7 +56,7 @@ def get_departemental_committee_id(club_id: str, df_clubs: pd.DataFrame) -> str:
     if not is_valid_french_club_id(club_id):
         raise ValueError(f"Invalid club ID: {club_id}")
     dept_code = club_id[2:4]
-    mask_club = df_clubs["id"].str[2:4] == dept_code
+    mask_club = df_clubs["club_id"].str[2:4] == dept_code
     dfi = df_clubs[mask_club]
     if len(dfi) == 0:
         raise ValueError(f"Club ID {club_id} not found in database")
@@ -76,11 +76,11 @@ def add_club(
     if not is_valid_season(season):
         raise ValueError(f"Invalid season: {season}")
 
-    if club_id in df["id"].values:
+    if club_id in df["club_id"].values:
         if verbose:
             print(f">>>>>>> Club {club_id} already exists in database")
         changed = False
-        mask_club = df["id"] == club_id
+        mask_club = df["club_id"] == club_id
         dfi = df[mask_club].iloc[0]
         db_club_name = dfi["name"]
         db_min_year = dfi["min_year"]
@@ -120,7 +120,7 @@ def add_club(
         df_club = pd.DataFrame(
             [
                 {
-                    "id": club_id,
+                    "club_id": club_id,
                     "name": club_name,
                     "departemental_committee_id": cd_id,
                     "min_year": season,
@@ -158,8 +158,8 @@ def identify_club(
     add_this_club = False
     df = df_clubs.copy()
     if is_valid_french_club_id(club_id, include_specific_cases=False):
-        if club_id in df["id"].values:
-            club_name = df[df["id"] == club_id]["name"].values[0]
+        if club_id in df["club_id"].values:
+            club_name = df[df["club_id"] == club_id]["name"].values[0]
             add_this_club = True
         elif is_individual_license(club_id) or is_individual_club(club_name):
             club_id = INDIVIDUAL_CLUB_ID
@@ -188,13 +188,13 @@ def identify_club(
             club_id = FOREIGN_CLUB_ID
             club_name = FOREIGN_NAME
         elif mask_names.any():
-            club_id, club_name = df.loc[mask_names, ["id", "name"]].iloc[0]
+            club_id, club_name = df.loc[mask_names, ["club_id", "name"]].iloc[0]
             add_this_club = True
         elif mask_alt_names.any():
             # Problem with a name shared by 2 clubs: "VC CHATILLONNAIS"
             # (FFC IDs 4436087 and 5079082)
             # For now, we'll just take the first one.
-            club_id, club_name = df.loc[mask_alt_names, ["id", "name"]].iloc[0]
+            club_id, club_name = df.loc[mask_alt_names, ["club_id", "name"]].iloc[0]
             add_this_club = True
         # else:
         #     print(f"ValueError in 'else': club_id={club_id}, club_name={club_name}")
