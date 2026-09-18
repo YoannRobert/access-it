@@ -1,4 +1,5 @@
 import pandas as pd
+from access_it.etl.transform.clubs import INDIVIDUAL_NAME, FOREIGN_NAME
 
 
 def fill_missing_values_by_groups(
@@ -104,3 +105,40 @@ def correct_wrong_uci_ids(data: list[dict]) -> list[dict]:
             if (d["race_id"] == race_id) & (d["rank"] == rank) & (d_uci_id == wrong_uci_id):
                 d["uci_id"] = correct_uci_id
     return data
+
+
+def apply_corrections_for_missing_club_labels(
+        data: list[dict],
+        corrections: list[tuple[str, int]],
+        correction_value: str
+    ) -> list[dict]:
+    for d in data:
+        d_club = d["club"] if isinstance(d["club"], str) else ""
+        for race_id, rank in corrections:
+            if (
+                    (d["race_id"] == race_id)
+                    & (d["rank"] == rank)
+                    & (d_club == "")
+            ):
+                d["club"] = correction_value
+    return data
+
+def add_missing_individual_labels(data: list[dict]) -> list[dict]:
+    corrections = [
+        ("7c605505e10d81a6", 49)
+    ]
+    return apply_corrections_for_missing_club_labels(data, corrections, INDIVIDUAL_NAME)
+
+
+def add_missing_foreign_labels(data: list[dict]) -> list[dict]:
+    corrections = [
+        ("88cf222e097b8b6b", 23),
+        ("3dfce1e035f3e7ca", 28),
+        ("58fd279416dc2e71", 17),
+        ("58fd279416dc2e71", 44),
+        ("3dfce1e035f3e7ca", 25),
+        ("88cf222e097b8b6b", 23),
+        ("3dfce1e035f3e7ca", 28),
+        ("3dfce1e035f3e7ca", 37)
+    ]
+    return apply_corrections_for_missing_club_labels(data, corrections, FOREIGN_NAME)

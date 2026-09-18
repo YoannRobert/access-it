@@ -187,18 +187,20 @@ def identify_club(
         elif is_foreign_club(club_name):
             club_id = FOREIGN_CLUB_ID
             club_name = FOREIGN_NAME
+        elif n_club_name.find("VC CHATILLONNAIS".lower()) != -1:
+            # Problem with a name shared by 2 clubs: "VC CHATILLONNAIS"
+            # (FFC IDs "4436087" and "5079082")
+            # For now, we'll just take the first one.
+            club_id, club_name = "4436087", "VC CHATILLONNAIS"
+            add_this_club = True
         elif mask_names.any():
             club_id, club_name = df.loc[mask_names, ["club_id", "name"]].iloc[0]
             add_this_club = True
         elif mask_alt_names.any():
-            # Problem with a name shared by 2 clubs: "VC CHATILLONNAIS"
-            # (FFC IDs 4436087 and 5079082)
-            # For now, we'll just take the first one.
             club_id, club_name = df.loc[mask_alt_names, ["club_id", "name"]].iloc[0]
             add_this_club = True
-        # else:
-        #     print(f"ValueError in 'else': club_id={club_id}, club_name={club_name}")
-        #     raise ValueError("Club not found")
+        else:
+            raise ValueError(f"Club not found (club_id={str(club_id)}, club_name={str(club_name)})")
     if not isinstance(club_id, (str, NoneType)) or not isinstance(club_name, (str, NoneType)):
         raise TypeError(
             "club_id and club_name types must be str or None, " +
@@ -234,6 +236,7 @@ def add_legacy_clubs(df_clubs: pd.DataFrame) -> pd.DataFrame:
         ("4927279", "AS BRETEUILCYCLISME", 2026),
         ("4927024", "CS BONNEVILLE", 2026),
         ("4927024", "CLUB SPORTIF BONNEVILLOIS", 2026),
+        ("4892411", "CSM CLAMART", 2024)
     ]
     for club_id, club_name, season in legacy_clubs:
         df = add_club(df_clubs=df, club_id=club_id, club_name=club_name, season=season)
