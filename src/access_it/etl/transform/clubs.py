@@ -1,8 +1,8 @@
-from types import NoneType
-
 import pandas as pd
 import re
+
 from datetime import datetime
+from types import NoneType
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.cache import read_html_file
 from access_it.etl.transform.parse import parse_clubs_in_organisation_page, get_race_html_files
