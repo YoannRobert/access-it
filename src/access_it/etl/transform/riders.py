@@ -204,6 +204,11 @@ def get_rider_id(
         )
 
 
+def define_affiliation_id(rider_id: str, club_id: str) -> str:
+    key = f"{rider_id}|{club_id}".encode()
+    return hashlib.blake2b(key, digest_size=8).hexdigest()
+
+
 def create_affiliation_clubs_riders(
         rider_x_race_data: pd.DataFrame,
         races_data: pd.DataFrame,
@@ -222,7 +227,6 @@ def create_affiliation_clubs_riders(
             "end_date": pd.Series(dtype="datetime64[ns]")
         }
     )
-    affiliation_id_int = 1
     aff_data = {}
     for row in df.itertuples():
         uci_id = row.uci_id
@@ -237,6 +241,7 @@ def create_affiliation_clubs_riders(
                 not isinstance(uci_id, str)
                 or not isinstance(last_name, str)
                 or not isinstance(first_name, str)
+                or not isinstance(club_id, str)
         ):
             raise TypeError(
                 "Invalid data type for uci_id, last_name, or first_name "
@@ -245,6 +250,7 @@ def create_affiliation_clubs_riders(
         rider_id = get_rider_id(
             db=rider_db, uci_id=uci_id, last_name=last_name, first_name=first_name
         )
+        affiliation_id = define_affiliation_id(rider_id, club_id)
         if rider_id in aff_data:
             if club_id in aff_data[rider_id]:
                 aff_data[rider_id][club_id]["start_date"] = min(
@@ -257,20 +263,18 @@ def create_affiliation_clubs_riders(
                 )
             else:
                 aff_data[rider_id][club_id] = {
-                    "affiliation_id": f"{affiliation_id_int:09d}",
+                    "affiliation_id": affiliation_id,
                     "start_date": date,
                     "end_date": date
                 }
-                affiliation_id_int += 1
         else:
             aff_data[rider_id] = {
                 club_id: {
-                    "affiliation_id": f"{affiliation_id_int:09d}",
+                    "affiliation_id": affiliation_id,
                     "start_date": date,
                     "end_date": date
                 }
             }
-            affiliation_id_int += 1
     # flattening the dictionary into a list of single-level dictionaries
     aff_data_list = []
     for rider_id, clubs in aff_data.items():
