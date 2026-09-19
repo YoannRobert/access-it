@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from access_it.etl.extract.cache import CACHE_DIR, write_sidecar_and_html_files, sidecar_exists
 from access_it.etl.extract.client import BASE_URL, get
-from access_it.etl.extract.listing import is_this_organization_excluded, is_this_organization_included
 from access_it.etl.transform.parse import get_text_safe, get_page_elements
 
 
@@ -43,15 +42,19 @@ def extract_organization_page(
     bs = BeautifulSoup(html, features="html.parser")
     name = get_text_safe(bs.find(name="h1", class_="titre"))
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
-    duration = get_page_elements(bs)["duration"]
-    excluded = is_this_organization_excluded(name)
+    general_info = get_page_elements(bs)
+    race_code = general_info["race_code"]
     included = (
-        is_this_organization_included(name)
-        and discipline == "Route"
-        and duration == "1 jour"
+        discipline == "Route"
+        and (
+            race_code.startswith("1.27.")
+            or race_code.startswith("3.07.")
+            or race_code.startswith("3.7.")
+            or race_code.startswith("3.28.")
+        )
     )
     # Races not kept:
-    if excluded or not included:
+    if not included:
         write_sidecar_and_html_files(season_int, code, race_response, kept=False)
         print(f"{org_ref} excluded race: {name}")
         return
