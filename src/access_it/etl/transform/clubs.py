@@ -6,46 +6,16 @@ from types import NoneType
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.cache import read_html_file
 from access_it.etl.transform.parse import parse_clubs_in_organisation_page, get_race_html_files
+from access_it.etl.extract.clubs import (
+    is_valid_french_club_id, is_individual_license,
+    is_individual_club, is_foreign_license, is_foreign_club
+)
 
 
 INDIVIDUAL_NAME = "Individuel"
 FOREIGN_NAME = "Etranger"
 INDIVIDUAL_CLUB_ID = "9999001"
 FOREIGN_CLUB_ID = "9999002"
-
-
-def is_individual_license(club_id: str | None) -> bool:
-    if club_id is None:
-        return False
-    return club_id.endswith("800")
-
-
-def is_individual_club(club_name: str | None) -> bool:
-    if club_name is None:
-        return False
-    return normalize_string_and_fold_case(club_name).find("individuel") != -1
-
-
-def is_foreign_license(club_id: str | None) -> bool:
-    if club_id is None:
-        return False
-    return club_id.startswith("00")
-
-
-def is_foreign_club(club_name: str | None) -> bool:
-    if club_name is None:
-        return False
-    foreign_names = ["etranger", "licencies uci", "autres federations"]
-    return normalize_string_and_fold_case(club_name) in foreign_names
-
-
-def is_valid_french_club_id(club_id: str | None, include_specific_cases: bool = True) -> bool:
-    if club_id is None:
-        return False
-    if include_specific_cases:
-        if is_foreign_license(club_id) or is_individual_license(club_id):
-            return False
-    return bool(re.fullmatch(r"\d{7}", club_id))
 
 
 def is_valid_season(season: int):

@@ -1,4 +1,5 @@
 import httpx
+import re
 
 from datetime import datetime
 from access_it.common.text import normalize_string_and_fold_case
@@ -98,3 +99,40 @@ def get_disciplines(client: httpx.Client) -> list[dict[str, str]]:
     r = client.get("https://velo.ffc.fr/wp-json/sn/terms/disciplines")
     r.raise_for_status()
     return r.json()
+
+
+def is_valid_french_club_id(
+        club_id: str | None,
+        include_specific_cases: bool = True
+    ) -> bool:
+    if club_id is None:
+        return False
+    if include_specific_cases:
+        if is_foreign_license(club_id) or is_individual_license(club_id):
+            return False
+    return bool(re.fullmatch(r"\d{7}", club_id))
+
+
+def is_individual_license(club_id: str | None) -> bool:
+    if club_id is None:
+        return False
+    return club_id.endswith("800")
+
+
+def is_individual_club(club_name: str | None) -> bool:
+    if club_name is None:
+        return False
+    return normalize_string_and_fold_case(club_name).find("individuel") != -1
+
+
+def is_foreign_license(club_id: str | None) -> bool:
+    if club_id is None:
+        return False
+    return club_id.startswith("00")
+
+
+def is_foreign_club(club_name: str | None) -> bool:
+    if club_name is None:
+        return False
+    foreign_names = ["etranger", "licencies uci", "autres federations"]
+    return normalize_string_and_fold_case(club_name) in foreign_names
