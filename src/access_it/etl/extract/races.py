@@ -14,10 +14,9 @@ def extract_organization_page(
     ):
 
     results_base_url = f"{BASE_URL}/resultats/resultat"
-    season_int = int(season)
-    season_str = f"{season_int:4d}"
+    season_str = f"{season:4d}"
     org_ref = f"{season_str:4s}/{code:11s}"
-    if sidecar_exists(season_int, code):
+    if sidecar_exists(season, code):
         print(f"{org_ref} already exists")
         return
 
@@ -33,7 +32,7 @@ def extract_organization_page(
     dst_url = str(race_response.url)
     page_not_found = dst_url.find("error") != -1 and dst_url.find("404") != -1
     if page_not_found:
-        write_sidecar_and_html_files(season_int, code, race_response, force_404=True)
+        write_sidecar_and_html_files(season, code, race_response, force_404=True)
         print(f"{org_ref} page not found")
         return
 
@@ -55,11 +54,11 @@ def extract_organization_page(
     )
     # Races not kept:
     if not included:
-        write_sidecar_and_html_files(season_int, code, race_response, kept=False)
+        write_sidecar_and_html_files(season, code, race_response, kept=False)
         print(f"{org_ref} excluded race: {name}")
         return
     # Races kept:
-    write_sidecar_and_html_files(season_int, code, race_response, kept=True)
+    write_sidecar_and_html_files(season, code, race_response, kept=True)
     print(f"{org_ref}: cached")
 
 
@@ -94,7 +93,11 @@ def extract_organization_pages_from_search_url(
             code = race.get("numero")
             if not isinstance(season, str) or not isinstance(code, str):
                 continue
-            extract_organization_page(client=client, season=int(season), code=code)
+            try:
+                season = int(season)
+            except ValueError:
+                raise ValueError(f"'season' value ({season}) not convertible to int")
+            extract_organization_page(client=client, season=season, code=code)
         page += 1
 
 
@@ -109,9 +112,9 @@ def extract_former_organization_pages_from_existing_ones(
     saved_sidecar_files = sorted(saved_sidecar_files)
     seasons = range(start_year, datetime.now(timezone.utc).year + 1)
     org_codes = list(set([org_code for _, org_code in saved_sidecar_files]))
-    for season_int in seasons:
+    for season in seasons:
         for code in org_codes:
-            extract_organization_page(client=client, season=season_int, code=code)
+            extract_organization_page(client=client, season=season, code=code)
 
 
 def extract_former_organization_pages_using_bruteforce(
@@ -135,11 +138,11 @@ def extract_former_organization_pages_using_bruteforce(
         for organizer_id in organizer_ids
     }
     seasons = range(start_year, datetime.now(timezone.utc).year + 1)
-    for season_int in seasons:
+    for season in seasons:
         for organizer_id in organizer_ids:
             organization_codes = [
                 f"C{organizer_id}{i:03d}"
                 for i in range(1, max_index_by_organizer[organizer_id] + margin)
             ]
             for organization_code in organization_codes:
-                extract_organization_page(client=client, season=season_int, code=organization_code)
+                extract_organization_page(client=client, season=season, code=organization_code)

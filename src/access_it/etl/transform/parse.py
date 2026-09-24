@@ -65,6 +65,11 @@ def get_page_elements(bs: BeautifulSoup) -> dict[str, str]:
         key2 = TRANSLATIONS[key]
         if key and value:
             data[key2] = value
+            if key2 == "season":
+                try:
+                    data[key2] = int(value)
+                except ValueError:
+                    raise ValueError(f"'season' value ({value}) not convertible to int")
     return data
 
 
