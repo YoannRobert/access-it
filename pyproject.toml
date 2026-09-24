@@ -18,6 +18,7 @@ dependencies = [
     "psycopg[binary]",
     "pandas",
     "pyarrow",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
