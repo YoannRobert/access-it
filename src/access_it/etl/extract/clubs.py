@@ -101,6 +101,27 @@ def get_disciplines(client: httpx.Client) -> list[dict[str, str]]:
     return r.json()
 
 
+def get_departemental_committee_id(
+        club_id: str,
+        departemental_committees: pd.DataFrame | list[dict]
+    ) -> str:
+    df = departemental_committees.copy()
+    try:
+        df = pd.DataFrame(df)
+    except ValueError:
+        raise ValueError(
+            "departemental_committees must be a DataFrame or a list of dictionaries"
+        )
+    dep_com_ids = df["departemental_committee_id"].to_list()
+    if not is_valid_french_club_id(club_id, include_specific_cases=False):
+        raise ValueError(f"Invalid club ID: {club_id}")
+    dep_com_id = club_id[:4]
+    dep_com_id = dep_com_id.replace("6098", "6097")  # Two possibilities in Guadeloupe
+    if dep_com_id not in dep_com_ids:
+        raise ValueError(f"Departemental committee ID not found: {dep_com_id}")
+    return dep_com_id
+
+
 def is_valid_french_club_id(
         club_id: str | None,
         include_specific_cases: bool = True

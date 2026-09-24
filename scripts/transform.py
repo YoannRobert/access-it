@@ -3,7 +3,7 @@ import pandas as pd
 from access_it.etl.extract.cache import (
     RACES_PARQUET_FILE, RIDER_X_RACE_DATA_PARQUET_FILE, RIDERS_PARQUET_FILE,
     CLUBS_PARQUET_FILE, CLUB_X_RIDER_PARQUET_FILE, RANKINGS_PARQUET_FILE,
-    DEPARTEMENTS_PARQUET_FILE
+    DEPARTEMENTS_PARQUET_FILE, DEPCOM_PARQUET_FILE
 )
 from access_it.etl.transform.clubs import add_legacy_clubs
 from access_it.etl.transform.riders import (
@@ -21,11 +21,18 @@ from access_it.etl.transform.races import get_race_data, create_race_table
 
 # Reading Parquet files obtained in the extract step of the ETL
 departements = pd.read_parquet(DEPARTEMENTS_PARQUET_FILE)
+departemental_committees = pd.read_parquet(DEPCOM_PARQUET_FILE)
 clubs = pd.read_parquet(CLUBS_PARQUET_FILE)
 
 # Enriching club database
-clubs = add_legacy_clubs(df_clubs=clubs)
-clubs = add_clubs_found_in_race_html_files(clubs)
+clubs = add_legacy_clubs(
+    df_clubs=clubs,
+    departemental_committees=departemental_committees
+)
+clubs = add_clubs_found_in_race_html_files(
+    clubs,
+    departemental_committees=departemental_committees
+)
 
 # Getting race data
 races_data = get_race_data()  # includes rankings

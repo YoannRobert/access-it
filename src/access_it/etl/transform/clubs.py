@@ -5,10 +5,13 @@ from datetime import datetime
 from types import NoneType
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.cache import read_html_file
-from access_it.etl.transform.parse import parse_clubs_in_organisation_page, get_race_html_files
 from access_it.etl.extract.clubs import (
+    get_departemental_committee_id,
     is_valid_french_club_id, is_individual_license,
     is_individual_club, is_foreign_license, is_foreign_club
+)
+from access_it.etl.transform.parse import (
+    parse_clubs_in_organisation_page, get_race_html_files
 )
 
 
@@ -22,22 +25,12 @@ def is_valid_season(season: int):
     return 2023 <= season <= datetime.now().year
 
 
-def get_departemental_committee_id(club_id: str, df_clubs: pd.DataFrame) -> str:
-    if not is_valid_french_club_id(club_id):
-        raise ValueError(f"Invalid club ID: {club_id}")
-    dept_code = club_id[2:4]
-    mask_club = df_clubs["club_id"].str[2:4] == dept_code
-    dfi = df_clubs[mask_club]
-    if len(dfi) == 0:
-        raise ValueError(f"Club ID {club_id} not found in database")
-    return str(dfi.loc[:, "departemental_committee_id"].values[0])
-
-
 def add_club(
         df_clubs: pd.DataFrame,
         club_id: str | None,
         club_name: str | None,
         season: int,
+        departemental_committees: pd.DataFrame | list[dict],
         verbose: bool = False
     ) -> pd.DataFrame:
     df = df_clubs.copy()
@@ -86,7 +79,7 @@ def add_club(
     elif is_valid_french_club_id(club_id):
         if verbose:
             print(f">>>>>>> {club_id} is a valid French club ID")
-        cd_id = get_departemental_committee_id(club_id, df)
+        cd_id = get_departemental_committee_id(club_id, departemental_committees)
         df_club = pd.DataFrame(
             [
                 {
@@ -179,7 +172,10 @@ def identify_club(
     return add_this_club, club_id, club_name
 
 
-def add_legacy_clubs(df_clubs: pd.DataFrame) -> pd.DataFrame:
+def add_legacy_clubs(
+        df_clubs: pd.DataFrame,
+        departemental_committees: pd.DataFrame | list[dict],
+    ) -> pd.DataFrame:
     df = df_clubs.copy()
     legacy_clubs = [
         ("4356456", "TEAM IMMO GOLFE", 2024),
@@ -209,11 +205,20 @@ def add_legacy_clubs(df_clubs: pd.DataFrame) -> pd.DataFrame:
         ("4892411", "CSM CLAMART", 2024)
     ]
     for club_id, club_name, season in legacy_clubs:
-        df = add_club(df_clubs=df, club_id=club_id, club_name=club_name, season=season)
+        df = add_club(
+            df_clubs=df,
+            club_id=club_id,
+            club_name=club_name,
+            season=season,
+            departemental_committees=departemental_committees
+        )
     return df
 
 
-def add_clubs_found_in_race_html_files(clubs: pd.DataFrame) -> pd.DataFrame:
+def add_clubs_found_in_race_html_files(
+        clubs: pd.DataFrame,
+        departemental_committees: pd.DataFrame | list[dict]
+    ) -> pd.DataFrame:
     for race_html_file in get_race_html_files():
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
@@ -227,7 +232,11 @@ def add_clubs_found_in_race_html_files(clubs: pd.DataFrame) -> pd.DataFrame:
                 )
                 if add_this_club:
                     clubs = add_club(
-                        df_clubs=clubs, club_id=club_id_2, club_name=club_name_2, season=season
+                        df_clubs=clubs,
+                        club_id=club_id_2,
+                        club_name=club_name_2,
+                        season=season,
+                        departemental_committees=departemental_committees
                     )
             except ValueError:
                 pass
