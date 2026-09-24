@@ -11,7 +11,7 @@ from access_it.etl.extract.cache import CACHE_DIR
 
 
 TRANSLATIONS = {
-    "RANG": "rank",
+    "RANG": "finish_rank",
     "NOM": "last_name",
     "PRENOM": "first_name",
     "UCIID": "uci_id",
@@ -76,12 +76,12 @@ def get_page_elements(bs: BeautifulSoup) -> dict[str, str]:
 def parse_organisation_page(html: str) -> dict[str, Any]:
     bs = BeautifulSoup(html, features="html.parser")
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
-    date = convert_date(get_text_safe(bs.find(name="div", class_="date")))
+    race_date = convert_date(get_text_safe(bs.find(name="div", class_="date")))
     title = get_text_safe(bs.find(name="h1", class_="titre"))
     departement = get_text_safe(bs.find(name="div", class_="localisation"))
     data: dict[str, Any] = {
         "discipline": discipline,
-        "date": date,
+        "race_date": race_date,
         "title": title,
         "departement": departement,
         "rankings": {}

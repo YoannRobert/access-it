@@ -55,7 +55,7 @@ def create_race_table(races_data: list[dict], departements: pd.DataFrame) -> pd.
     df["categories"] = df["categories"].apply(lambda x: ",".join(x))
     columns = [
        'race_id', 'title', 'categories', 'season',
-       'discipline', 'date', c, 'organization_code',
+       'discipline', 'race_date', c, 'organization_code',
        'race_type', 'organizer', 'duration', 'race_code'
     ]
     return df[columns]

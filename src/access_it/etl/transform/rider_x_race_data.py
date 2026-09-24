@@ -102,9 +102,13 @@ def correct_wrong_uci_ids(data: list[dict]) -> list[dict]:
         ("7bc45e816a53236d", 64, "", "10145307596")
     ]
     for d in data:
-        for race_id, rank, wrong_uci_id, correct_uci_id in corrections:
+        for race_id, finish_rank, wrong_uci_id, correct_uci_id in corrections:
             d_uci_id = d["uci_id"] if isinstance(d["uci_id"], str) else ""
-            if (d["race_id"] == race_id) & (d["rank"] == rank) & (d_uci_id == wrong_uci_id):
+            if ((
+                    d["race_id"] == race_id)
+                    & (d["finish_rank"] == finish_rank)
+                    & (d_uci_id == wrong_uci_id)
+            ):
                 d["uci_id"] = correct_uci_id
     return data
 
@@ -116,10 +120,10 @@ def apply_corrections_for_missing_club_labels(
     ) -> list[dict]:
     for d in data:
         d_club = d["club"] if isinstance(d["club"], str) else ""
-        for race_id, rank in corrections:
+        for race_id, finish_rank in corrections:
             if (
                     (d["race_id"] == race_id)
-                    & (d["rank"] == rank)
+                    & (d["finish_rank"] == finish_rank)
                     & (d_club == "")
             ):
                 d["club"] = correction_value
@@ -157,4 +161,4 @@ def create_ranking_table(
             df["uci_id"], df["last_name"], df["first_name"]
         )
     ]
-    return df[["race_id", "rider_id", "rank"]]
+    return df[["race_id", "rider_id", "finish_rank"]]

@@ -215,9 +215,9 @@ def create_affiliation_clubs_riders(
         races_data: pd.DataFrame,
         rider_db: pd.DataFrame
     ) -> pd.DataFrame:
-    race_dates = races_data[["race_id", "date"]]
-    race_dates["date"] = pd.to_datetime(race_dates["date"])
-    cols = ["uci_id", "last_name", "first_name", "club_id", "date"]
+    race_dates = races_data[["race_id", "race_date"]]
+    race_dates["race_date"] = pd.to_datetime(race_dates["race_date"])
+    cols = ["uci_id", "last_name", "first_name", "club_id", "race_date"]
     df = rider_x_race_data.merge(race_dates, on="race_id", how="inner")[cols]
     aff = pd.DataFrame(
         {
@@ -234,7 +234,7 @@ def create_affiliation_clubs_riders(
         last_name = row.last_name
         first_name = row.first_name
         club_id = row.club_id
-        date = row.date
+        race_date = row.race_date
         uci_id = uci_id if isinstance(uci_id, str) else ""
         last_name = last_name if isinstance(last_name, str) else ""
         first_name = first_name if isinstance(first_name, str) else ""
@@ -255,25 +255,25 @@ def create_affiliation_clubs_riders(
         if rider_id in aff_data:
             if club_id in aff_data[rider_id]:
                 aff_data[rider_id][club_id]["start_date"] = min(
-                    date,
+                    race_date,
                     aff_data[rider_id][club_id]["start_date"]
                 )
                 aff_data[rider_id][club_id]["end_date"] = max(
-                    date,
+                    race_date,
                     aff_data[rider_id][club_id]["end_date"]
                 )
             else:
                 aff_data[rider_id][club_id] = {
                     "affiliation_id": affiliation_id,
-                    "start_date": date,
-                    "end_date": date
+                    "start_date": race_date,
+                    "end_date": race_date
                 }
         else:
             aff_data[rider_id] = {
                 club_id: {
                     "affiliation_id": affiliation_id,
-                    "start_date": date,
-                    "end_date": date
+                    "start_date": race_date,
+                    "end_date": race_date
                 }
             }
     # flattening the dictionary into a list of single-level dictionaries
