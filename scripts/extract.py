@@ -14,12 +14,6 @@ from access_it.etl.extract.races import (
 from access_it.etl.extract.clubs import get_committees, get_clubs
 
 with make_client() as client:
-    this_year = datetime.now().year
-    cst_club_dat = {
-        "min_year": this_year,
-        "max_year": this_year,
-        "alternative_names": ""
-    }
     for dept in [
         44, 49, 53, 85, 72,  # Pays de La Loire
         22, 29, 35, 56,  # Bretagne
@@ -30,9 +24,10 @@ with make_client() as client:
 
     reg_committees, dep_committees = get_committees(client)
     clubs = get_clubs(client, departemental_committees=dep_committees)
-    reg_committees = [{"id": cr_id} | cr_data for cr_id, cr_data in reg_committees.items()]
-    dep_committees = [{"id": cd_id} | cd_data for cd_id, cd_data in dep_committees.items()]
-    clubs = [{"club_id": cl_id} | cl_data | cst_club_dat for cl_id, cl_data in clubs.items()]
+    this_year = datetime.now().year
+    clubs["min_year"] = this_year
+    clubs["max_year"] = this_year
+    clubs["alternative_names"] = ""
     departements = get_departement_mapping(client)
     pd.DataFrame(reg_committees).to_parquet(REGCOM_PARQUET_FILE, index=False)
     pd.DataFrame(dep_committees).to_parquet(DEPCOM_PARQUET_FILE, index=False)

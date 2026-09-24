@@ -1,98 +1,153 @@
 import httpx
+import pandas as pd
 import re
 
 from datetime import datetime
 from access_it.common.text import normalize_string_and_fold_case
+from access_it.etl.extract.departements import get_departement_mapping
 
 
-def get_regions(client: httpx.Client) -> list[dict[str, str]]:
+def get_regions(client: httpx.Client) -> list[dict]:
     r = client.get("https://velo.ffc.fr/wp-json/sn/terms/region")
     r.raise_for_status()
     return r.json()
 
 
-def get_committees(client: httpx.Client):
-    reg_committees = {}
-    dep_committees = {}
-    page = 1
-    max_pages = 100
-    cd_id = 0
-    while True and page <= max_pages:
-        r = client.get(f"https://velo.ffc.fr/wp-json/sn/cpt/comite?page={page}")
+def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[list[dict], list[dict]]:
+    reg_committees = []
+    dep_committees = []
+    regions = get_regions(client=client)
+    departements = get_departement_mapping(client=client)
+    # regions = [{"value": "Ile de France", "label": "ile-de-france"}]
+    for region in regions:
+        region_label = region["label"]
+        region_value = region["value"]
+        if region_value == "outre-mer":  # because it is a duplicate of Polynésie
+            continue
+        if verbose:
+            print(f"{region_label}")
+        r = client.get(f"https://velo.ffc.fr/wp-json/sn/cpt/comite?region={region_value}")
         r.raise_for_status()
         try:
             reg_committee_data = r.json()
             if "region" not in reg_committee_data:
-                break
+                continue
             reg_committee_name = reg_committee_data['region']
             if "extra_data" not in reg_committee_data:
-                break
+                continue
             reg_committee_extra_data = reg_committee_data['extra_data']
             if not isinstance(reg_committee_extra_data, dict):
-                break
+                continue
             if 'id_api' not in reg_committee_extra_data:
-                break
+                continue
             reg_committee_id = reg_committee_extra_data['id_api']
             if not isinstance(reg_committee_id, str):
-                break
+                continue
             if "committees" in reg_committee_data:
-                for dep_committee_data in reg_committee_data["committees"]:
-                    dep_committee_name = dep_committee_data['post_title']
-                    dep_committees[str(cd_id)] = {
-                        "name": dep_committee_name,
-                        "regional_committee_id": reg_committee_id
-                    }
-                    cd_id += 1
-            reg_committees[reg_committee_id] = {"name": reg_committee_name}
+                cur_dep_committees = reg_committee_data["committees"]
+                if len(cur_dep_committees) == 0:
+                    if reg_committee_name.lower().find("polynésie") != -1:
+                        dep_committee_name = "CD POLYNÉSIE"
+                        reg_committee_id = "66"
+                    else:
+                        dep_committee_name = "CD " + reg_committee_name.upper()
+                    cur_dep_committees = [{'post_title': dep_committee_name}]
+                for dep_committee_data in cur_dep_committees:
+                    dep_committee_name = str(dep_committee_data['post_title'])
+                    dep_name = (
+                        normalize_string_and_fold_case(dep_committee_name)
+                        .replace("cd ", "")
+                        .replace("polynesie", "polynesie francaise")
+                        .replace("rhone-metropole de lyon", "rhone")
+                        .replace("-", " ")
+                    )
+                    departements["tmp_name"] = departements["departement_name"].apply(
+                        lambda x: normalize_string_and_fold_case(x).replace("-", " ")
+                    )
+                    try:
+                        departement_code = (
+                            departements
+                            [departements["tmp_name"] == dep_name]
+                            .loc[:, "departement_code"]
+                            .values[0]
+                        )
+                        cd_id = reg_committee_id + departement_code[:2]
+                        # dep_committees[cd_id] = {
+                        #     "name": dep_committee_name,
+                        #     "regional_committee_id": reg_committee_id,
+                        #     "departement_code": departement_code
+                        # }
+                        dep_committee = {
+                            "departemental_committee_id": cd_id,
+                            "name": dep_committee_name,
+                            "regional_committee_id": reg_committee_id,
+                            "departement_code": departement_code
+                        }
+                        dep_committees.append(dep_committee)
+                        if verbose:
+                            print(f"\t{dep_committee_name:30s} {cd_id:4s} {departement_code:3s}")
+                    except IndexError as e:
+                        print(f"Can not find a department for '{dep_committee_name}'.")
+                        raise e
+            # reg_committees[reg_committee_id] = {"name": reg_committee_name}
+            reg_committees.append(
+                {
+                    "regional_committee_id": reg_committee_id,
+                    "name": reg_committee_name
+                }
+            )
         except KeyError:
-            break
-        page += 1
+            continue
     return reg_committees, dep_committees
 
 
 def get_clubs(
         client: httpx.Client,
-        departemental_committees: dict[int, dict[str, str]] | None = None
-) -> dict[str, dict[str, str, int, int, str]]:
-    if departemental_committees is None:
-        departemental_committees = get_committees(client=client)[1]
-    clubs = {}
+        departemental_committees: list[dict],
+        verbose: bool = False,
+    ) -> pd.DataFrame:
+    clubs = []
     this_year = datetime.now().year
     alternative_names = ""
-    page = 1
-    max_pages = 100
-    while True and page <= max_pages:
-        r = client.get(f"https://velo.ffc.fr/wp-json/sn/cpt/clubs?page={page}")
+    regions = get_regions(client=client)
+    for region in regions:
+        region_label = region["label"]
+        region_value = region["value"]
+        if region_value == "outre-mer":  # because it is a duplicate of Polynésie
+            continue
+        if verbose:
+            print(f"{region_label}")
+        r = client.get(f"https://velo.ffc.fr/wp-json/sn/cpt/clubs?region={region_value}")
         r.raise_for_status()
         try:
             data = r.json()
             if "committees" not in data:
-                break
+                continue
             for dep_committee_data in data['committees']:
                 dep_committee_name = dep_committee_data['title']
-                norm_dep_committee_name = normalize_string_and_fold_case(dep_committee_name)
-                dep_committee_id = None
-                for cd_id, cd_data in departemental_committees.items():
-                    norm_cd_name = normalize_string_and_fold_case(cd_data['name'])
-                    if norm_cd_name == norm_dep_committee_name:
-                        dep_committee_id = cd_id
-                        break
-                if dep_committee_id is None:
-                    raise ValueError(f"Departemental committee not found: {dep_committee_name}")
+                if verbose:
+                    print(f"\t{dep_committee_name}")
                 for club_data in dep_committee_data['items']:
-                    club_name = club_data['post_title']
-                    club_id = club_data['extra_data']['id_ffc']
-                    clubs[club_id] = {
-                        "name": club_name,
-                        "departemental_committee_id": dep_committee_id,
-                        "min_year": this_year,
-                        "max_year": this_year,
-                        "alternative_names": alternative_names
-                    }
+                    club_name = str(club_data['post_title'])
+                    club_id = str(club_data['extra_data']['id_ffc'])
+                    if not is_valid_french_club_id(club_id, include_specific_cases=False):
+                        raise ValueError(f"Invalid club ID: {club_id}")
+                    departemental_committee_id = get_departemental_committee_id(
+                        club_id, departemental_committees
+                    )
+                    clubs.append(
+                        {
+                            "club_id": club_id,
+                            "name": club_name,
+                            "departemental_committee_id": departemental_committee_id,
+                            "min_year": this_year,
+                            "max_year": this_year,
+                            "alternative_names": alternative_names
+                        }
+                    )
         except KeyError:
-            break
-        page += 1
-    return clubs
+            continue
+    return pd.DataFrame(clubs)
 
 
 def get_disciplines(client: httpx.Client) -> list[dict[str, str]]:
