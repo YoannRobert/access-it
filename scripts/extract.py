@@ -2,7 +2,8 @@ import pandas as pd
 
 from datetime import datetime
 from access_it.etl.extract.cache import (
-    REGCOM_PARQUET_FILE, DEPCOM_PARQUET_FILE, CLUBS_PARQUET_FILE, DEPARTEMENTS_PARQUET_FILE
+    REGCOM_PARQUET_FILE, DEPCOM_PARQUET_FILE, CLUBS_PARQUET_FILE,
+    DEPARTEMENTS_PARQUET_FILE
 )
 from access_it.etl.extract.client import make_client
 from access_it.etl.extract.departements import get_departement_mapping

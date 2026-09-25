@@ -18,7 +18,6 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[list[di
     dep_committees = []
     regions = get_regions(client=client)
     departements = get_departement_mapping(client=client)
-    # regions = [{"value": "Ile de France", "label": "ile-de-france"}]
     for region in regions:
         region_label = region["label"]
         region_value = region["value"]
@@ -72,11 +71,6 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[list[di
                             .values[0]
                         )
                         cd_id = reg_committee_id + departement_code[:2]
-                        # dep_committees[cd_id] = {
-                        #     "name": dep_committee_name,
-                        #     "regional_committee_id": reg_committee_id,
-                        #     "departement_code": departement_code
-                        # }
                         dep_committee = {
                             "departemental_committee_id": cd_id,
                             "name": dep_committee_name,

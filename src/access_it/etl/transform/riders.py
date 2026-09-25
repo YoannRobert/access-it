@@ -103,7 +103,6 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
     added_names_unknown_uci_id = []
     db_rows = []
     i_uci_id, i_red_list, i_individual_license, i_missing_uci_id = 0, 0, 0, 0
-    # rider_id_int = 1
 
     for row in df.itertuples():
         index = row.Index
@@ -160,7 +159,6 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
                 "first_name": first_name
             }
             db_rows.append(row2)
-            # rider_id_int += 1
 
     db = pd.concat([db, pd.DataFrame(db_rows)], axis=0)
     print_summary(

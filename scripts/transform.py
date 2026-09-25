@@ -1,8 +1,8 @@
 import pandas as pd
 
 from access_it.etl.extract.cache import (
-    RACES_PARQUET_FILE, RIDER_X_RACE_DATA_PARQUET_FILE, RIDERS_PARQUET_FILE,
-    CLUBS_PARQUET_FILE, CLUB_X_RIDER_PARQUET_FILE, RANKINGS_PARQUET_FILE,
+    RACES_PARQUET_FILE, RIDERS_PARQUET_FILE,
+    CLUBS_PARQUET_FILE, AFFILIATIONS_PARQUET_FILE, RANKINGS_PARQUET_FILE,
     DEPARTEMENTS_PARQUET_FILE, DEPCOM_PARQUET_FILE
 )
 from access_it.etl.transform.clubs import add_legacy_clubs
@@ -64,7 +64,6 @@ aff_club_rider = create_affiliation_clubs_riders(rider_x_race_data, races, rider
 # Saving all data to Parquet files
 pd.DataFrame(clubs).to_parquet(CLUBS_PARQUET_FILE, index=False)
 pd.DataFrame(races).to_parquet(RACES_PARQUET_FILE, index=False)
-pd.DataFrame(rider_x_race_data).to_parquet(RIDER_X_RACE_DATA_PARQUET_FILE, index=False)
 pd.DataFrame(rider_db).to_parquet(RIDERS_PARQUET_FILE, index=False)
 pd.DataFrame(rankings).to_parquet(RANKINGS_PARQUET_FILE, index=False)
-pd.DataFrame(aff_club_rider).to_parquet(CLUB_X_RIDER_PARQUET_FILE, index=False)
+pd.DataFrame(aff_club_rider).to_parquet(AFFILIATIONS_PARQUET_FILE, index=False)
