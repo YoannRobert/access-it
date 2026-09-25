@@ -126,6 +126,7 @@ def extract_former_organization_pages_using_bruteforce(
         p.name.removesuffix(".meta.json")
         for p in CACHE_DIR.rglob("*.meta.json")
     ]
+    known_organization_codes = [c for c in known_organization_codes if c.startswith("C")]
     organizer_ids = sorted(list(set([c[1:8] for c in known_organization_codes])))
     max_index_by_organizer = {
         organizer_id: max(
