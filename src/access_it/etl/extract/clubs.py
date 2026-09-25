@@ -89,7 +89,6 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[list[di
                     except IndexError as e:
                         print(f"Can not find a department for '{dep_committee_name}'.")
                         raise e
-            # reg_committees[reg_committee_id] = {"name": reg_committee_name}
             reg_committees.append(
                 {
                     "regional_committee_id": reg_committee_id,
@@ -98,6 +97,34 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[list[di
             )
         except KeyError:
             continue
+    reg_committees.extend(
+        [
+            {
+                "regional_committee_id": INDIVIDUAL_CLUB_ID[:2],
+                "name": INDIVIDUAL_NAME
+            },
+            {
+                "regional_committee_id": FOREIGN_CLUB_ID[:2],
+                "name": FOREIGN_NAME
+            }
+        ]
+    )
+    dep_committees.extend(
+        [
+            {
+                "departemental_committee_id": INDIVIDUAL_CLUB_ID[:4],
+                "name": INDIVIDUAL_NAME,
+                "regional_committee_id": INDIVIDUAL_CLUB_ID[:2],
+                "departement_code": INDIVIDUAL_CLUB_ID[2:4]
+            },
+            {
+                "departemental_committee_id": FOREIGN_CLUB_ID[:4],
+                "name": FOREIGN_NAME,
+                "regional_committee_id": FOREIGN_CLUB_ID[:2],
+                "departement_code": FOREIGN_CLUB_ID[2:4]
+            }
+        ]
+    )
     return reg_committees, dep_committees
 
 
@@ -147,6 +174,26 @@ def get_clubs(
                     )
         except KeyError:
             continue
+    clubs.extend(
+        [
+            {
+                "club_id": INDIVIDUAL_CLUB_ID,
+                "name": INDIVIDUAL_NAME,
+                "departemental_committee_id": INDIVIDUAL_CLUB_ID[:4],
+                "min_year": this_year,
+                "max_year": this_year,
+                "alternative_names": alternative_names
+            },
+            {
+                "club_id": FOREIGN_CLUB_ID,
+                "name": FOREIGN_NAME,
+                "departemental_committee_id": FOREIGN_CLUB_ID[:4],
+                "min_year": this_year,
+                "max_year": this_year,
+                "alternative_names": alternative_names
+            },
+        ]
+    )
     return pd.DataFrame(clubs)
 
 

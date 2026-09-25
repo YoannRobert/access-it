@@ -3,6 +3,8 @@ import pandas as pd
 
 from bs4 import BeautifulSoup
 
+from access_it.etl.extract.clubs import FOREIGN_CLUB_ID
+
 
 def get_departement_mapping(client: httpx.Client) -> pd.DataFrame:
     response = client.get("https://competitions.ffc.fr/resultats/")
@@ -29,5 +31,11 @@ def get_departement_mapping(client: httpx.Client) -> pd.DataFrame:
                 "departement_name": name.strip(),
             }
         )
+    departements.append(
+        {
+            "departement_code": FOREIGN_CLUB_ID[2:4],
+            "departement_name": "Autre",
+        }
+    )
 
     return pd.DataFrame(departements)
