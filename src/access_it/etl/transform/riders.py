@@ -3,7 +3,7 @@ import pandas as pd
 import re
 
 from access_it.common.text import normalize_string_and_fold_case
-from access_it.etl.extract.clubs import INDIVIDUAL_CLUB_ID
+from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 from access_it.etl.transform.clubs import parse_club_text, identify_club
 
 

@@ -4,13 +4,8 @@ import re
 
 from datetime import datetime
 from access_it.common.text import normalize_string_and_fold_case
+from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME, INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 from access_it.etl.extract.departements import get_departement_mapping
-
-
-INDIVIDUAL_NAME = "Individuel"
-FOREIGN_NAME = "Etranger"
-INDIVIDUAL_CLUB_ID = "9899001"
-FOREIGN_CLUB_ID = "9999002"
 
 
 def get_regions(client: httpx.Client) -> list[dict]:

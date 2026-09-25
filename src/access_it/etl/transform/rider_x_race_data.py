@@ -1,6 +1,6 @@
 import pandas as pd
 
-from access_it.etl.extract.clubs import INDIVIDUAL_NAME, FOREIGN_NAME
+from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME
 from access_it.etl.transform.riders import get_rider_id
 
 

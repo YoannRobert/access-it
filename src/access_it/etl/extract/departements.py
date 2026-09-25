@@ -3,7 +3,7 @@ import pandas as pd
 
 from bs4 import BeautifulSoup
 
-from access_it.etl.extract.clubs import FOREIGN_CLUB_ID
+from access_it.etl.extract.constants import FOREIGN_CLUB_ID
 
 
 def get_departement_mapping(client: httpx.Client) -> pd.DataFrame:

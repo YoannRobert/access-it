@@ -8,7 +8,9 @@ from access_it.etl.extract.cache import read_html_file
 from access_it.etl.extract.clubs import (
     get_departemental_committee_id,
     is_valid_french_club_id, is_individual_license,
-    is_individual_club, is_foreign_license, is_foreign_club,
+    is_individual_club, is_foreign_license, is_foreign_club
+)
+from access_it.etl.extract.constants import (
     INDIVIDUAL_NAME, FOREIGN_NAME, INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 )
 from access_it.etl.transform.parse import (
