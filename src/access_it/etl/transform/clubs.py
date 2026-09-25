@@ -8,17 +8,12 @@ from access_it.etl.extract.cache import read_html_file
 from access_it.etl.extract.clubs import (
     get_departemental_committee_id,
     is_valid_french_club_id, is_individual_license,
-    is_individual_club, is_foreign_license, is_foreign_club
+    is_individual_club, is_foreign_license, is_foreign_club,
+    INDIVIDUAL_NAME, FOREIGN_NAME, INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 )
 from access_it.etl.transform.parse import (
     parse_clubs_in_organisation_page, get_race_html_files
 )
-
-
-INDIVIDUAL_NAME = "Individuel"
-FOREIGN_NAME = "Etranger"
-INDIVIDUAL_CLUB_ID = "9999001"
-FOREIGN_CLUB_ID = "9999002"
 
 
 def is_valid_season(season: int):

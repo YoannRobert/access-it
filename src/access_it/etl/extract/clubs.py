@@ -7,6 +7,12 @@ from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.departements import get_departement_mapping
 
 
+INDIVIDUAL_NAME = "Individuel"
+FOREIGN_NAME = "Etranger"
+INDIVIDUAL_CLUB_ID = "9899001"
+FOREIGN_CLUB_ID = "9999002"
+
+
 def get_regions(client: httpx.Client) -> list[dict]:
     r = client.get("https://velo.ffc.fr/wp-json/sn/terms/region")
     r.raise_for_status()
