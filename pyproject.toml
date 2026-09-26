@@ -19,6 +19,7 @@ dependencies = [
     "pandas",
     "pyarrow",
     "python-dotenv",
+    "boto3",
 ]
 
 [project.optional-dependencies]
