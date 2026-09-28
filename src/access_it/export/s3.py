@@ -108,3 +108,21 @@ def delete_old_snapshots(
             raise RuntimeError(f"Failed to delete some snapshots: {errors}")
 
     return keys_to_delete
+
+
+def download_latest_snapshot(
+        bucket: str,
+        dest_dir: Path,
+        client: S3Client | None = None
+    ) -> Path:
+    """Download the most recent snapshot into `dest_dir` and return the local file path."""
+    client = client or get_s3_client()
+    keys = list_snapshot_keys(bucket, client=client)
+    if not keys:
+        raise FileNotFoundError(f"No snapshot found in s3://{bucket}/{SNAPSHOT_PREFIX}/")
+
+    latest_key = keys[0]
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    local_path = dest_dir / Path(latest_key).name
+    client.download_file(Bucket=bucket, Key=latest_key, Filename=str(local_path))
+    return local_path
