@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "jupyter"]
+dev = ["pytest", "ruff", "jupyter", "boto3-stubs[s3]"]
 app = ["streamlit", "fastapi", "uvicorn", "plotly"]
 ml = ["scikit-learn", "xgboost", "mlflow"]
 
