@@ -51,7 +51,11 @@ def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[i
         n = n.replace(org, dst)
     for i in range(1, 5):
         n = n.replace(f"access{i}", f"a{i}")
-    n = n.replace("access", "a1a2a3a4")
+    if (
+            n.find("access") != -1
+            and not any([(f"a{i}" in n) for i in range(1, 5)])
+    ):
+            n = n.replace("access", "a1a2a3a4")
     if n.find(" sauf ") != -1:
        n = n[:n.find(" sauf ")]
     n = n.replace(" ", "")
