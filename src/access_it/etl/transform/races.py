@@ -18,7 +18,10 @@ def split_organization_into_races(organization_data: dict) -> list[dict]:
     code = organization_data["organization_code"]
     for ranking_id in ranking_categories.keys():
         ranking = rankings[ranking_id]
-        categories = convert_categories_from_dict_to_list(ranking_categories[ranking_id])
+        current_rankin_categories = ranking_categories[ranking_id]
+        if not any(current_rankin_categories.values()):
+            continue
+        categories = convert_categories_from_dict_to_list(current_rankin_categories)
         race_id = create_race_id(season, code, ranking_id)
         race_data = race_data_org.copy() | {
             "race_id": race_id,
