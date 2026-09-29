@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from types import NoneType
 from access_it.common.text import normalize_string_and_fold_case
-from access_it.etl.extract.cache import read_html_file
+from access_it.etl.extract.cache import read_results_html_file
 from access_it.etl.extract.clubs import (
     get_departemental_committee_id,
     is_valid_french_club_id, is_individual_license,
@@ -219,7 +219,7 @@ def add_clubs_found_in_race_html_files(
     for race_html_file in get_race_html_files():
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
-        html = read_html_file(season, code)
+        html = read_results_html_file(season, code)
         club_texts = parse_clubs_in_organisation_page(html)
         for club_text in club_texts:
             try:

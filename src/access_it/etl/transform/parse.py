@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.common.date import convert_date
-from access_it.etl.extract.cache import CACHE_DIR
+from access_it.etl.extract.cache import RESULTS_DIR
 
 
 TRANSLATIONS = {
@@ -34,7 +34,7 @@ def get_text_safe(tag: Tag | None) -> str | None:
 
 
 def get_race_html_files() -> list[Path]:
-    return sorted(CACHE_DIR.rglob("*.html"))
+    return sorted(RESULTS_DIR.rglob("*.html"))
 
 
 def parse_clubs_in_organisation_page(html: str) -> list[str]:

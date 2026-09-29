@@ -11,7 +11,7 @@ import pandas as pd
 from sqlalchemy import Connection, Engine, Table, or_
 from sqlalchemy.dialects.postgresql import insert
 
-from access_it.etl.extract.cache import CACHE_DIR
+from access_it.etl.extract.cache import DATA_DIR
 from access_it.etl.load.engine import get_engine
 from access_it.etl.load.models import Base
 
@@ -30,7 +30,7 @@ ConflictMode = Literal["ignore", "update"]
 
 def read_parquet(table: Table) -> pd.DataFrame:
     """Read the Parquet file matching the table name."""
-    path = CACHE_DIR / f"{table.name}.parquet"
+    path = DATA_DIR / f"{table.name}.parquet"
     if not path.exists():
         raise FileNotFoundError(f"Missing Parquet file for table '{table.name}': {path}")
     return pd.read_parquet(path)

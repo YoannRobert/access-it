@@ -1,7 +1,7 @@
 import hashlib
 import pandas as pd
 
-from access_it.etl.extract.cache import read_html_file
+from access_it.etl.extract.cache import read_results_html_file
 from access_it.etl.transform.categories import (
     find_ranking_categories, convert_categories_from_dict_to_list
 )
@@ -44,7 +44,7 @@ def get_race_data() -> list[dict]:
     for race_html_file in get_race_html_files():
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
-        html = read_html_file(season, code)
+        html = read_results_html_file(season, code)
         data = parse_organisation_page(html)
         data_split = split_organization_into_races(data)
         races_data.extend(data_split)

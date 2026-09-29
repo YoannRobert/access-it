@@ -2,7 +2,9 @@ import httpx
 
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from access_it.etl.extract.cache import CACHE_DIR, write_sidecar_and_html_files, sidecar_exists
+from access_it.etl.extract.cache import (
+    RESULTS_DIR, write_results_sidecar_and_html_files, results_sidecar_exists
+)
 from access_it.etl.extract.client import BASE_URL, get
 from access_it.etl.transform.parse import get_text_safe, get_page_elements
 
@@ -16,7 +18,7 @@ def extract_organization_page(
     results_base_url = f"{BASE_URL}/resultats/resultat"
     season_str = f"{season:4d}"
     org_ref = f"{season_str:4s}/{code:11s}"
-    if sidecar_exists(season, code):
+    if results_sidecar_exists(season, code):
         print(f"{org_ref} already exists")
         return
 
@@ -32,7 +34,7 @@ def extract_organization_page(
     dst_url = str(race_response.url)
     page_not_found = dst_url.find("error") != -1 and dst_url.find("404") != -1
     if page_not_found:
-        write_sidecar_and_html_files(season, code, race_response, force_404=True)
+        write_results_sidecar_and_html_files(season, code, race_response, force_404=True)
         print(f"{org_ref} page not found")
         return
 
@@ -54,11 +56,11 @@ def extract_organization_page(
     )
     # Races not kept:
     if not included:
-        write_sidecar_and_html_files(season, code, race_response, kept=False)
+        write_results_sidecar_and_html_files(season, code, race_response, kept=False)
         print(f"{org_ref} excluded race: {name}")
         return
     # Races kept:
-    write_sidecar_and_html_files(season, code, race_response, kept=True)
+    write_results_sidecar_and_html_files(season, code, race_response, kept=True)
     print(f"{org_ref}: cached")
 
 
@@ -107,7 +109,7 @@ def extract_former_organization_pages_from_existing_ones(
     ):
     saved_sidecar_files = [
         [p.parent.name, p.name.removesuffix(".meta.json")]
-        for p in CACHE_DIR.rglob("*.meta.json")
+        for p in RESULTS_DIR.rglob("*.meta.json")
     ]
     saved_sidecar_files = sorted(saved_sidecar_files)
     seasons = range(start_year, datetime.now(timezone.utc).year + 1)
@@ -124,7 +126,7 @@ def extract_former_organization_pages_using_bruteforce(
     ):
     known_organization_codes = [
         p.name.removesuffix(".meta.json")
-        for p in CACHE_DIR.rglob("*.meta.json")
+        for p in RESULTS_DIR.rglob("*.meta.json")
     ]
     known_organization_codes = [c for c in known_organization_codes if c.startswith("C")]
     organizer_ids = sorted(list(set([c[1:8] for c in known_organization_codes])))

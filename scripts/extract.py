@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from access_it.etl.extract.cache import (
     REGCOM_PARQUET_FILE, DEPCOM_PARQUET_FILE, CLUBS_PARQUET_FILE,
-    DEPARTEMENTS_PARQUET_FILE
+    DEPARTEMENTS_PARQUET_FILE, create_cache_dir
 )
 from access_it.etl.extract.client import make_client
 from access_it.etl.extract.departements import get_departement_mapping
@@ -16,8 +16,10 @@ from access_it.etl.extract.clubs import get_committees, get_clubs
 
 
 def extract():
+    create_cache_dir()
 
     with make_client() as client:
+
         for dept in [
             44, 49, 53, 85, 72,  # Pays de La Loire
             22, 29, 35, 56,  # Bretagne
