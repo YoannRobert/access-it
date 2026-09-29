@@ -9,7 +9,7 @@ from access_it.etl.extract.client import BASE_URL, get
 from access_it.etl.transform.parse import get_text_safe, get_page_elements
 
 
-def extract_organization_page(
+def extract_results_from_organization_page(
         client: httpx.Client,
         season: int,
         code: str
@@ -99,7 +99,7 @@ def extract_organization_pages_from_search_url(
                 season = int(season)
             except ValueError:
                 raise ValueError(f"'season' value ({season}) not convertible to int")
-            extract_organization_page(client=client, season=season, code=code)
+            extract_results_from_organization_page(client=client, season=season, code=code)
         page += 1
 
 
@@ -116,7 +116,7 @@ def extract_former_organization_pages_from_existing_ones(
     org_codes = list(set([org_code for _, org_code in saved_sidecar_files]))
     for season in seasons:
         for code in org_codes:
-            extract_organization_page(client=client, season=season, code=code)
+            extract_results_from_organization_page(client=client, season=season, code=code)
 
 
 def extract_former_organization_pages_using_bruteforce(
@@ -148,4 +148,4 @@ def extract_former_organization_pages_using_bruteforce(
                 for i in range(1, max_index_by_organizer[organizer_id] + margin)
             ]
             for organization_code in organization_codes:
-                extract_organization_page(client=client, season=season, code=organization_code)
+                extract_results_from_organization_page(client=client, season=season, code=organization_code)
