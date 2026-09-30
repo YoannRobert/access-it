@@ -42,28 +42,37 @@ def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[i
     for i in range(1, 5):
         for org in [f"access {i}", f"acc {i}", f"acc{i}"]:
             n = n.replace(org, f"access{i}")
+            if verbose:
+                print(f"n={n}")
     for seq in ["1234", "234", "123", "34", "23", "12"]:
         org = "access" + seq
         dst = "a" + "a".join(seq)
         n = n.replace(org, dst)
-    for org in ["1234", "234", "123", "34", "23", "12"]:
-        dst = "a" + "a".join(seq)
-        n = n.replace(org, dst)
+        if verbose:
+            print(f"n={n}")
     for i in range(1, 5):
         n = n.replace(f"access{i}", f"a{i}")
+        if verbose:
+            print(f"n={n}")
     if n.find("access") != -1:
         if any([(f"a{i}" in n) for i in range(1, 5)]):
             n = n.replace("access", "")
         else:
             n = n.replace("access", "a1a2a3a4")
+    if verbose:
+        print(f"n={n}")
     if n.find(" sauf ") != -1:
        n = n[:n.find(" sauf ")]
     n = n.replace(" ", "")
+    if verbose:
+        print(f"n={n}")
     start, end = len(n), 0
     for s in ["a1", "a2", "a3", "a4"]:
         start = min(start, n.find(s)) if n.find(s) != -1 else start
         end = max(end, n.find(s) + 1)
     n = n[start: end + 1]
+    if verbose:
+        print(f"n={n}")
     for i in categories.keys():
         categories[i] = n.find(f"a{i}") != -1
     return categories
