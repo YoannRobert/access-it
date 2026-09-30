@@ -6,7 +6,7 @@ from access_it.etl.extract.cache import (
     RESULTS_DIR, write_results_sidecar_and_html_files, results_sidecar_exists
 )
 from access_it.etl.extract.client import BASE_URL, get
-from access_it.etl.transform.parse import get_text_safe, get_page_elements
+from access_it.etl.transform.parse import get_text_safe, get_elements_from_results_page
 
 
 def extract_results_from_organization_page(
@@ -43,7 +43,7 @@ def extract_results_from_organization_page(
     bs = BeautifulSoup(html, features="html.parser")
     name = get_text_safe(bs.find(name="h1", class_="titre"))
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
-    general_info = get_page_elements(bs)
+    general_info = get_elements_from_results_page(bs)
     race_code = general_info["race_code"]
     included = (
         discipline == "Route"

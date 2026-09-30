@@ -14,7 +14,7 @@ from access_it.etl.extract.constants import (
     INDIVIDUAL_NAME, FOREIGN_NAME, INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 )
 from access_it.etl.transform.parse import (
-    parse_clubs_in_organisation_page, get_race_html_files
+    parse_clubs_in_organisation_page, get_results_html_files
 )
 
 
@@ -216,7 +216,7 @@ def add_clubs_found_in_race_html_files(
         clubs: pd.DataFrame,
         departemental_committees: pd.DataFrame | list[dict]
     ) -> pd.DataFrame:
-    for race_html_file in get_race_html_files():
+    for race_html_file in get_results_html_files():
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
         html = read_results_html_file(season, code)

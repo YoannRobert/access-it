@@ -5,7 +5,9 @@ from access_it.etl.extract.cache import read_results_html_file
 from access_it.etl.transform.categories import (
     find_ranking_categories, convert_categories_from_dict_to_list
 )
-from access_it.etl.transform.parse import get_race_html_files, parse_organisation_page
+from access_it.etl.transform.parse import (
+    get_results_html_files, parse_results_organization_page
+)
 
 
 def split_organization_into_races(organization_data: dict) -> list[dict]:
@@ -41,11 +43,11 @@ def create_race_id(season: int, organisation_code: str, ranking_id: str) -> str:
 
 def get_race_data() -> list[dict]:
     races_data = []
-    for race_html_file in get_race_html_files():
+    for race_html_file in get_results_html_files():
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
         html = read_results_html_file(season, code)
-        data = parse_organisation_page(html)
+        data = parse_results_organization_page(html)
         data_split = split_organization_into_races(data)
         races_data.extend(data_split)
     return races_data

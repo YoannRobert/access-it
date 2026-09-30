@@ -33,7 +33,7 @@ def get_text_safe(tag: Tag | None) -> str | None:
     return page_element
 
 
-def get_race_html_files() -> list[Path]:
+def get_results_html_files() -> list[Path]:
     return sorted(RESULTS_DIR.rglob("*.html"))
 
 
@@ -55,7 +55,7 @@ def parse_clubs_in_organisation_page(html: str) -> list[str]:
     return club_texts
 
 
-def get_page_elements(bs: BeautifulSoup) -> dict[str, str]:
+def get_elements_from_results_page(bs: BeautifulSoup) -> dict[str, str]:
     data = {}
     for blk in bs.find_all(name="div", class_="info-principale"):
         key = blk.find(name="div", class_="titreValeur-titre")
@@ -73,7 +73,7 @@ def get_page_elements(bs: BeautifulSoup) -> dict[str, str]:
     return data
 
 
-def parse_organisation_page(html: str) -> dict[str, Any]:
+def parse_results_organization_page(html: str) -> dict[str, Any]:
     bs = BeautifulSoup(html, features="html.parser")
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
     race_date = convert_date(get_text_safe(bs.find(name="div", class_="date")))
@@ -86,7 +86,7 @@ def parse_organisation_page(html: str) -> dict[str, Any]:
         "departement": departement,
         "rankings": {}
     }
-    data = data | get_page_elements(bs)
+    data = data | get_elements_from_results_page(bs)
     try:
         rankings = get_rankings(html)
     except ValueError:
