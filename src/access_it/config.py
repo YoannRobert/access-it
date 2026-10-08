@@ -19,6 +19,7 @@ class Settings:
     aws_secret_access_key: str
     aws_region: str
     s3_bucket: str
+    startlists_url: str
     sql_info: bool = False
 
 
@@ -40,6 +41,7 @@ def get_settings() -> Settings:
     aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
     aws_region = os.getenv("AWS_REGION")
     s3_bucket = os.getenv("S3_BUCKET")
+    startlists_url = os.getenv("STARTLISTS_URL")
     if not database_url:
         raise RuntimeError("Environment variable 'DATABASE_URL' is not set")
     if not aws_endpoint_url_s3:
@@ -52,6 +54,8 @@ def get_settings() -> Settings:
         raise RuntimeError("Environment variable 'AWS_REGION' is not set")
     if not s3_bucket:
         raise RuntimeError("Environment variable 'S3_BUCKET' is not set")
+    if not startlists_url:
+        raise RuntimeError("Environment variable 'STARTLISTS_URL' is not set")
     return Settings(
         database_url=database_url,
         sql_info=_read_bool("SQL_INFO"),
@@ -59,5 +63,6 @@ def get_settings() -> Settings:
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
         aws_region=aws_region,
+        startlists_url=startlists_url,
         s3_bucket=s3_bucket,
     )
