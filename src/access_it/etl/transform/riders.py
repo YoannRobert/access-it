@@ -313,6 +313,13 @@ def create_affiliation_clubs_riders(
         rider_id = get_rider_id(
             db=rider_db, uci_id=uci_id, last_name=last_name, first_name=first_name
         )
+        if not isinstance(rider_id, str):
+            raise TypeError(
+                "Invalid data type for rider_id (should be str).\n"
+                + f"type: {type(rider_id)}\n"
+                + f"value: {str(rider_id)}\n"
+                + f"arguments: uci_id={uci_id}, last_name={last_name}, first_name={first_name}"
+            )
         affiliation_id = define_affiliation_id(rider_id, club_id)
         if rider_id in aff_data:
             if club_id in aff_data[rider_id]:
@@ -353,3 +360,24 @@ def create_affiliation_clubs_riders(
             )
     aff = pd.concat([aff, pd.DataFrame(aff_data_list)], ignore_index=True)
     return aff
+
+
+def get_rider_id_using_affiliations(
+        rider_ids: list[str],
+        affiliations: pd.DataFrame,
+        club_id: str
+    ) -> str:
+    if len(rider_ids) == 0:
+        raise ValueError("No rider IDs provided")
+    rider_ids_in = list(set(rider_ids))
+    rider_ids_out = affiliations[
+        (affiliations["club_id"] == club_id)
+        & (affiliations["rider_id"].isin(rider_ids_in))
+    ].loc[:, "rider_id"].tolist()
+    rider_ids_out = list(set(rider_ids_out))
+    n = len(rider_ids_out)
+    if n == 0:
+        raise ValueError(f"No rider ID found for club ID {club_id}")
+    if n > 1:
+        raise ValueError(f"Multiple rider IDs found for club ID {club_id}")
+    return rider_ids_out[0]
