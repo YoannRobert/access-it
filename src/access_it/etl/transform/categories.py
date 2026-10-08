@@ -40,7 +40,7 @@ def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[i
             if verbose:
                 print(f"n={n}")
     for i in range(1, 5):
-        for org in [f"access {i}", f"acc {i}", f"acc{i}"]:
+        for org in [f"access {i}", f"acc {i}", f"acc{i}", f"ac {i}", f"ac{i}"]:
             n = n.replace(org, f"access{i}")
             if verbose:
                 print(f"n={n}")
