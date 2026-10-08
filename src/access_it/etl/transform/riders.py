@@ -28,9 +28,11 @@ def split_race_data_into_rider_data(races_data: list[dict]) -> list[dict]:
     for race_data in races_data:
         season = race_data["season"]
         race_id = race_data["race_id"]
+        race_date = race_data["race_date"]
         for rider_data in race_data["ranking_data"]:
             rider_data["race_id"] = race_id
             rider_data["season"] = season
+            rider_data["race_date"] = race_date
             rider_x_race_data.append(rider_data)
     return rider_x_race_data
 
@@ -217,6 +219,7 @@ def create_affiliation_clubs_riders(
     race_dates = races_data[["race_id", "race_date"]]
     race_dates["race_date"] = pd.to_datetime(race_dates["race_date"])
     cols = ["uci_id", "last_name", "first_name", "club_id", "race_date"]
+    rider_x_race_data = rider_x_race_data.drop(columns=["race_date"])
     df = rider_x_race_data.merge(race_dates, on="race_id", how="inner")[cols]
     aff = pd.DataFrame(
         {
