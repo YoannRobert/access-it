@@ -2,6 +2,8 @@ import hashlib
 import pandas as pd
 import re
 
+from typing import Literal
+
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 from access_it.etl.transform.clubs import parse_club_text, identify_club
@@ -177,33 +179,91 @@ def get_rider_id(
         db: pd.DataFrame,
         uci_id: str = "",
         last_name: str = "",
-        first_name: str = ""
-    ) -> str:
+        first_name: str = "",
+        full_name: str = "",
+        case_sensitive: bool = True,
+        broader_search: bool = False,
+        output: Literal["first", "last", "all"] = "first"
+    ) -> str | list[str]:
+    db = db.copy()
+    if case_sensitive:
+        db["last_name"] = db["last_name"].apply(lambda x: x.strip())
+        db["first_name"] = db["first_name"].apply(lambda x: x.strip())
+        last_name = last_name.strip()
+        first_name = first_name.strip()
+        full_name = full_name.strip()
+    else:
+        db["last_name"] = db["last_name"].apply(lambda x: normalize_string_and_fold_case(x.strip()))
+        db["first_name"] = db["first_name"].apply(lambda x: normalize_string_and_fold_case(x.strip()))
+        last_name = normalize_string_and_fold_case(last_name.strip())
+        first_name = normalize_string_and_fold_case(first_name.strip())
+        full_name = normalize_string_and_fold_case(full_name.strip())
     uci_id = "" if pd.isna(uci_id) else uci_id
     if uci_id != "" and uci_id != "Liste Rouge":
         if not is_valid_uci_id(uci_id):
             raise ValueError(f"Invalid UCI ID: {uci_id}")
-        return db[db.uci_id == uci_id]['rider_id'].iloc[0]
-    elif last_name != "" and first_name != "":
-        mask_l = (db.last_name == last_name)
-        mask_f = (db.first_name == first_name)
-        rider_ids = db[mask_l & mask_f]['rider_id']
-        if len(rider_ids) == 0:
+        rider_ids = db.loc[db.uci_id == uci_id, 'rider_id']
+    elif broader_search:
+        if last_name == "" and first_name == "":
             raise ValueError(
-                "No rider found with last name "
-                + f"'{last_name}' and first name '{first_name}'"
+                "Both last and first names cannot be empty when broader search is enabled."
             )
-        elif len(rider_ids) > 1:
-            raise ValueError(
-                "Multiple riders found with last name "
-                + f"'{last_name}' and first name '{first_name}'"
-            )
+        if last_name == "":
+            mask_l = True
         else:
-            return rider_ids.iloc[0]
+            mask_l = db["last_name"].str.contains(last_name, regex=False, na=False)
+        if first_name == "":
+            mask_f = True
+        else:
+            mask_f = db["first_name"].str.contains(first_name, regex=False, na=False)
+        rider_ids = db.loc[mask_l & mask_f, 'rider_id']
+        output = "all"
+    elif (
+            uci_id == "Liste Rouge"
+            and last_name != ""
+            and first_name != "" and len(first_name) >= 1
+            and output == "all"
+    ):
+        first_name = first_name[0] + "."
+        mask = (
+            (db["uci_id"] == "Liste Rouge")
+            & (db["last_name"] == last_name)
+            & (db["first_name"] == first_name)
+        )
+        rider_ids = db.loc[mask, 'rider_id']
+    elif last_name != "" and first_name != "":
+        mask_l = (db["last_name"] == last_name)
+        mask_f = (db["first_name"] == first_name)
+        rider_ids = db.loc[mask_l & mask_f, 'rider_id']
+    elif full_name != "":
+        db["full_name"] = db["last_name"].str.cat(db["first_name"], sep=" ")
+        mask = (db.full_name == full_name)
+        rider_ids = db.loc[mask, 'rider_id']
+        # Forcing "all" to ensure all same-name riders are returned,
+        # then the rider can be determined by his club affiliation.
+        output = "all"
     else:
         raise ValueError(
-            "Either UCI ID or last name and first name must be provided"
+            "Please provide:\n"
+            + "- UCI ID, or\n"
+            + "- last name and first name, or\n"
+            + "- full name (last and first names joined by a space), or\n"
+            + "- UCI ID = 'Liste Rouge', complete last name and first letter of the first name."
         )
+    if isinstance(rider_ids, pd.Series):
+        n = rider_ids.shape[0]
+    else:
+        raise ValueError("'rider_ids' should be a pandas Series")
+    if n == 0:
+        raise ValueError("Rider(s) not found")
+    elif n > 1 and output != "all":
+        raise ValueError(f"Multiple riders found while only one is asked:\n{rider_ids.to_list()}")
+    if output == "first":
+        return rider_ids.iloc[0]
+    elif output == "last":
+        return rider_ids.iloc[-1]
+    else:
+        return rider_ids.to_list()
 
 
 def define_affiliation_id(rider_id: str, club_id: str) -> str:
