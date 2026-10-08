@@ -6,11 +6,11 @@ from access_it.etl.transform.categories import (
     find_ranking_categories, convert_categories_from_dict_to_list
 )
 from access_it.etl.transform.parse import (
-    get_results_html_files, parse_results_organization_page
+    get_results_html_files, parse_results_from_organization_page
 )
 
 
-def split_organization_into_races(organization_data: dict) -> list[dict]:
+def split_results_from_organization_into_races(organization_data: dict) -> list[dict]:
     races_data = []
     race_data_org = organization_data.copy()
     del race_data_org["rankings"]
@@ -41,14 +41,14 @@ def create_race_id(season: int, organisation_code: str, ranking_id: str) -> str:
     return hashlib.blake2b(key, digest_size=8).hexdigest()
 
 
-def get_race_data() -> list[dict]:
+def get_results_data() -> list[dict]:
     races_data = []
     for race_html_file in get_results_html_files():
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
         html = read_results_html_file(season, code)
-        data = parse_results_organization_page(html)
-        data_split = split_organization_into_races(data)
+        data = parse_results_from_organization_page(html)
+        data_split = split_results_from_organization_into_races(data)
         races_data.extend(data_split)
     return races_data
 

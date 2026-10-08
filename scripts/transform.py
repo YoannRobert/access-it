@@ -16,7 +16,7 @@ from access_it.etl.transform.rider_x_race_data import (
     correct_wrong_uci_ids, create_ranking_table, correct_swapped_names
 )
 from access_it.etl.transform.clubs import add_clubs_found_in_race_html_files
-from access_it.etl.transform.races import get_race_data, create_race_table
+from access_it.etl.transform.races import get_results_data, create_race_table
 
 
 def transform():
@@ -37,7 +37,7 @@ def transform():
     )
 
     # Getting race data
-    races_data = get_race_data()  # includes rankings
+    races_data = get_results_data()  # includes rankings
     races = create_race_table(races_data, departements)  # fewer columns
 
     # Creating intermediate data: rider x race

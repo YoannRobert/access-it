@@ -73,7 +73,7 @@ def get_elements_from_results_page(bs: BeautifulSoup) -> dict[str, str]:
     return data
 
 
-def parse_results_organization_page(html: str) -> dict[str, Any]:
+def parse_results_from_organization_page(html: str) -> dict[str, Any]:
     bs = BeautifulSoup(html, features="html.parser")
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
     race_date = convert_date(get_text_safe(bs.find(name="div", class_="date")))
