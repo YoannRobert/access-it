@@ -145,6 +145,21 @@ def identify_club(
                     for n in names
                 ]
             )
+        mask_included = (
+            (
+                df["name"].apply(normalize_string_and_fold_case).str.contains(n_club_name, regex=False)
+            )
+            |
+            (
+                df["alternative_names"].str.split(",")
+                .apply(
+                    lambda names: any(
+                        n_club_name in normalize_string_and_fold_case(n.strip())
+                        for n in names
+                    )
+                )
+            )
+        )
         if is_individual_club(club_name):
             club_id = INDIVIDUAL_CLUB_ID
             club_name = INDIVIDUAL_NAME
@@ -162,6 +177,9 @@ def identify_club(
             add_this_club = True
         elif mask_alt_names.any():
             club_id, club_name = df.loc[mask_alt_names, ["club_id", "name"]].iloc[0]
+            add_this_club = True
+        elif mask_included.any() and len(n_club_name) >= 10:
+            club_id, club_name = df.loc[mask_included, ["club_id", "name"]].iloc[0]
             add_this_club = True
         else:
             raise ValueError(f"Club not found (club_id={str(club_id)}, club_name={str(club_name)})")
