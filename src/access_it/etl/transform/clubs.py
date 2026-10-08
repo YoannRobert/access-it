@@ -102,6 +102,7 @@ def parse_club_text(text: str | None) -> tuple[str | None, str | None]:
     if text is None:
         return None, None
     RE_CLUB = re.compile(r"^(?:(\d{7})\s*-?\s*)?(.*)$")
+    text = " ".join(text.split())
     m = RE_CLUB.match(text.strip())
     if m is None:
         print(f"In parse_club_text: ValueError was raised, text={text}")
@@ -133,6 +134,9 @@ def identify_club(
         if club_name is None:
             return False, None, None
         n_club_name = normalize_string_and_fold_case(club_name)
+        n_club_name = " ".join(n_club_name.split())
+        df["name"] = df["name"].apply(lambda x: " ".join(x.split()))
+        df["alternative_names"] = df["alternative_names"].apply(lambda x: " ".join(x.split()))
         mask_names = df["name"].apply(normalize_string_and_fold_case) == n_club_name
         mask_alt_names = df["alternative_names"].str.split(",") \
             .apply(
