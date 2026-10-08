@@ -13,7 +13,7 @@ from access_it.etl.transform.riders import (
 from access_it.etl.transform.rider_x_race_data import (
     fill_missing_club_and_uci_ids, fill_missing_uci_ids_deep_mode,
     add_missing_individual_labels, add_missing_foreign_labels,
-    correct_wrong_uci_ids, create_ranking_table
+    correct_wrong_uci_ids, create_ranking_table, correct_swapped_names
 )
 from access_it.etl.transform.clubs import add_clubs_found_in_race_html_files
 from access_it.etl.transform.races import get_race_data, create_race_table
@@ -45,6 +45,7 @@ def transform():
     rider_x_race_data = split_race_data_into_rider_data(races_data)
     # ---- multiple corrections
     rider_x_race_data = correct_wrong_uci_ids(rider_x_race_data)
+    rider_x_race_data = correct_swapped_names(rider_x_race_data)
     rider_x_race_data = add_missing_individual_labels(rider_x_race_data)
     rider_x_race_data = add_missing_foreign_labels(rider_x_race_data)
     # ---- identifying the club of the riders

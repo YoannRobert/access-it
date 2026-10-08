@@ -113,6 +113,60 @@ def correct_wrong_uci_ids(data: list[dict]) -> list[dict]:
     return data
 
 
+def correct_swapped_names(records: list[dict]) -> list[dict]:
+    """Harmonize rider names across races using the UCI ID as the reference key.
+
+    For each `uci_id`, the most frequent (last_name, first_name) pair is kept as
+    the reference. Ties are broken by the most recent `race_date` (YYYY-MM-DD
+    strings). All other name variants of that `uci_id` are replaced by the
+    reference pair. Rows with a missing or empty `uci_id` are left untouched.
+    Incomplete pairs (missing last or first name) never become the reference;
+    a `uci_id` with only incomplete pairs is left untouched as well.
+
+    Takes a list of dicts (one per rider result) and returns a corrected list
+    of dicts with the same length and order as `records`.
+    """
+    df = pd.DataFrame(records)
+
+    name_cols = ["last_name", "first_name"]
+    corrected = df.copy()
+
+    # Ignore rows whose uci_id is missing or an empty / blank string
+    uci_id = corrected["uci_id"]
+    valid_mask = uci_id.notna() & (uci_id.astype(str).str.strip() != "") & (uci_id != "Liste Rouge")
+    valid = corrected.loc[valid_mask]
+
+    # Occurrences and most recent race date for each complete (uci_id, name) sub-group;
+    # pairs with a missing name are dropped so they can never become the reference
+    stats = (
+        valid.groupby(["uci_id", *name_cols])
+        .agg(n_occurrences=("race_date", "size"), latest_date=("race_date", "max"))
+        .reset_index()
+    )
+
+    # Reference name per uci_id: highest count, then most recent date
+    reference = (
+        stats.sort_values(
+            by=["n_occurrences", "latest_date"],
+            ascending=[False, False],
+            na_position="last",
+            kind="stable",
+        )
+        .drop_duplicates(subset="uci_id", keep="first")
+        .set_index("uci_id")[name_cols]
+    )
+
+    # Only correct rows whose uci_id has a reference, so no name is ever set to NaN
+    valid_mask &= uci_id.isin(reference.index)
+
+    # Overwrite names of valid rows only; excluded rows keep their original values
+    for col in name_cols:
+        corrected.loc[valid_mask, col] = corrected.loc[valid_mask, "uci_id"].map(reference[col])
+
+    # Convert back to a list of dicts, turning pandas NaN back into None
+    return corrected.astype(object).where(corrected.notna(), other=None).to_dict(orient="records")
+
+
 def apply_corrections_for_missing_club_labels(
         data: list[dict],
         corrections: list[tuple[str, int]],
@@ -156,7 +210,9 @@ def create_ranking_table(
     ) -> pd.DataFrame:
     df = rider_x_race_data.copy()
     df["rider_id"] = [
-        get_rider_id(rider_db, uci_id, last_name, first_name)
+        get_rider_id(
+            db=rider_db, uci_id=uci_id, last_name=last_name, first_name=first_name
+        )
         for uci_id, last_name, first_name in zip(
             df["uci_id"], df["last_name"], df["first_name"]
         )
