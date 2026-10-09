@@ -191,6 +191,22 @@ def identify_club(
     return add_this_club, club_id, club_name
 
 
+def identify_clubs(s: pd.Series, df_clubs: pd.DataFrame) -> pd.Series:
+    club_ids_out = []
+    for club_text in s:
+        try:
+            club_id_in, club_name_in = parse_club_text(club_text)
+            club_id_out = identify_club(
+                club_id=club_id_in, club_name=club_name_in, df_clubs=df_clubs
+            )[1]
+        except AttributeError:
+            club_id_out = None
+        except ValueError:
+            club_id_out = None
+        club_ids_out.append(club_id_out)
+    return pd.Series(club_ids_out, index=s.index)
+
+
 def add_legacy_clubs(
         df_clubs: pd.DataFrame,
         departemental_committees: pd.DataFrame | list[dict],

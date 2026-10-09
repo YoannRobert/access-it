@@ -1,9 +1,9 @@
 import pandas as pd
 
 from access_it.etl.extract.cache import (
-    RACES_PARQUET_FILE, RIDERS_PARQUET_FILE,
+    RACES_PARQUET_FILE, RIDERS_PARQUET_FILE, CATEGORIES_PARQUET_FILE,
     CLUBS_PARQUET_FILE, AFFILIATIONS_PARQUET_FILE, RANKINGS_PARQUET_FILE,
-    DEPARTEMENTS_PARQUET_FILE, DEPCOM_PARQUET_FILE
+    DEPARTEMENTS_PARQUET_FILE, DEPCOM_PARQUET_FILE, REGCOM_PARQUET_FILE
 )
 from access_it.etl.transform.clubs import add_legacy_clubs
 from access_it.etl.transform.riders import (
@@ -17,6 +17,8 @@ from access_it.etl.transform.rider_x_race_data import (
 )
 from access_it.etl.transform.clubs import add_clubs_found_in_race_html_files
 from access_it.etl.transform.races import get_results_data, create_race_table
+from access_it.etl.transform.startlists import identify_riders_categories_on_startlists
+from access_it.etl.transform.categories import create_category_table
 
 
 def transform():
@@ -24,6 +26,7 @@ def transform():
     # Reading Parquet files obtained in the extract step of the ETL
     departements = pd.read_parquet(DEPARTEMENTS_PARQUET_FILE)
     departemental_committees = pd.read_parquet(DEPCOM_PARQUET_FILE)
+    regional_committees = pd.read_parquet(REGCOM_PARQUET_FILE)
     clubs = pd.read_parquet(CLUBS_PARQUET_FILE)
 
     # Enriching club database
@@ -64,12 +67,27 @@ def transform():
     # Creating the club-rider affiliation database
     aff_club_rider = create_affiliation_clubs_riders(rider_x_race_data, races, rider_db)
 
+    # Creating the category database
+    categories_from_startlists = identify_riders_categories_on_startlists(
+        clubs=clubs,
+        riders=rider_db,
+        affiliations=aff_club_rider,
+        departemental_committees=departemental_committees,
+        regional_committees=regional_committees
+    )
+    categories = create_category_table(
+        races=races,
+        rankings=rankings,
+        categories_from_startlists=categories_from_startlists
+    )
+
     # Saving all data to Parquet files
     pd.DataFrame(clubs).to_parquet(CLUBS_PARQUET_FILE, index=False)
     pd.DataFrame(races).to_parquet(RACES_PARQUET_FILE, index=False)
     pd.DataFrame(rider_db).to_parquet(RIDERS_PARQUET_FILE, index=False)
     pd.DataFrame(rankings).to_parquet(RANKINGS_PARQUET_FILE, index=False)
     pd.DataFrame(aff_club_rider).to_parquet(AFFILIATIONS_PARQUET_FILE, index=False)
+    pd.DataFrame(categories).to_parquet(CATEGORIES_PARQUET_FILE, index=False)
 
 
 if __name__ == "__main__":

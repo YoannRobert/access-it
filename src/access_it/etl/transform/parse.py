@@ -230,7 +230,8 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
                                     "INDIV", "INDV", "IND",
                                     "PASS' DÉCOUVERTE", "PASS DÉCOUVERTE",
                                     "PASS' DECOUVERTE", "PASS DECOUVERTE",
-                                    "SANS CLUB", "TEMPORAIRE"
+                                    "SANS CLUB", "TEMPORAIRE",
+                                    "NON LICENCIÉ", "NON LICENCIE"
                                 ]:
                                     value = "Individuel"
                             if value == "":
