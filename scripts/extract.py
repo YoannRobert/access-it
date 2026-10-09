@@ -12,6 +12,7 @@ from access_it.etl.extract.races import (
     extract_former_organization_pages_using_bruteforce
 )
 from access_it.etl.extract.clubs import get_committees, get_clubs
+from access_it.etl.extract.startlists import extract_startlists_pages_from_search_url
 
 
 def extract():
@@ -27,6 +28,9 @@ def extract():
             extract_organization_pages_from_search_url(client=client, dept=dept)
         extract_former_organization_pages_from_existing_ones(client=client)
         extract_former_organization_pages_using_bruteforce(client=client)
+
+        # Extract startlists
+        extract_startlists_pages_from_search_url(client=client)
 
         # Extract committees, departement details and clubs
         reg_committees, dep_committees = get_committees(client)
