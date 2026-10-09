@@ -189,7 +189,12 @@ def get_clubs(
             },
         ]
     )
-    return pd.DataFrame(clubs)
+    clubs = pd.DataFrame(clubs)
+    this_year = datetime.now().year
+    clubs["min_year"] = this_year
+    clubs["max_year"] = this_year
+    clubs["alternative_names"] = ""
+    return clubs
 
 
 def get_disciplines(client: httpx.Client) -> list[dict[str, str]]:

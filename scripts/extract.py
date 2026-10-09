@@ -1,6 +1,5 @@
 import pandas as pd
 
-from datetime import datetime
 from access_it.etl.extract.cache import (
     REGCOM_PARQUET_FILE, DEPCOM_PARQUET_FILE, CLUBS_PARQUET_FILE,
     DEPARTEMENTS_PARQUET_FILE, create_cache_dir
@@ -20,6 +19,7 @@ def extract():
 
     with make_client() as client:
 
+        # Extract results
         for dept in [
             44, 49, 53, 85, 72,  # Pays de La Loire
             22, 29, 35, 56,  # Bretagne
@@ -28,13 +28,12 @@ def extract():
         extract_former_organization_pages_from_existing_ones(client=client)
         extract_former_organization_pages_using_bruteforce(client=client)
 
+        # Extract committees, departement details and clubs
         reg_committees, dep_committees = get_committees(client)
-        clubs = get_clubs(client, departemental_committees=dep_committees)
-        this_year = datetime.now().year
-        clubs["min_year"] = this_year
-        clubs["max_year"] = this_year
-        clubs["alternative_names"] = ""
         departements = get_departement_mapping(client)
+        clubs = get_clubs(client, departemental_committees=dep_committees)
+
+        # Save all data to parquet files in cache
         pd.DataFrame(reg_committees).to_parquet(REGCOM_PARQUET_FILE, index=False)
         pd.DataFrame(dep_committees).to_parquet(DEPCOM_PARQUET_FILE, index=False)
         pd.DataFrame(clubs).to_parquet(CLUBS_PARQUET_FILE, index=False)
