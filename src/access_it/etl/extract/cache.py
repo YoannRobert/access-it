@@ -22,7 +22,7 @@ CLUBS_PARQUET_FILE = DATA_DIR / "clubs.parquet"
 RIDERS_PARQUET_FILE = DATA_DIR / "riders.parquet"
 AFFILIATIONS_PARQUET_FILE = DATA_DIR / "affiliations.parquet"
 RANKINGS_PARQUET_FILE = DATA_DIR / "rankings.parquet"
-CATEGORIES_PARQUET_FILE = DATA_DIR / "categories.parquet"
+RIDER_CATEGORIES_PARQUET_FILE = DATA_DIR / "rider_categories.parquet"
 
 
 def create_cache_dir() -> None:

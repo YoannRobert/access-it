@@ -1,7 +1,7 @@
 import pandas as pd
 
 from access_it.etl.extract.cache import (
-    RACES_PARQUET_FILE, RIDERS_PARQUET_FILE, CATEGORIES_PARQUET_FILE,
+    RACES_PARQUET_FILE, RIDERS_PARQUET_FILE, RIDER_CATEGORIES_PARQUET_FILE,
     CLUBS_PARQUET_FILE, AFFILIATIONS_PARQUET_FILE, RANKINGS_PARQUET_FILE,
     DEPARTEMENTS_PARQUET_FILE, DEPCOM_PARQUET_FILE, REGCOM_PARQUET_FILE
 )
@@ -75,7 +75,7 @@ def transform():
         departemental_committees=departemental_committees,
         regional_committees=regional_committees
     )
-    categories = create_category_table(
+    rider_categories = create_category_table(
         races=races,
         rankings=rankings,
         categories_from_startlists=categories_from_startlists
@@ -87,7 +87,7 @@ def transform():
     pd.DataFrame(rider_db).to_parquet(RIDERS_PARQUET_FILE, index=False)
     pd.DataFrame(rankings).to_parquet(RANKINGS_PARQUET_FILE, index=False)
     pd.DataFrame(aff_club_rider).to_parquet(AFFILIATIONS_PARQUET_FILE, index=False)
-    pd.DataFrame(categories).to_parquet(CATEGORIES_PARQUET_FILE, index=False)
+    pd.DataFrame(rider_categories).to_parquet(RIDER_CATEGORIES_PARQUET_FILE, index=False)
 
 
 if __name__ == "__main__":
