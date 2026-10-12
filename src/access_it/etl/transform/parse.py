@@ -194,7 +194,7 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
             for code_html_element in code_html_elements:
                 tables = code_html_element.find_all(name="table")
                 for table in tables:
-                    heading = table.find_previous_sibling(["h2", "h3"])
+                    heading = table.find_previous_sibling(["h2", "h3", "h4"])
                     heading_text = get_text_safe(heading)
                     if heading_text is None:
                         continue
