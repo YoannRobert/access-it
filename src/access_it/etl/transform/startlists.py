@@ -3,7 +3,7 @@ import pandas as pd
 from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 from access_it.etl.transform.categories import (
-    find_access_categories_from_name, count_nb_access_subcategories_from_name,
+    count_nb_access_subcategories_from_name,
     has_access_subcategories, get_higher_access_subcategory
 )
 from access_it.etl.transform.clubs import identify_clubs
@@ -312,15 +312,16 @@ def identify_riders_categories_on_startlist(
 
         # Identify categories
         # Check the startlist title: in case of a single-category startlist
-        categories = find_access_categories_from_name(table_name)
-        is_single_access_category = (sum([int(v) for v in categories.values()]) == 1)
-        multiple_access_categories = (sum([int(v) for v in categories.values()]) > 1)
+        nb_categories = count_nb_access_subcategories_from_name(table_name)
+        is_single_access_category = (nb_categories == 1)
+        multiple_access_categories = (nb_categories > 1)
         excluded = any([ref in table_name.lower() for ref in ["open", "op ", "elite", "engag"]])
         is_single_access_category = is_single_access_category and not excluded
         multiple_access_categories = multiple_access_categories and not excluded
         category = None
         if is_single_access_category:
-            category = [f"A{k}" for k, v in categories.items() if v][0]
+            subcategory = get_higher_access_subcategory(table_name)
+            category = f"A{subcategory}"
 
         # Give up if there are not enough columns left
         if (
