@@ -560,4 +560,12 @@ def create_category_table(
         rankings=rankings,
         categories_from_startlists=categories_from_startlists
     )
+    # Remove riders having duplicated keys
+    key = ["rider_id", "start_date"]
+    duplicated_keys = category_history.duplicated(key, keep=False)
+    print(
+        f"Found {duplicated_keys.astype(int).sum()} duplicated keys."
+        + " The riders are removed from category_history."
+    )
+    category_history = category_history[~duplicated_keys]
     return category_history
