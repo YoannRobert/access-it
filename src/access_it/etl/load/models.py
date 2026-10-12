@@ -149,3 +149,26 @@ class Affiliation(Base):
     club_id: Mapped[str] = mapped_column(String(7), ForeignKey("clubs.club_id"))
     start_date: Mapped[date]
     end_date: Mapped[date]
+
+
+class RiderCategory(Base):
+    """Category history: one row per period, starting at start_date.
+
+    A period ends the day before the next start_date of the same rider,
+    or is still ongoing if there is none. A NULL category means unknown.
+    """
+
+    __tablename__ = "rider_categories"
+    __table_args__ = (
+        CheckConstraint(
+            sqltext="rider_category BETWEEN 1 AND 4",
+            name="rider_category_range"
+        ),
+    )
+
+    rider_id: Mapped[str] = mapped_column(
+        String(16), ForeignKey("riders.rider_id"),
+        primary_key=True
+    )
+    start_date: Mapped[date] = mapped_column(primary_key=True)
+    rider_category: Mapped[int | None] = mapped_column(SmallInteger())
