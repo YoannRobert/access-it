@@ -5,14 +5,13 @@ either left untouched or updated when at least one column differs,
 depending on the table.
 """
 
-from typing import Literal
-
 import pandas as pd
+
+from typing import Literal
 from sqlalchemy import Connection, Engine, Table, or_
 from sqlalchemy.dialects.postgresql import insert
 
 from access_it.etl.extract.cache import DATA_DIR
-from access_it.etl.load.engine import get_engine
 from access_it.etl.load.models import Base
 
 
@@ -108,7 +107,3 @@ def load_all(engine: Engine) -> None:
                 f"{table.name} [{on_conflict}]: "
                 f"{written} written, {len(df) - written} unchanged"
             )
-
-
-if __name__ == "__main__":
-    load_all(get_engine())

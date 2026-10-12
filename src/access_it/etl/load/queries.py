@@ -1,4 +1,5 @@
 import pandas as pd
+
 from sqlalchemy import Engine, Select, Table, select
 
 from access_it.etl.load.models import Base
@@ -31,11 +32,3 @@ def read_all_tables(
         name: read_table(engine, table, first_rows=first_rows)
         for name, table in Base.metadata.tables.items()
     }
-
-
-if __name__ == "__main__":
-    from access_it.etl.load.engine import get_engine
-    limit = 2
-    tables = read_all_tables(get_engine(), first_rows=limit)
-    for table_name, df in tables.items():
-        print(f"{table_name}:\n{df.head(5)}", end="\n\n")
