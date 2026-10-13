@@ -125,7 +125,7 @@ def find_ranking_categories(organization_data: dict[str, Any]) -> dict[str, dict
     if all(found.values()):
         return ranking_categories
 
-    # 2) Only one ranking lacks of categorization and it can be deduced from the organization name
+    # 2) Only one ranking lacks of categorization, and it can be deduced from the organization name
     if nb_rankings - nb_rankings_categorized == 1:
         uncategorized_ranking_id = [rk_id for rk_id, rk_value in found.items() if not rk_value][0]
         found_categories = []
@@ -542,6 +542,37 @@ def add_unknown_years_in_category_history(
     return category_history
 
 
+def delete_rows_for_riders_having_duplicated_keys(
+        category_history: pd.DataFrame,
+        add_unknown_category_row: bool = True,
+        after_year: int = 2023
+    ) -> pd.DataFrame:
+    df = category_history.copy()
+    duplicated_keys = df.duplicated(["rider_id", "start_date"], keep=False)
+    print(f"Found {df[duplicated_keys].shape[0]} duplicated keys.")
+    riders_removed = df.loc[duplicated_keys, "rider_id"].drop_duplicates().to_list()
+    df = df[~df["rider_id"].isin(riders_removed)]
+    if not add_unknown_category_row:
+        return df
+    modifs = []
+    start_date = pd.to_datetime(arg=f"{after_year}-01-01", format="%Y-%m-%d")
+    for rider_id in riders_removed:
+        modifs.append(
+            {
+                "rider_id": rider_id,
+                "start_date": start_date,
+                "rider_category": None,
+            }
+        )
+    df = (
+        pd.concat(objs=[df, pd.DataFrame(modifs)], ignore_index=True)
+        .sort_values(by=["rider_id", "start_date"])
+    )
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df is not a pandas DataFrame")
+    return df
+
+
 def create_category_table(
     races: pd.DataFrame,
     rankings: pd.DataFrame,
@@ -560,12 +591,5 @@ def create_category_table(
         rankings=rankings,
         categories_from_startlists=categories_from_startlists
     )
-    # Remove riders having duplicated keys
-    key = ["rider_id", "start_date"]
-    duplicated_keys = category_history.duplicated(key, keep=False)
-    print(
-        f"Found {duplicated_keys.astype(int).sum()} duplicated keys."
-        + " The riders are removed from category_history."
-    )
-    category_history = category_history[~duplicated_keys]
+    category_history = delete_rows_for_riders_having_duplicated_keys(category_history)
     return category_history
