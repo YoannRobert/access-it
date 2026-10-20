@@ -23,10 +23,20 @@ def is_valid_uci_id(uci_id: str | None) -> bool:
 
 
 def define_rider_id(uci_id: str | None, last_name: str, first_name: str) -> str:
+    """Return a stable rider ID.
+
+    With a valid UCI ID, the ID depends on the UCI ID only: corrections of the
+    names (e.g. by correct_swapped_names) do not change it. Otherwise (red-list
+    riders, missing UCI ID), there is no stable identifier and the ID depends on
+    the UCI ID field and the normalized names, as before.
+    """
     uci_id = "" if (uci_id is None or pd.isna(uci_id)) else str(uci_id).strip()
-    n_last_name = normalize_string_and_fold_case(last_name).strip()
-    n_first_name = normalize_string_and_fold_case(first_name).strip()
-    key = f"{uci_id}|{n_last_name}|{n_first_name}".encode()
+    if is_valid_uci_id(uci_id):
+        key = f"uci|{uci_id}".encode()
+    else:
+        n_last_name = normalize_string_and_fold_case(last_name).strip()
+        n_first_name = normalize_string_and_fold_case(first_name).strip()
+        key = f"{uci_id}|{n_last_name}|{n_first_name}".encode()
     return hashlib.blake2b(key, digest_size=8).hexdigest()
 
 
