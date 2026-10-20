@@ -152,13 +152,14 @@ def load_all(engine: Engine) -> None:
     if unknown_sync_tables:
         raise ValueError(f"Unknown tables in TABLES_TO_SYNC: {sorted(unknown_sync_tables)}")
 
-    # Read and check all the files first: nothing is written if one check fails
+    # Read and check all the files first, against each other and against the
+    # database (read-only queries): nothing is written if one check fails
     frames = {}
     for table in Base.metadata.sorted_tables:
         df = read_parquet(table)
         validate_columns(df, table)
         frames[table.name] = df
-    run_checks(frames)
+    run_checks(frames, engine)
 
     with engine.begin() as connection:
         for table in Base.metadata.sorted_tables:
