@@ -2,7 +2,7 @@ import hashlib
 import pandas as pd
 import re
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Literal
 
 from access_it.common.text import normalize_string_and_fold_case
@@ -11,6 +11,7 @@ from access_it.etl.transform.clubs import ClubLookup, parse_club_text, identify_
 
 
 RED_LIST = "Liste Rouge"
+MAX_REPORTED_CLUB_TEXTS = 10  # club texts listed in the report of dropped rows
 
 
 def is_valid_uci_id(uci_id: str | None) -> bool:
@@ -47,9 +48,15 @@ def identify_club_of_riders(
         rider_x_race_data: list[dict],
         df_clubs: pd.DataFrame | ClubLookup
     ) -> list[dict]:
+    """Replace the club text of each result row by the identified club ID.
+
+    Rows whose club cannot be identified are dropped, and reported (number of
+    rows per club text) so that missing clubs or name variants can be fixed.
+    """
     # Indexes over the club table are built once for all rows
     clubs = df_clubs if isinstance(df_clubs, ClubLookup) else ClubLookup(df_clubs)
     data = []
+    unidentified_club_texts: Counter[str] = Counter()
     for single_rider_x_race_data in rider_x_race_data:
         club_text = single_rider_x_race_data["club"]
         club_id, club_name = parse_club_text(club_text)
@@ -59,8 +66,22 @@ def identify_club_of_riders(
             single_rider_x_race_data["club_id"] = club_id_2
             data.append(single_rider_x_race_data)
         except ValueError:
-            pass
+            unidentified_club_texts[str(club_text)] += 1
+    report_unidentified_club_texts(unidentified_club_texts)
     return data
+
+
+def report_unidentified_club_texts(unidentified_club_texts: Counter[str]) -> None:
+    """Print the number of result rows dropped because their club was not identified."""
+    if not unidentified_club_texts:
+        return
+    n_rows = sum(unidentified_club_texts.values())
+    n_texts = len(unidentified_club_texts)
+    print(f"Warning: {n_rows} result row(s) dropped, club not identified ({n_texts} club text(s)):")
+    for club_text, count in unidentified_club_texts.most_common(MAX_REPORTED_CLUB_TEXTS):
+        print(f"{count:8d}  {club_text!r}")
+    if n_texts > MAX_REPORTED_CLUB_TEXTS:
+        print(f"          ... and {n_texts - MAX_REPORTED_CLUB_TEXTS} other club text(s)")
 
 
 def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
