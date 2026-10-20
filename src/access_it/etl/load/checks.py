@@ -11,12 +11,15 @@ the database as long as one problem remains.
 import pandas as pd
 
 from contextlib import nullcontext
-from sqlalchemy import Connection, Engine, Table, func, select
+from sqlalchemy import (
+    Column, Connection, Engine, MetaData, Table, and_, exists, func, select
+)
 
 from access_it.etl.load.models import Base
 
 MAX_EXAMPLES = 3  # example values shown in each problem message
 QUERY_CHUNK_SIZE = 1_000  # values per IN (...) clause
+MAX_DIAGNOSED_RIDERS = 20  # missing riders read from the database to explain the problem
 
 # Maximum relative decrease of the row count, from the database to the file.
 # Only tables rebuilt from the whole cache are listed: their files hold the full
@@ -31,6 +34,13 @@ MAX_ROW_DECREASE = {
     # The category inference heuristic may legitimately produce fewer rows
     "rider_categories": 0.05,
 }
+
+# Tables whose rows already in the database must all be present in the file.
+# A missing row usually means that an identifier changed between two runs
+# (e.g. rider_id, computed from the names and the UCI ID): the database would
+# keep the old row next to the new one. rider_categories is left out on
+# purpose: its rows may change with the inference heuristic and are synchronized.
+NO_MISSING_ROWS = ["riders", "rankings", "affiliations"]
 
 
 class DataValidationError(Exception):
@@ -166,6 +176,91 @@ def check_row_count(table: Table, df: pd.DataFrame, connection: Connection | Non
     ]
 
 
+def find_missing_rows(
+        connection: Connection,
+        table: Table,
+        df: pd.DataFrame,
+        columns: list[str] | None = None,
+        limit: int = MAX_EXAMPLES
+    ) -> tuple[int, list[tuple]]:
+    """Return the number of rows of the database table absent from the file, and some of them.
+
+    The primary keys of the file are uploaded into a temporary table, and the
+    database only sends back the count and at most `limit` missing rows,
+    restricted to `columns` (default: the primary key columns).
+    """
+    key_columns = [column.name for column in table.primary_key.columns]
+    columns = columns or key_columns
+    file_keys = Table(
+        f"tmp_check_{table.name}_keys",
+        MetaData(),
+        *(Column(name, table.c[name].type) for name in key_columns),
+        prefixes=["TEMPORARY"],
+    )
+    file_keys.create(connection)
+    try:
+        records = df[key_columns].dropna().drop_duplicates().to_dict(orient="records")
+        if records:
+            connection.execute(file_keys.insert(), records)
+        absent_from_file = ~exists().where(
+            and_(*(file_keys.c[name] == table.c[name] for name in key_columns))
+        )
+        count = connection.execute(
+            select(func.count()).select_from(table).where(absent_from_file)
+        ).scalar_one()
+        rows = connection.execute(
+            select(*(table.c[name] for name in columns)).where(absent_from_file).limit(limit)
+        )
+        return count, [tuple(row) for row in rows]
+    finally:
+        file_keys.drop(connection)
+
+
+def explain_missing_riders(missing_riders: list[tuple], riders: pd.DataFrame) -> list[str]:
+    """Explain missing riders (rider_id, uci_id) whose UCI ID has another rider_id in the file."""
+    file_rider_id_by_uci_id = {
+        uci_id: rider_id
+        for uci_id, rider_id in zip(riders["uci_id"], riders["rider_id"])
+        if isinstance(uci_id, str) and uci_id.isdigit()
+    }
+    return [
+        f"UCI ID {uci_id}: {rider_id!r} in database, {file_rider_id_by_uci_id[uci_id]!r} in file"
+        for rider_id, uci_id in missing_riders
+        if uci_id in file_rider_id_by_uci_id
+    ]
+
+
+def check_missing_rows(table: Table, df: pd.DataFrame, connection: Connection | None) -> list[str]:
+    """Check that the rows already in the database are all present in the file.
+
+    Only applies to the tables of NO_MISSING_ROWS.
+    """
+    if connection is None or table.name not in NO_MISSING_ROWS:
+        return []
+    if count_rows(connection, table) == 0:
+        return []
+    is_riders = table.name == "riders"
+    count, rows = find_missing_rows(
+        connection,
+        table,
+        df,
+        columns=["rider_id", "uci_id"] if is_riders else None,
+        limit=MAX_DIAGNOSED_RIDERS if is_riders else MAX_EXAMPLES,
+    )
+    if count == 0:
+        return []
+    examples = [row[0] for row in rows] if len(rows[0]) == 1 or is_riders else rows
+    problem = (
+        f"[{table.name}] {count} row(s) in database missing from file, "
+        f"e.g. {format_examples(examples)}: identifiers probably changed since the last load"
+    )
+    if is_riders:
+        explanations = explain_missing_riders(rows, df)
+        if explanations:
+            problem += "; " + "; ".join(explanations[:MAX_EXAMPLES])
+    return [problem]
+
+
 def run_checks(frames: dict[str, pd.DataFrame], engine: Engine | None = None) -> None:
     """Run every check on the DataFrames to load, keyed by table name.
 
@@ -181,5 +276,6 @@ def run_checks(frames: dict[str, pd.DataFrame], engine: Engine | None = None) ->
             problems += check_primary_key(table, df)
             problems += check_foreign_keys(table, df, frames, connection)
             problems += check_row_count(table, df, connection)
+            problems += check_missing_rows(table, df, connection)
     if problems:
         raise DataValidationError(problems)

@@ -7,8 +7,8 @@ from sqlalchemy import create_engine, insert
 
 from access_it.etl.load import load
 from access_it.etl.load.checks import (
-    DataValidationError, check_foreign_keys, check_primary_key, check_row_count,
-    find_existing_values, run_checks
+    DataValidationError, check_foreign_keys, check_missing_rows, check_primary_key,
+    check_row_count, find_existing_values, find_missing_rows, run_checks
 )
 from access_it.etl.load.models import Base
 
@@ -71,6 +71,20 @@ def valid_frames() -> dict[str, pd.DataFrame]:
         "rider_categories": {"rider_id": "r1", "start_date": date, "rider_category": 1},
     }
     return {name: pd.DataFrame([row]) for name, row in rows.items()}
+
+
+def sqlite_engine_with_rows(rows_by_table: dict[str, list[dict]]):
+    """In-memory SQLite database with all tables, holding the given rows."""
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        for table_name, rows in rows_by_table.items():
+            connection.execute(insert(TABLES[table_name]), rows)
+    return engine
+
+
+def rider_row(rider_id: str, uci_id: str = "") -> dict:
+    return {"rider_id": rider_id, "uci_id": uci_id, "last_name": "X", "first_name": "Y"}
 
 
 def sqlite_engine_with_rider_categories(n_rows: int):
@@ -262,6 +276,72 @@ def test_row_count_not_checked_for_tables_built_from_the_api():
 
 def test_row_count_without_database():
     assert check_row_count(TABLES["riders"], valid_frames()["riders"], None) == []
+
+
+# ---------------------------------------------------------------- check_missing_rows
+
+UCI_ID_1, UCI_ID_2 = "10012345601", "10012345702"
+
+
+def test_missing_rows_none():
+    engine = sqlite_engine_with_rows({"riders": [rider_row("r1"), rider_row("r2")]})
+    df = pd.DataFrame([rider_row("r1"), rider_row("r2"), rider_row("r3")])
+    with engine.connect() as connection:
+        assert check_missing_rows(TABLES["riders"], df, connection) == []
+
+
+def test_missing_riders_with_changed_identifier():
+    engine = sqlite_engine_with_rows({
+        "riders": [rider_row("r1", UCI_ID_1), rider_row("r2_old", UCI_ID_2), rider_row("r3")]
+    })
+    df = pd.DataFrame([rider_row("r1", UCI_ID_1), rider_row("r2_new", UCI_ID_2), rider_row("r3")])
+    with engine.connect() as connection:
+        problems = check_missing_rows(TABLES["riders"], df, connection)
+    assert problems == [
+        "[riders] 1 row(s) in database missing from file, e.g. 'r2_old': identifiers probably "
+        f"changed since the last load; UCI ID {UCI_ID_2}: 'r2_old' in database, 'r2_new' in file"
+    ]
+
+
+def test_missing_rows_composite_key():
+    engine = sqlite_engine_with_rows({
+        "rankings": [
+            {"race_id": "race1", "rider_id": "r1", "finish_rank": 1},
+            {"race_id": "race1", "rider_id": "r2", "finish_rank": 2},
+        ]
+    })
+    df = pd.DataFrame({"race_id": ["race1"], "rider_id": ["r1"], "finish_rank": [1]})
+    with engine.connect() as connection:
+        problems = check_missing_rows(TABLES["rankings"], df, connection)
+    assert problems == [
+        "[rankings] 1 row(s) in database missing from file, e.g. ('race1', 'r2'): "
+        "identifiers probably changed since the last load"
+    ]
+
+
+def test_missing_rows_temporary_table_is_dropped():
+    engine = sqlite_engine_with_rows({"riders": [rider_row("r1"), rider_row("r2")]})
+    df = pd.DataFrame([rider_row("r1")])
+    with engine.connect() as connection:
+        assert find_missing_rows(connection, TABLES["riders"], df) == (1, [("r2",)])
+        assert find_missing_rows(connection, TABLES["riders"], df) == (1, [("r2",)])
+
+
+def test_missing_rows_not_checked_for_rider_categories():
+    connection = ConnectionThatMustNotBeQueried()
+    df = rider_categories(1)
+    assert check_missing_rows(TABLES["rider_categories"], df, connection) == []
+
+
+def test_missing_rows_empty_database():
+    engine = sqlite_engine_with_rows({})
+    with engine.connect() as connection:
+        df = pd.DataFrame([rider_row("r1")])
+        assert check_missing_rows(TABLES["riders"], df, connection) == []
+
+
+def test_missing_rows_without_database():
+    assert check_missing_rows(TABLES["riders"], pd.DataFrame([rider_row("r1")]), None) == []
 
 
 # ---------------------------------------------------------------- run_checks
