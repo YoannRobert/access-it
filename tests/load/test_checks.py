@@ -7,7 +7,8 @@ from sqlalchemy import create_engine, insert
 
 from access_it.etl.load import load
 from access_it.etl.load.checks import (
-    DataValidationError, check_foreign_keys, check_primary_key, find_existing_values, run_checks
+    DataValidationError, check_foreign_keys, check_primary_key, check_row_count,
+    find_existing_values, run_checks
 )
 from access_it.etl.load.models import Base
 
@@ -39,6 +40,53 @@ def empty_frames() -> dict[str, pd.DataFrame]:
         name: pd.DataFrame(columns=list(table.columns.keys()))
         for name, table in TABLES.items()
     }
+
+
+def valid_frames() -> dict[str, pd.DataFrame]:
+    """One consistent row per table, passing every check."""
+    date = pd.Timestamp("2025-04-12")
+    rows = {
+        "departements": {"departement_code": "44", "departement_name": "Loire-Atlantique"},
+        "regional_committees": {"regional_committee_id": "52", "name": "PAYS DE LA LOIRE"},
+        "departemental_committees": {
+            "departemental_committee_id": "5244", "name": "CD 44",
+            "regional_committee_id": "52", "departement_code": "44",
+        },
+        "clubs": {
+            "club_id": "5244001", "name": "VC Test", "departemental_committee_id": "5244",
+            "min_year": 2025, "max_year": 2025, "alternative_names": "",
+        },
+        "riders": {"rider_id": "r1", "uci_id": "", "last_name": "X", "first_name": "Y"},
+        "races": {
+            "race_id": "race1", "title": "Test", "categories": "A1", "season": 2025,
+            "discipline": "Route", "race_date": date, "departement_code": "44",
+            "organization_code": "C5244001001", "race_type": "R", "organizer": "VC Test",
+            "duration": "1 jour", "race_code": "1.27.1",
+        },
+        "rankings": {"race_id": "race1", "rider_id": "r1", "finish_rank": 1},
+        "affiliations": {
+            "affiliation_id": "f1", "rider_id": "r1", "club_id": "5244001",
+            "start_date": date, "end_date": date,
+        },
+        "rider_categories": {"rider_id": "r1", "start_date": date, "rider_category": 1},
+    }
+    return {name: pd.DataFrame([row]) for name, row in rows.items()}
+
+
+def sqlite_engine_with_rider_categories(n_rows: int):
+    """In-memory SQLite database with all tables, holding n_rows category rows."""
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(
+            insert(TABLES["rider_categories"]),
+            [
+                {"rider_id": f"r{k}", "start_date": pd.Timestamp("2025-01-01").date(),
+                 "rider_category": 1}
+                for k in range(n_rows)
+            ],
+        )
+    return engine
 
 
 # ---------------------------------------------------------------- check_primary_key
@@ -162,18 +210,76 @@ def test_foreign_keys_composite_primary_key_table():
     ]
 
 
+# ---------------------------------------------------------------- check_row_count
+
+def rider_categories(n_rows: int) -> pd.DataFrame:
+    return pd.DataFrame({
+        "rider_id": [f"r{k}" for k in range(n_rows)],
+        "start_date": pd.Timestamp("2025-01-01"),
+        "rider_category": 1,
+    })
+
+
+def test_row_count_empty_file():
+    df = empty_frames()["clubs"]
+    assert check_row_count(TABLES["clubs"], df, None) == ["[clubs] file is empty"]
+
+
+def test_row_count_no_decrease_allowed():
+    engine = sqlite_engine_with_riders(["r1", "r2", "r3"])
+    df = pd.DataFrame({"rider_id": ["r1", "r2"]})
+    with engine.connect() as connection:
+        problems = check_row_count(TABLES["riders"], df, connection)
+    assert problems == [
+        "[riders] file has 2 rows, database has 3 (-33.3%, tolerance 0%): "
+        "possible incomplete extract or transform"
+    ]
+
+
+def test_row_count_increase_is_allowed():
+    engine = sqlite_engine_with_riders(["r1"])
+    df = pd.DataFrame({"rider_id": ["r1", "r2"]})
+    with engine.connect() as connection:
+        assert check_row_count(TABLES["riders"], df, connection) == []
+
+
+def test_row_count_decrease_within_tolerance():
+    engine = sqlite_engine_with_rider_categories(100)
+    with engine.connect() as connection:
+        assert check_row_count(TABLES["rider_categories"], rider_categories(95), connection) == []
+        problems = check_row_count(TABLES["rider_categories"], rider_categories(94), connection)
+    assert problems == [
+        "[rider_categories] file has 94 rows, database has 100 (-6.0%, tolerance 5%): "
+        "possible incomplete extract or transform"
+    ]
+
+
+def test_row_count_not_checked_for_tables_built_from_the_api():
+    df = valid_frames()["clubs"]
+    connection = ConnectionThatMustNotBeQueried()
+    assert check_row_count(TABLES["clubs"], df, connection) == []
+
+
+def test_row_count_without_database():
+    assert check_row_count(TABLES["riders"], valid_frames()["riders"], None) == []
+
+
 # ---------------------------------------------------------------- run_checks
 
 def test_run_checks_valid_data():
-    run_checks(empty_frames())
+    run_checks(valid_frames())
+
+
+def test_run_checks_valid_data_with_database():
+    run_checks(valid_frames(), sqlite_engine_with_riders(["r1"]))
 
 
 def test_run_checks_collects_problems_of_all_tables():
-    frames = empty_frames()
-    frames["riders"] = pd.DataFrame({"rider_id": ["a", "a"]})
-    frames["clubs"] = pd.DataFrame(
-        {"club_id": ["4400001", "4400001"], "departemental_committee_id": ["5244", "9999"]}
-    )
+    frames = valid_frames()
+    frames["riders"] = pd.concat([frames["riders"]] * 2)
+    clubs = pd.concat([frames["clubs"]] * 2, ignore_index=True)
+    clubs.loc[1, "departemental_committee_id"] = "9999"
+    frames["clubs"] = clubs
     with pytest.raises(DataValidationError) as error:
         run_checks(frames)
     assert len(error.value.problems) == 3  # 2 duplicated keys + 1 unknown foreign key column

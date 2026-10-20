@@ -11,12 +11,26 @@ the database as long as one problem remains.
 import pandas as pd
 
 from contextlib import nullcontext
-from sqlalchemy import Connection, Engine, Table, select
+from sqlalchemy import Connection, Engine, Table, func, select
 
 from access_it.etl.load.models import Base
 
 MAX_EXAMPLES = 3  # example values shown in each problem message
 QUERY_CHUNK_SIZE = 1_000  # values per IN (...) clause
+
+# Maximum relative decrease of the row count, from the database to the file.
+# Only tables rebuilt from the whole cache are listed: their files hold the full
+# history, so they should not shrink. Tables built from the current FFC API
+# (clubs, departements, committees) are left out, since entries can disappear
+# from the API while the database keeps them.
+MAX_ROW_DECREASE = {
+    "races": 0.0,
+    "rankings": 0.0,
+    "riders": 0.0,
+    "affiliations": 0.0,
+    # The category inference heuristic may legitimately produce fewer rows
+    "rider_categories": 0.05,
+}
 
 
 class DataValidationError(Exception):
@@ -125,6 +139,33 @@ def check_foreign_keys(
     return problems
 
 
+def count_rows(connection: Connection | None, table: Table) -> int:
+    """Return the number of rows of the table in the database (0 without database)."""
+    if connection is None:
+        return 0
+    return connection.execute(select(func.count()).select_from(table)).scalar_one()
+
+
+def check_row_count(table: Table, df: pd.DataFrame, connection: Connection | None) -> list[str]:
+    """Check that the file is not empty and has not shrunk too much compared with the database.
+
+    Only a row count is read from the database (tables of MAX_ROW_DECREASE only).
+    """
+    if df.empty:
+        return [f"[{table.name}] file is empty"]
+    if table.name not in MAX_ROW_DECREASE:
+        return []
+    database_rows = count_rows(connection, table)
+    tolerance = MAX_ROW_DECREASE[table.name]
+    if database_rows == 0 or len(df) >= database_rows * (1 - tolerance):
+        return []
+    decrease = 1 - len(df) / database_rows
+    return [
+        f"[{table.name}] file has {len(df)} rows, database has {database_rows} "
+        f"(-{decrease:.1%}, tolerance {tolerance:.0%}): possible incomplete extract or transform"
+    ]
+
+
 def run_checks(frames: dict[str, pd.DataFrame], engine: Engine | None = None) -> None:
     """Run every check on the DataFrames to load, keyed by table name.
 
@@ -139,5 +180,6 @@ def run_checks(frames: dict[str, pd.DataFrame], engine: Engine | None = None) ->
             df = frames[table.name]
             problems += check_primary_key(table, df)
             problems += check_foreign_keys(table, df, frames, connection)
+            problems += check_row_count(table, df, connection)
     if problems:
         raise DataValidationError(problems)
