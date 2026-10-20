@@ -245,7 +245,7 @@ def test_row_count_no_decrease_allowed():
     with engine.connect() as connection:
         problems = check_row_count(TABLES["riders"], df, connection)
     assert problems == [
-        "[riders] file has 2 rows, database has 3 (-33.3%, tolerance 0%): "
+        "[riders] file has 2 rows, database has 3 (-33.33%, tolerance 0%): "
         "possible incomplete extract or transform"
     ]
 
@@ -263,7 +263,7 @@ def test_row_count_decrease_within_tolerance():
         assert check_row_count(TABLES["rider_categories"], rider_categories(95), connection) == []
         problems = check_row_count(TABLES["rider_categories"], rider_categories(94), connection)
     assert problems == [
-        "[rider_categories] file has 94 rows, database has 100 (-6.0%, tolerance 5%): "
+        "[rider_categories] file has 94 rows, database has 100 (-6.00%, tolerance 5%): "
         "possible incomplete extract or transform"
     ]
 

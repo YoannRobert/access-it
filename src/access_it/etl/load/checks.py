@@ -172,7 +172,7 @@ def check_row_count(table: Table, df: pd.DataFrame, connection: Connection | Non
     decrease = 1 - len(df) / database_rows
     return [
         f"[{table.name}] file has {len(df)} rows, database has {database_rows} "
-        f"(-{decrease:.1%}, tolerance {tolerance:.0%}): possible incomplete extract or transform"
+        f"(-{decrease:.2%}, tolerance {tolerance:.0%}): possible incomplete extract or transform"
     ]
 
 
