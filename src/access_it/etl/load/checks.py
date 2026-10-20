@@ -15,11 +15,19 @@ from sqlalchemy import (
     Column, Connection, Engine, MetaData, Table, and_, exists, func, select
 )
 
+from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.load.models import Base
+from access_it.etl.transform.riders import is_valid_uci_id
 
 MAX_EXAMPLES = 3  # example values shown in each problem message
 QUERY_CHUNK_SIZE = 1_000  # values per IN (...) clause
 MAX_DIAGNOSED_RIDERS = 20  # missing riders read from the database to explain the problem
+CLEANING_INSTRUCTIONS = [
+    "To delete the stale riders and their rows, run from the repository root:",
+    "  python scripts/prune_stale_rows.py            (dry run: shows what would be deleted)",
+    "  python scripts/prune_stale_rows.py --apply    (deletes)",
+    "then run the load again: python scripts/load.py",
+]
 
 # Maximum relative decrease of the row count, from the database to the file.
 # Only tables rebuilt from the whole cache are listed: their files hold the full
@@ -216,24 +224,95 @@ def find_missing_rows(
         file_keys.drop(connection)
 
 
+def _names_match(db_last: str, db_first: str, file_last: str, file_first: str) -> bool:
+    """Whether names of the database and of the file belong to the same person.
+
+    Red-list riders often have their first name reduced to an initial ("J."),
+    which then only has to match the first letter of the first name in the file.
+    """
+    db_last, db_first = fold_name(db_last), fold_name(db_first)
+    file_last, file_first = fold_name(file_last), fold_name(file_first)
+    if db_last != file_last or not db_first or not file_first:
+        return False
+    initial = db_first.rstrip(".")
+    if len(initial) == 1:
+        return file_first.startswith(initial)
+    return db_first == file_first
+
+
+def fold_name(name) -> str:
+    """Name without case, accents and extra spaces ('' for a missing name)."""
+    if not isinstance(name, str):
+        return ""
+    return " ".join(normalize_string_and_fold_case(name).split())
+
+
 def explain_missing_riders(missing_riders: list[tuple], riders: pd.DataFrame) -> list[str]:
-    """Explain missing riders (rider_id, uci_id) whose UCI ID has another rider_id in the file."""
-    file_rider_id_by_uci_id = {
-        uci_id: rider_id
-        for uci_id, rider_id in zip(riders["uci_id"], riders["rider_id"])
-        if isinstance(uci_id, str) and uci_id.isdigit()
-    }
-    return [
-        f"UCI ID {uci_id}: {rider_id!r} in database, {file_rider_id_by_uci_id[uci_id]!r} in file"
-        for rider_id, uci_id in missing_riders
-        if uci_id in file_rider_id_by_uci_id
+    """Explain the missing riders (rider_id, uci_id, last_name, first_name), one line each.
+
+    Missing riders are grouped by cause: riders without valid UCI ID in the
+    database now appearing with one in the file, riders whose UCI ID has another
+    rider_id in the file, and riders missing for an unknown reason.
+    """
+    file_riders_with_uci_id = [
+        (rider_id, uci_id, last_name, first_name)
+        for rider_id, uci_id, last_name, first_name in zip(
+            riders["rider_id"], riders["uci_id"], riders["last_name"], riders["first_name"]
+        )
+        if isinstance(uci_id, str) and is_valid_uci_id(uci_id)
     ]
+    file_rider_id_by_uci_id = {uci_id: rider_id for rider_id, uci_id, *_ in file_riders_with_uci_id}
+
+    gained_uci_id, same_uci_id, unknown = [], [], []
+    for rider_id, uci_id, last_name, first_name in missing_riders:
+        name = f"{last_name} {first_name}"
+        if isinstance(uci_id, str) and uci_id in file_rider_id_by_uci_id:
+            same_uci_id.append(
+                f"{name}: {rider_id!r} in database -> "
+                f"{file_rider_id_by_uci_id[uci_id]!r} in file (UCI ID {uci_id})"
+            )
+            continue
+        if not (isinstance(uci_id, str) and is_valid_uci_id(uci_id)):
+            matches = [
+                (file_rider_id, file_uci_id)
+                for file_rider_id, file_uci_id, file_last, file_first in file_riders_with_uci_id
+                if _names_match(last_name, first_name, file_last, file_first)
+            ]
+            if len(matches) == 1:
+                file_rider_id, file_uci_id = matches[0]
+                status = "red list" if uci_id == "Liste Rouge" else "no UCI ID"
+                gained_uci_id.append(
+                    f"{name} ({status}): {rider_id!r} in database -> "
+                    f"{file_rider_id!r} in file (UCI ID {file_uci_id})"
+                )
+                continue
+        unknown.append(f"{name}: {rider_id!r} (UCI ID field: {uci_id!r})")
+
+    lines = []
+    if gained_uci_id:
+        lines.append(
+            f"Riders without UCI ID in the database who now appear with a UCI ID in the "
+            f"file ({len(gained_uci_id)}):"
+        )
+        lines += [f"  {line}" for line in gained_uci_id]
+    if same_uci_id:
+        lines.append(f"Riders whose UCI ID has another rider_id in the file ({len(same_uci_id)}):")
+        lines += [f"  {line}" for line in same_uci_id]
+    if unknown:
+        lines.append(
+            f"Riders missing for an unknown reason, check the transform step first "
+            f"({len(unknown)}):"
+        )
+        lines += [f"  {line}" for line in unknown]
+    return lines
 
 
 def check_missing_rows(table: Table, df: pd.DataFrame, connection: Connection | None) -> list[str]:
     """Check that the rows already in the database are all present in the file.
 
-    Only applies to the tables of NO_MISSING_ROWS.
+    Only applies to the tables of NO_MISSING_ROWS. For riders, every missing
+    rider is explained (see explain_missing_riders) and the cleaning commands
+    are given.
     """
     if connection is None or table.name not in NO_MISSING_ROWS:
         return []
@@ -244,21 +323,26 @@ def check_missing_rows(table: Table, df: pd.DataFrame, connection: Connection | 
         connection,
         table,
         df,
-        columns=["rider_id", "uci_id"] if is_riders else None,
+        columns=["rider_id", "uci_id", "last_name", "first_name"] if is_riders else None,
         limit=MAX_DIAGNOSED_RIDERS if is_riders else MAX_EXAMPLES,
     )
     if count == 0:
         return []
-    examples = [row[0] for row in rows] if len(rows[0]) == 1 or is_riders else rows
-    problem = (
-        f"[{table.name}] {count} row(s) in database missing from file, "
-        f"e.g. {format_examples(examples)}: identifiers probably changed since the last load"
-    )
-    if is_riders:
-        explanations = explain_missing_riders(rows, df)
-        if explanations:
-            problem += "; " + "; ".join(explanations[:MAX_EXAMPLES])
-    return [problem]
+    if not is_riders:
+        examples = [row[0] for row in rows] if len(rows[0]) == 1 else rows
+        return [
+            f"[{table.name}] {count} row(s) in database missing from file, "
+            f"e.g. {format_examples(examples)}: identifiers probably changed since the last load"
+        ]
+    lines = [
+        f"[riders] {count} rider(s) in database missing from file: "
+        f"identifiers probably changed since the last load"
+    ]
+    lines += [f"    {line}" for line in explain_missing_riders(rows, df)]
+    if count > len(rows):
+        lines.append(f"    ... and {count - len(rows)} other rider(s)")
+    lines += [f"    {line}" for line in CLEANING_INSTRUCTIONS]
+    return ["\n".join(lines)]
 
 
 def run_checks(frames: dict[str, pd.DataFrame], engine: Engine | None = None) -> None:

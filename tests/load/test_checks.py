@@ -280,7 +280,21 @@ def test_row_count_without_database():
 
 # ---------------------------------------------------------------- check_missing_rows
 
-UCI_ID_1, UCI_ID_2 = "10012345601", "10012345702"
+UCI_ID_1, UCI_ID_2 = "10012345656", "10012345757"  # valid check digits (modulo 97)
+
+
+def named_rider(rider_id: str, uci_id: str, last_name: str, first_name: str) -> dict:
+    return {
+        "rider_id": rider_id, "uci_id": uci_id, "last_name": last_name, "first_name": first_name
+    }
+
+
+def missing_riders_message(database_riders: list[dict], file_riders: list[dict]) -> str:
+    engine = sqlite_engine_with_rows({"riders": database_riders})
+    with engine.connect() as connection:
+        problems = check_missing_rows(TABLES["riders"], pd.DataFrame(file_riders), connection)
+    assert len(problems) == 1
+    return problems[0]
 
 
 def test_missing_rows_none():
@@ -290,17 +304,62 @@ def test_missing_rows_none():
         assert check_missing_rows(TABLES["riders"], df, connection) == []
 
 
-def test_missing_riders_with_changed_identifier():
-    engine = sqlite_engine_with_rows({
-        "riders": [rider_row("r1", UCI_ID_1), rider_row("r2_old", UCI_ID_2), rider_row("r3")]
-    })
-    df = pd.DataFrame([rider_row("r1", UCI_ID_1), rider_row("r2_new", UCI_ID_2), rider_row("r3")])
-    with engine.connect() as connection:
-        problems = check_missing_rows(TABLES["riders"], df, connection)
-    assert problems == [
-        "[riders] 1 row(s) in database missing from file, e.g. 'r2_old': identifiers probably "
-        f"changed since the last load; UCI ID {UCI_ID_2}: 'r2_old' in database, 'r2_new' in file"
+def test_missing_rider_who_now_has_a_uci_id():
+    message = missing_riders_message(
+        [named_rider("r1", UCI_ID_1, "DUPONT", "Paul"), named_rider("r_old", "", "MARTIN", "Jean")],
+        [named_rider("r1", UCI_ID_1, "DUPONT", "Paul"),
+         named_rider("r_new", UCI_ID_2, "Martin", "Jean")],
+    )
+    assert message.splitlines()[:3] == [
+        "[riders] 1 rider(s) in database missing from file: "
+        "identifiers probably changed since the last load",
+        "    Riders without UCI ID in the database who now appear with a UCI ID in the file (1):",
+        "      MARTIN Jean (no UCI ID): 'r_old' in database -> 'r_new' in file "
+        f"(UCI ID {UCI_ID_2})",
     ]
+    assert "python scripts/prune_stale_rows.py --apply" in message
+    assert "python scripts/load.py" in message
+
+
+def test_missing_red_list_rider_who_now_has_a_uci_id():
+    message = missing_riders_message(
+        [named_rider("r_old", "Liste Rouge", "MARTIN", "J.")],
+        [named_rider("r_new", UCI_ID_2, "MARTIN", "Jean")],
+    )
+    assert (
+        f"MARTIN J. (red list): 'r_old' in database -> 'r_new' in file (UCI ID {UCI_ID_2})"
+        in message
+    )
+
+
+def test_missing_rider_with_same_uci_id_under_another_rider_id():
+    message = missing_riders_message(
+        [named_rider("r_old", UCI_ID_1, "DUPONT", "Paul")],
+        [named_rider("r_new", UCI_ID_1, "DUPOND", "Paul")],
+    )
+    assert "Riders whose UCI ID has another rider_id in the file (1):" in message
+    assert f"DUPONT Paul: 'r_old' in database -> 'r_new' in file (UCI ID {UCI_ID_1})" in message
+
+
+def test_missing_rider_for_an_unknown_reason():
+    message = missing_riders_message(
+        [named_rider("r1", UCI_ID_1, "DUPONT", "Paul"), named_rider("r2", "", "BERNARD", "Luc")],
+        [named_rider("r1", UCI_ID_1, "DUPONT", "Paul")],
+    )
+    assert "Riders missing for an unknown reason, check the transform step first (1):" in message
+    assert "BERNARD Luc: 'r2' (UCI ID field: '')" in message
+
+
+def test_homonyms_with_a_uci_id_are_not_guessed():
+    message = missing_riders_message(
+        [named_rider("r_old", "", "MARTIN", "Jean")],
+        [
+            named_rider("a", UCI_ID_1, "MARTIN", "Jean"),
+            named_rider("b", UCI_ID_2, "MARTIN", "Jean"),
+        ],
+    )
+    assert "unknown reason" in message
+    assert "now appear with a UCI ID" not in message
 
 
 def test_missing_rows_composite_key():
