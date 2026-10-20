@@ -1,7 +1,7 @@
 import pandas as pd
 
 from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME
-from access_it.etl.transform.riders import get_rider_id
+from access_it.etl.transform.riders import RiderLookup
 
 
 def fill_missing_values_by_groups(
@@ -209,10 +209,9 @@ def create_ranking_table(
         rider_db: pd.DataFrame
     ) -> pd.DataFrame:
     df = rider_x_race_data.copy()
+    riders = RiderLookup(rider_db)
     df["rider_id"] = [
-        get_rider_id(
-            db=rider_db, uci_id=uci_id, last_name=last_name, first_name=first_name
-        )
+        riders.get_rider_id(uci_id=uci_id, last_name=last_name, first_name=first_name)
         for uci_id, last_name, first_name in zip(
             df["uci_id"], df["last_name"], df["first_name"]
         )

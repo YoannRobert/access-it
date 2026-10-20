@@ -98,10 +98,12 @@ def add_club(
     return df
 
 
+RE_CLUB = re.compile(r"^(?:(\d{7})\s*-?\s*)?(.*)$")
+
+
 def parse_club_text(text: str | None) -> tuple[str | None, str | None]:
     if text is None:
         return None, None
-    RE_CLUB = re.compile(r"^(?:(\d{7})\s*-?\s*)?(.*)$")
     text = " ".join(text.split())
     m = RE_CLUB.match(text.strip())
     if m is None:
@@ -111,16 +113,105 @@ def parse_club_text(text: str | None) -> tuple[str | None, str | None]:
     return club_id, club_name
 
 
+def _fold_alternative_names(alternative_names: str) -> list[str]:
+    """Normalized alternative names, as compared by `identify_club`."""
+    return [
+        normalize_string_and_fold_case(name.strip())
+        for name in " ".join(alternative_names.split()).split(",")
+    ]
+
+
+class ClubLookup:
+    """Indexes over the club table, built once and queried many times.
+
+    Replaces the normalization of every club name previously done at every
+    call of `identify_club`. Results are identical: when several clubs match,
+    the first one in table order is returned.
+    """
+
+    def __init__(self, df_clubs: pd.DataFrame):
+        self.club_ids: list = []
+        self.names: list[str] = []
+        self.collapsed_names: list[str] = []
+        self.folded_names: list[str] = []
+        self.raw_alternative_names: list[str] = []
+        self.folded_alternative_names: list[list[str]] = []
+        self.position_by_id: dict = {}
+        self.position_by_folded_name: dict[str, int] = {}
+        self.position_by_folded_alternative_name: dict[str, int] = {}
+        for club_id, name, alternative_names in zip(
+                df_clubs["club_id"], df_clubs["name"], df_clubs["alternative_names"]
+        ):
+            self._append(club_id, name, alternative_names)
+
+    def _append(self, club_id, name: str, alternative_names: str) -> None:
+        position = len(self.club_ids)
+        collapsed_name = " ".join(name.split())
+        folded_name = normalize_string_and_fold_case(collapsed_name)
+        folded_alternative_names = _fold_alternative_names(alternative_names)
+        self.club_ids.append(club_id)
+        self.names.append(name)
+        self.collapsed_names.append(collapsed_name)
+        self.folded_names.append(folded_name)
+        self.raw_alternative_names.append(alternative_names)
+        self.folded_alternative_names.append(folded_alternative_names)
+        # setdefault keeps the first position, as .iloc[0] did on a boolean mask
+        self.position_by_id.setdefault(club_id, position)
+        self.position_by_folded_name.setdefault(folded_name, position)
+        for folded_alternative_name in folded_alternative_names:
+            self.position_by_folded_alternative_name.setdefault(folded_alternative_name, position)
+
+    def _rebuild_alternative_name_index(self) -> None:
+        self.position_by_folded_alternative_name = {}
+        for position, folded_alternative_names in enumerate(self.folded_alternative_names):
+            for folded_alternative_name in folded_alternative_names:
+                self.position_by_folded_alternative_name.setdefault(
+                    folded_alternative_name, position
+                )
+
+    def sync(self, df_clubs: pd.DataFrame, club_id: str | None) -> None:
+        """Apply the changes made by `add_club` to the club `club_id` of `df_clubs`.
+
+        `add_club` either appends new clubs at the end of the table or updates
+        the alternative names of an existing club (names and positions never change).
+        """
+        for position in range(len(self.club_ids), len(df_clubs)):
+            row = df_clubs.iloc[position]
+            self._append(row["club_id"], row["name"], row["alternative_names"])
+        position = self.position_by_id.get(club_id)
+        if position is None:
+            return
+        alternative_names = df_clubs["alternative_names"].iat[position]
+        if alternative_names != self.raw_alternative_names[position]:
+            self.raw_alternative_names[position] = alternative_names
+            self.folded_alternative_names[position] = _fold_alternative_names(alternative_names)
+            self._rebuild_alternative_name_index()
+
+    def find_first_club_containing(self, folded_name: str) -> int | None:
+        """Position of the first club whose name or an alternative name contains `folded_name`."""
+        for position, (name, alternative_names) in enumerate(
+                zip(self.folded_names, self.folded_alternative_names)
+        ):
+            if folded_name in name or any(folded_name in n for n in alternative_names):
+                return position
+        return None
+
+
 def identify_club(
         club_id: str | None,
         club_name: str | None,
-        df_clubs: pd.DataFrame,
+        df_clubs: pd.DataFrame | ClubLookup,
     ) -> tuple[bool, str | None, str | None]:
+    """Identify a club from its ID and/or name.
+
+    For repeated calls, pass a `ClubLookup` built once instead of the DataFrame.
+    """
+    clubs = df_clubs if isinstance(df_clubs, ClubLookup) else ClubLookup(df_clubs)
     add_this_club = False
-    df = df_clubs.copy()
     if is_valid_french_club_id(club_id, include_specific_cases=False):
-        if club_id in df["club_id"].values:
-            club_name = df[df["club_id"] == club_id]["name"].values[0]
+        position = clubs.position_by_id.get(club_id)
+        if position is not None:
+            club_name = clubs.names[position]
             add_this_club = True
         elif is_individual_license(club_id) or is_individual_club(club_name):
             club_id = INDIVIDUAL_CLUB_ID
@@ -135,31 +226,6 @@ def identify_club(
             return False, None, None
         n_club_name = normalize_string_and_fold_case(club_name)
         n_club_name = " ".join(n_club_name.split())
-        df["name"] = df["name"].apply(lambda x: " ".join(x.split()))
-        df["alternative_names"] = df["alternative_names"].apply(lambda x: " ".join(x.split()))
-        mask_names = df["name"].apply(normalize_string_and_fold_case) == n_club_name
-        mask_alt_names = df["alternative_names"].str.split(",") \
-            .apply(
-                lambda names: n_club_name in [
-                    normalize_string_and_fold_case(n.strip())
-                    for n in names
-                ]
-            )
-        mask_included = (
-            (
-                df["name"].apply(normalize_string_and_fold_case).str.contains(n_club_name, regex=False)
-            )
-            |
-            (
-                df["alternative_names"].str.split(",")
-                .apply(
-                    lambda names: any(
-                        n_club_name in normalize_string_and_fold_case(n.strip())
-                        for n in names
-                    )
-                )
-            )
-        )
         if is_individual_club(club_name):
             club_id = INDIVIDUAL_CLUB_ID
             club_name = INDIVIDUAL_NAME
@@ -172,17 +238,19 @@ def identify_club(
             # For now, we'll just take the first one.
             club_id, club_name = "4436087", "VC CHATILLONNAIS"
             add_this_club = True
-        elif mask_names.any():
-            club_id, club_name = df.loc[mask_names, ["club_id", "name"]].iloc[0]
-            add_this_club = True
-        elif mask_alt_names.any():
-            club_id, club_name = df.loc[mask_alt_names, ["club_id", "name"]].iloc[0]
-            add_this_club = True
-        elif mask_included.any() and len(n_club_name) >= 10:
-            club_id, club_name = df.loc[mask_included, ["club_id", "name"]].iloc[0]
-            add_this_club = True
         else:
-            raise ValueError(f"Club not found (club_id={str(club_id)}, club_name={str(club_name)})")
+            position = clubs.position_by_folded_name.get(n_club_name)
+            if position is None:
+                position = clubs.position_by_folded_alternative_name.get(n_club_name)
+            if position is None and len(n_club_name) >= 10:
+                position = clubs.find_first_club_containing(n_club_name)
+            if position is None:
+                raise ValueError(
+                    f"Club not found (club_id={str(club_id)}, club_name={str(club_name)})"
+                )
+            # The returned name has its whitespace collapsed
+            club_id, club_name = clubs.club_ids[position], clubs.collapsed_names[position]
+            add_this_club = True
     if not isinstance(club_id, (str, NoneType)) or not isinstance(club_name, (str, NoneType)):
         raise TypeError(
             "club_id and club_name types must be str or None, " +
@@ -191,13 +259,14 @@ def identify_club(
     return add_this_club, club_id, club_name
 
 
-def identify_clubs(s: pd.Series, df_clubs: pd.DataFrame) -> pd.Series:
+def identify_clubs(s: pd.Series, df_clubs: pd.DataFrame | ClubLookup) -> pd.Series:
+    clubs = df_clubs if isinstance(df_clubs, ClubLookup) else ClubLookup(df_clubs)
     club_ids_out = []
     for club_text in s:
         try:
             club_id_in, club_name_in = parse_club_text(club_text)
             club_id_out = identify_club(
-                club_id=club_id_in, club_name=club_name_in, df_clubs=df_clubs
+                club_id=club_id_in, club_name=club_name_in, df_clubs=clubs
             )[1]
         except AttributeError:
             club_id_out = None
@@ -254,6 +323,8 @@ def add_clubs_found_in_race_html_files(
         clubs: pd.DataFrame,
         departemental_committees: pd.DataFrame | list[dict]
     ) -> pd.DataFrame:
+    # Indexes over the club table, kept in sync with the clubs added below
+    club_lookup = ClubLookup(clubs)
     for race_html_file in get_results_html_files():
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
@@ -263,7 +334,7 @@ def add_clubs_found_in_race_html_files(
             try:
                 club_id, club_name = parse_club_text(club_text)
                 add_this_club, club_id_2, club_name_2 = identify_club(
-                    club_id=club_id, club_name=club_name, df_clubs=clubs
+                    club_id=club_id, club_name=club_name, df_clubs=club_lookup
                 )
                 if add_this_club:
                     clubs = add_club(
@@ -273,6 +344,7 @@ def add_clubs_found_in_race_html_files(
                         season=season,
                         departemental_committees=departemental_committees
                     )
+                    club_lookup.sync(clubs, club_id_2)
             except ValueError:
                 pass
     return clubs

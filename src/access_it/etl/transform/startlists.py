@@ -6,9 +6,11 @@ from access_it.etl.transform.categories import (
     count_nb_access_subcategories_from_name,
     has_access_subcategories, get_higher_access_subcategory
 )
-from access_it.etl.transform.clubs import identify_clubs
+from access_it.etl.transform.clubs import ClubLookup, identify_clubs
 from access_it.etl.transform.parse import get_startlists_html_files, parse_startlists_from_organization_page
-from access_it.etl.transform.riders import get_rider_id, get_rider_id_using_affiliations
+from access_it.etl.transform.riders import (
+    RiderLookup, build_riders_by_club, get_rider_id, get_rider_id_using_affiliations
+)
 
 
 CLUB_LONG_REFERENCES = [
@@ -99,9 +101,14 @@ def compute_probability_of_club_column(s: pd.Series) -> float:
 
 def identify_riders_on_startlist(
         df: pd.DataFrame,
-        riders: pd.DataFrame,
-        affiliations: pd.DataFrame
+        riders: pd.DataFrame | RiderLookup,
+        affiliations: pd.DataFrame | dict[str, set[str]]
     ) -> pd.DataFrame:
+    # Indexes built once for all rows (no-op if already built by the caller)
+    if not isinstance(riders, RiderLookup):
+        riders = RiderLookup(riders)
+    if isinstance(affiliations, pd.DataFrame):
+        affiliations = build_riders_by_club(affiliations)
     df = df.copy()
     rider_ids = []
     for row in df.itertuples():
@@ -195,11 +202,14 @@ def has_digits(s: pd.Series) -> bool:
 def identify_riders_categories_on_startlist(
         data: dict,
         clubs: pd.DataFrame,
-        riders: pd.DataFrame,
-        affiliations: pd.DataFrame,
+        riders: pd.DataFrame | RiderLookup,
+        affiliations: pd.DataFrame | dict[str, set[str]],
         departemental_committees: pd.DataFrame,
-        regional_committees: pd.DataFrame
+        regional_committees: pd.DataFrame,
+        club_lookup: ClubLookup | None = None
     ) -> list[dict]:
+    if club_lookup is None:
+        club_lookup = ClubLookup(clubs)
     race_date = data["date"]
     young_labels = ["u7", "u9", "u11", "u13", "u15", "u17", "ecole"]
     women_labels = ["dames", "femmes"]
@@ -434,7 +444,7 @@ def identify_riders_categories_on_startlist(
         if club_col not in cols:
             continue
 
-        df0[club_id_col] = identify_clubs(df0[club_col], df_clubs=clubs)
+        df0[club_id_col] = identify_clubs(df0[club_col], df_clubs=club_lookup)
 
         # Remove rows with missing club_id
         df0 = df0.dropna(subset=[club_id_col])
@@ -519,15 +529,20 @@ def identify_riders_categories_on_startlists(
         regional_committees: pd.DataFrame
     ):
     startlists_data = get_startlists_data()
+    # Indexes built once for all startlists
+    rider_lookup = RiderLookup(riders)
+    riders_by_club = build_riders_by_club(affiliations)
+    club_lookup = ClubLookup(clubs)
     output = []
     for data in startlists_data:
         new_output = identify_riders_categories_on_startlist(
             data=data,
             clubs=clubs,
-            riders=riders,
-            affiliations=affiliations,
+            riders=rider_lookup,
+            affiliations=riders_by_club,
             departemental_committees=departemental_committees,
-            regional_committees=regional_committees
+            regional_committees=regional_committees,
+            club_lookup=club_lookup
         )
         output.extend(new_output)
     return pd.DataFrame(output).drop_duplicates(keep="first").reset_index(drop=True)

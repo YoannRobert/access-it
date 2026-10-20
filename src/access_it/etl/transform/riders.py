@@ -2,11 +2,15 @@ import hashlib
 import pandas as pd
 import re
 
+from collections import defaultdict
 from typing import Literal
 
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
-from access_it.etl.transform.clubs import parse_club_text, identify_club
+from access_it.etl.transform.clubs import ClubLookup, parse_club_text, identify_club
+
+
+RED_LIST = "Liste Rouge"
 
 
 def is_valid_uci_id(uci_id: str | None) -> bool:
@@ -41,15 +45,17 @@ def split_race_data_into_rider_data(races_data: list[dict]) -> list[dict]:
 
 def identify_club_of_riders(
         rider_x_race_data: list[dict],
-        df_clubs: pd.DataFrame
+        df_clubs: pd.DataFrame | ClubLookup
     ) -> list[dict]:
+    # Indexes over the club table are built once for all rows
+    clubs = df_clubs if isinstance(df_clubs, ClubLookup) else ClubLookup(df_clubs)
     data = []
     for single_rider_x_race_data in rider_x_race_data:
         club_text = single_rider_x_race_data["club"]
         club_id, club_name = parse_club_text(club_text)
         del single_rider_x_race_data["club"]
         try:
-            _, club_id_2, _ = identify_club(club_id=club_id, club_name=club_name, df_clubs=df_clubs)
+            _, club_id_2, _ = identify_club(club_id=club_id, club_name=club_name, df_clubs=clubs)
             single_rider_x_race_data["club_id"] = club_id_2
             data.append(single_rider_x_race_data)
         except ValueError:
@@ -102,10 +108,11 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
         }
     )
     added_index = []
-    added_uci_ids = []
-    added_names_red_list = []
-    added_names_individual_license = []
-    added_names_unknown_uci_id = []
+    # Sets give constant-time membership tests (lists were scanned at every row)
+    added_uci_ids: set[str] = set()
+    added_names_red_list: set[tuple[str, str]] = set()
+    added_names_individual_license: set[tuple[str, str]] = set()
+    added_names_unknown_uci_id: set[tuple[str, str]] = set()
     db_rows = []
     i_uci_id, i_red_list, i_individual_license, i_missing_uci_id = 0, 0, 0, 0
 
@@ -124,36 +131,38 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
             continue
         uci_id = uci_id if isinstance(uci_id, str) else ""
         club_id = club_id if isinstance(club_id, str) else ""
-        isin_red_list = (row.uci_id == "Liste Rouge")
+        isin_red_list = (row.uci_id == RED_LIST)
         isin_individual_license = (club_id == INDIVIDUAL_CLUB_ID)
+        names = (last_name, first_name)
 
         if is_valid_uci_id(uci_id):
             i_uci_id += 1
             valid_row = True
             if uci_id not in added_uci_ids:
                 add_this_row = True
-                added_uci_ids.append(uci_id)
+                added_uci_ids.add(uci_id)
         elif isin_red_list:
             i_red_list += 1
             valid_row = True
-            if [last_name, first_name] not in added_names_red_list:
+            if names not in added_names_red_list:
                 add_this_row = True
-                added_names_red_list.append([last_name, first_name])
+                added_names_red_list.add(names)
         elif isin_individual_license:
             i_individual_license += 1
             valid_row = True
-            if [last_name, first_name] not in added_names_individual_license:
+            if names not in added_names_individual_license:
                 add_this_row = True
-                added_names_individual_license.append([last_name, first_name])
+                added_names_individual_license.add(names)
         elif (
                 uci_id == ""
-                and [last_name, first_name] not in added_names_red_list + added_names_individual_license
+                and names not in added_names_red_list
+                and names not in added_names_individual_license
         ):
             i_missing_uci_id += 1
             valid_row = True
-            if [last_name, first_name] not in added_names_unknown_uci_id:
+            if names not in added_names_unknown_uci_id:
                 add_this_row = True
-                added_names_unknown_uci_id.append([last_name, first_name])
+                added_names_unknown_uci_id.add(names)
         if valid_row:
             added_index.append(index)
         if add_this_row:
@@ -175,8 +184,130 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
     return db
 
 
+def _group_positions(keys: list) -> dict:
+    """Map each key to the list of its positions, in increasing order."""
+    positions = defaultdict(list)
+    for position, key in enumerate(keys):
+        positions[key].append(position)
+    return dict(positions)
+
+
+class RiderLookup:
+    """Indexes over the rider table, built once and queried many times.
+
+    Replaces the full scan (copy + string normalization of the whole table)
+    previously done at every call of `get_rider_id`. Results are identical,
+    including the order of the returned rider IDs (order of the table).
+    """
+
+    def __init__(self, db: pd.DataFrame):
+        self.rider_ids: list[str] = db["rider_id"].to_list()
+        self.uci_ids: list[str] = db["uci_id"].to_list()
+        stripped_last_names = [x.strip() for x in db["last_name"]]
+        stripped_first_names = [x.strip() for x in db["first_name"]]
+        # Names as compared in case-sensitive (True) and case-insensitive (False) modes
+        self.names: dict[bool, tuple[list[str], list[str]]] = {
+            True: (stripped_last_names, stripped_first_names),
+            False: (
+                [normalize_string_and_fold_case(x) for x in stripped_last_names],
+                [normalize_string_and_fold_case(x) for x in stripped_first_names],
+            ),
+        }
+        self.positions_by_uci_id = _group_positions(self.uci_ids)
+        self._name_indexes: dict[bool, dict[str, dict]] = {}
+
+    def name_indexes(self, case_sensitive: bool) -> dict[str, dict]:
+        """Name indexes for one mode, built on first use."""
+        if case_sensitive not in self._name_indexes:
+            last_names, first_names = self.names[case_sensitive]
+            pairs = list(zip(last_names, first_names))
+            self._name_indexes[case_sensitive] = {
+                "name": _group_positions(pairs),
+                "full_name": _group_positions([f"{l} {f}" for l, f in pairs]),
+                "red_list_name": _group_positions(
+                    [pair if uci_id == RED_LIST else None for pair, uci_id in zip(pairs, self.uci_ids)]
+                ),
+            }
+        return self._name_indexes[case_sensitive]
+
+    def get_rider_id(
+            self,
+            uci_id: str = "",
+            last_name: str = "",
+            first_name: str = "",
+            full_name: str = "",
+            case_sensitive: bool = True,
+            broader_search: bool = False,
+            output: Literal["first", "last", "all"] = "first"
+        ) -> str | list[str]:
+        if case_sensitive:
+            last_name = last_name.strip()
+            first_name = first_name.strip()
+            full_name = full_name.strip()
+        else:
+            last_name = normalize_string_and_fold_case(last_name.strip())
+            first_name = normalize_string_and_fold_case(first_name.strip())
+            full_name = normalize_string_and_fold_case(full_name.strip())
+        db_last_names, db_first_names = self.names[case_sensitive]
+        uci_id = "" if pd.isna(uci_id) else uci_id
+        if uci_id != "" and uci_id != RED_LIST:
+            if not is_valid_uci_id(uci_id):
+                raise ValueError(f"Invalid UCI ID: {uci_id}")
+            positions = self.positions_by_uci_id.get(uci_id, [])
+        elif broader_search:
+            if last_name == "" and first_name == "":
+                raise ValueError(
+                    "Both last and first names cannot be empty when broader search is enabled."
+                )
+            positions = [
+                position
+                for position, (db_last_name, db_first_name)
+                in enumerate(zip(db_last_names, db_first_names))
+                if (last_name == "" or last_name in db_last_name)
+                and (first_name == "" or first_name in db_first_name)
+            ]
+            output = "all"
+        elif (
+                uci_id == RED_LIST
+                and last_name != ""
+                and first_name != "" and len(first_name) >= 1
+                and output == "all"
+        ):
+            first_name = first_name[0] + "."
+            positions = self.name_indexes(case_sensitive)["red_list_name"].get(
+                (last_name, first_name), []
+            )
+        elif last_name != "" and first_name != "":
+            positions = self.name_indexes(case_sensitive)["name"].get((last_name, first_name), [])
+        elif full_name != "":
+            positions = self.name_indexes(case_sensitive)["full_name"].get(full_name, [])
+            # Forcing "all" to ensure all same-name riders are returned,
+            # then the rider can be determined by his club affiliation.
+            output = "all"
+        else:
+            raise ValueError(
+                "Please provide:\n"
+                + "- UCI ID, or\n"
+                + "- last name and first name, or\n"
+                + "- full name (last and first names joined by a space), or\n"
+                + "- UCI ID = 'Liste Rouge', complete last name and first letter of the first name."
+            )
+        rider_ids = [self.rider_ids[position] for position in positions]
+        n = len(rider_ids)
+        if n == 0:
+            raise ValueError("Rider(s) not found")
+        elif n > 1 and output != "all":
+            raise ValueError(f"Multiple riders found while only one is asked:\n{rider_ids}")
+        if output == "first":
+            return rider_ids[0]
+        elif output == "last":
+            return rider_ids[-1]
+        else:
+            return rider_ids
+
+
 def get_rider_id(
-        db: pd.DataFrame,
+        db: pd.DataFrame | RiderLookup,
         uci_id: str = "",
         last_name: str = "",
         first_name: str = "",
@@ -185,85 +316,20 @@ def get_rider_id(
         broader_search: bool = False,
         output: Literal["first", "last", "all"] = "first"
     ) -> str | list[str]:
-    db = db.copy()
-    if case_sensitive:
-        db["last_name"] = db["last_name"].apply(lambda x: x.strip())
-        db["first_name"] = db["first_name"].apply(lambda x: x.strip())
-        last_name = last_name.strip()
-        first_name = first_name.strip()
-        full_name = full_name.strip()
-    else:
-        db["last_name"] = db["last_name"].apply(lambda x: normalize_string_and_fold_case(x.strip()))
-        db["first_name"] = db["first_name"].apply(lambda x: normalize_string_and_fold_case(x.strip()))
-        last_name = normalize_string_and_fold_case(last_name.strip())
-        first_name = normalize_string_and_fold_case(first_name.strip())
-        full_name = normalize_string_and_fold_case(full_name.strip())
-    uci_id = "" if pd.isna(uci_id) else uci_id
-    if uci_id != "" and uci_id != "Liste Rouge":
-        if not is_valid_uci_id(uci_id):
-            raise ValueError(f"Invalid UCI ID: {uci_id}")
-        rider_ids = db.loc[db.uci_id == uci_id, 'rider_id']
-    elif broader_search:
-        if last_name == "" and first_name == "":
-            raise ValueError(
-                "Both last and first names cannot be empty when broader search is enabled."
-            )
-        if last_name == "":
-            mask_l = True
-        else:
-            mask_l = db["last_name"].str.contains(last_name, regex=False, na=False)
-        if first_name == "":
-            mask_f = True
-        else:
-            mask_f = db["first_name"].str.contains(first_name, regex=False, na=False)
-        rider_ids = db.loc[mask_l & mask_f, 'rider_id']
-        output = "all"
-    elif (
-            uci_id == "Liste Rouge"
-            and last_name != ""
-            and first_name != "" and len(first_name) >= 1
-            and output == "all"
-    ):
-        first_name = first_name[0] + "."
-        mask = (
-            (db["uci_id"] == "Liste Rouge")
-            & (db["last_name"] == last_name)
-            & (db["first_name"] == first_name)
-        )
-        rider_ids = db.loc[mask, 'rider_id']
-    elif last_name != "" and first_name != "":
-        mask_l = (db["last_name"] == last_name)
-        mask_f = (db["first_name"] == first_name)
-        rider_ids = db.loc[mask_l & mask_f, 'rider_id']
-    elif full_name != "":
-        db["full_name"] = db["last_name"].str.cat(db["first_name"], sep=" ")
-        mask = (db.full_name == full_name)
-        rider_ids = db.loc[mask, 'rider_id']
-        # Forcing "all" to ensure all same-name riders are returned,
-        # then the rider can be determined by his club affiliation.
-        output = "all"
-    else:
-        raise ValueError(
-            "Please provide:\n"
-            + "- UCI ID, or\n"
-            + "- last name and first name, or\n"
-            + "- full name (last and first names joined by a space), or\n"
-            + "- UCI ID = 'Liste Rouge', complete last name and first letter of the first name."
-        )
-    if isinstance(rider_ids, pd.Series):
-        n = rider_ids.shape[0]
-    else:
-        raise ValueError("'rider_ids' should be a pandas Series")
-    if n == 0:
-        raise ValueError("Rider(s) not found")
-    elif n > 1 and output != "all":
-        raise ValueError(f"Multiple riders found while only one is asked:\n{rider_ids.to_list()}")
-    if output == "first":
-        return rider_ids.iloc[0]
-    elif output == "last":
-        return rider_ids.iloc[-1]
-    else:
-        return rider_ids.to_list()
+    """Find rider ID(s) in the rider table.
+
+    For repeated calls, pass a `RiderLookup` built once instead of the DataFrame.
+    """
+    lookup = db if isinstance(db, RiderLookup) else RiderLookup(db)
+    return lookup.get_rider_id(
+        uci_id=uci_id,
+        last_name=last_name,
+        first_name=first_name,
+        full_name=full_name,
+        case_sensitive=case_sensitive,
+        broader_search=broader_search,
+        output=output,
+    )
 
 
 def define_affiliation_id(rider_id: str, club_id: str) -> str:
@@ -276,7 +342,7 @@ def create_affiliation_clubs_riders(
         races_data: pd.DataFrame,
         rider_db: pd.DataFrame
     ) -> pd.DataFrame:
-    race_dates = races_data[["race_id", "race_date"]]
+    race_dates = races_data[["race_id", "race_date"]].copy()
     race_dates["race_date"] = pd.to_datetime(race_dates["race_date"])
     cols = ["uci_id", "last_name", "first_name", "club_id", "race_date"]
     rider_x_race_data = rider_x_race_data.drop(columns=["race_date"])
@@ -290,6 +356,7 @@ def create_affiliation_clubs_riders(
             "end_date": pd.Series(dtype="datetime64[ns]")
         }
     )
+    riders = RiderLookup(rider_db)
     aff_data = {}
     for row in df.itertuples():
         uci_id = row.uci_id
@@ -310,8 +377,8 @@ def create_affiliation_clubs_riders(
                 "Invalid data type for uci_id, last_name, or first_name "
                 + "(should be str)."
             )
-        rider_id = get_rider_id(
-            db=rider_db, uci_id=uci_id, last_name=last_name, first_name=first_name
+        rider_id = riders.get_rider_id(
+            uci_id=uci_id, last_name=last_name, first_name=first_name
         )
         if not isinstance(rider_id, str):
             raise TypeError(
@@ -362,19 +429,29 @@ def create_affiliation_clubs_riders(
     return aff
 
 
+def build_riders_by_club(affiliations: pd.DataFrame) -> dict[str, set[str]]:
+    """Map each club ID to the set of rider IDs affiliated with it."""
+    riders_by_club: dict[str, set[str]] = defaultdict(set)
+    for club_id, rider_id in zip(affiliations["club_id"], affiliations["rider_id"]):
+        riders_by_club[club_id].add(rider_id)
+    return dict(riders_by_club)
+
+
 def get_rider_id_using_affiliations(
         rider_ids: list[str],
-        affiliations: pd.DataFrame,
+        affiliations: pd.DataFrame | dict[str, set[str]],
         club_id: str
     ) -> str:
+    """Return the only rider among `rider_ids` affiliated with `club_id`.
+
+    For repeated calls, pass the mapping returned by `build_riders_by_club`
+    instead of the affiliation DataFrame.
+    """
     if len(rider_ids) == 0:
         raise ValueError("No rider IDs provided")
-    rider_ids_in = list(set(rider_ids))
-    rider_ids_out = affiliations[
-        (affiliations["club_id"] == club_id)
-        & (affiliations["rider_id"].isin(rider_ids_in))
-    ].loc[:, "rider_id"].tolist()
-    rider_ids_out = list(set(rider_ids_out))
+    if isinstance(affiliations, pd.DataFrame):
+        affiliations = build_riders_by_club(affiliations)
+    rider_ids_out = list(set(rider_ids) & affiliations.get(club_id, set()))
     n = len(rider_ids_out)
     if n == 0:
         raise ValueError(f"No rider ID found for club ID {club_id}")

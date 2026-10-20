@@ -2,11 +2,28 @@ import pandas as pd
 import re
 
 from datetime import datetime
+from functools import lru_cache
 from typing import Literal, Any
 from access_it.common.text import normalize_string_and_fold_case
 
 
 def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[int, bool]:
+    """Return, for each Access subcategory (1 to 4), whether it appears in `name`.
+
+    Results are cached (the same labels are parsed many times); a new dict is
+    returned at every call so callers can safely modify it.
+    """
+    if verbose:
+        return _compute_access_categories_from_name(name, verbose=True)
+    return dict(zip(range(1, 5), _cached_access_categories_from_name(name)))
+
+
+@lru_cache(maxsize=None)
+def _cached_access_categories_from_name(name: str) -> tuple[bool, ...]:
+    return tuple(_compute_access_categories_from_name(name).values())
+
+
+def _compute_access_categories_from_name(name: str, verbose: bool = False) -> dict[int, bool]:
     categories = {k: False for k in range(1, 5)}
     if verbose:
         print(f"name={name}")
@@ -201,7 +218,11 @@ def search_rider_category(
         rider_hc_prev, rider_lc_prev = 100, -100
         first_index = df_rider.index[0]
         rider_hc_next, rider_lc_next = None, None
-        for row in df_rider.itertuples():
+        # Values are collected in lists and written once at the end
+        # (row-by-row .loc assignments were slow)
+        rider_hc_values, rider_lc_values, events = [], [], []
+        rider_categories = df_rider["rider_category"].to_list()
+        for k, row in enumerate(df_rider.itertuples()):
             i = row.Index
             event = ""
             if not isinstance(row.race_hc, int) or not isinstance(row.race_lc, int):
@@ -242,16 +263,20 @@ def search_rider_category(
             if rider_hc > rider_lc_prev:
                 event += "↓cat, "
 
-            df_rider.loc[i, "rider_hc"] = rider_hc
-            df_rider.loc[i, "rider_lc"] = rider_lc
+            rider_hc_values.append(rider_hc)
+            rider_lc_values.append(rider_lc)
             if i == first_index:
                 event = ""
-            df_rider.loc[i, "event"] = event.strip(", ")
+            events.append(event.strip(", "))
             if rider_hc == rider_lc:
-                df_rider.loc[i, "rider_category"] = rider_hc
+                rider_categories[k] = rider_hc
 
             rider_hc_prev, rider_lc_prev = rider_hc, rider_lc
 
+        df_rider["rider_hc"] = rider_hc_values
+        df_rider["rider_lc"] = rider_lc_values
+        df_rider["event"] = events
+        df_rider["rider_category"] = pd.Series(rider_categories, index=df_rider.index, dtype=object)
         return df_rider
 
     def propagation(
@@ -322,11 +347,10 @@ def search_rider_category(
     df["rider_category"] = None
     df["event"] = ""
 
-    rider_ids = sorted(list(set(df["rider_id"].to_list())))
-
-    for rider_id in rider_ids:
-        mask = df["rider_id"] == rider_id
-        df_rider = df[mask]
+    # One pass per rider over its own rows (groupby avoids a full-table mask per rider)
+    processed_riders = []
+    for _, df_rider in df.groupby("rider_id", sort=True):
+        df_rider = df_rider.copy()
 
         df_rider = forward_search(df_rider)
         df_rider = backward_propagation(df_rider, step=1)
@@ -356,7 +380,12 @@ def search_rider_category(
         df_rider = forward_propagation(df_rider, step=1)
         df_rider = backward_propagation(df_rider, step=2)
 
-        df[mask] = df_rider
+        processed_riders.append(df_rider)
+
+    if processed_riders:
+        processed = pd.concat(processed_riders)
+        updated_columns = ["rider_hc", "rider_lc", "rider_category", "event"]
+        df.loc[processed.index, updated_columns] = processed[updated_columns]
     return df.loc[:, ["rider_id", "race_date", "rider_category"]].reset_index(drop=True)
 
 
@@ -368,10 +397,8 @@ def compute_category_history(category_at_given_times: pd.DataFrame) -> pd.DataFr
     df = category_at_given_times.copy()
     df["race_date"] = pd.to_datetime(df["race_date"])
     df = df.sort_values(["rider_id", "race_date"])
-    rider_ids = list(set(df["rider_id"].to_list()))
     category_history_tmp: list[dict] = []
-    for rider_id in rider_ids:
-        df_rider = df.loc[df["rider_id"] == rider_id]
+    for rider_id, df_rider in df.groupby("rider_id", sort=False):
         # initializations
         first_index = df_rider.index[0]
         start_date_prev = df_rider.loc[first_index, "race_date"]
@@ -411,20 +438,13 @@ def advance_start_dates_in_category_history(category_history: pd.DataFrame) -> p
     df = category_history.copy()
     df["start_date"] = pd.to_datetime(df["start_date"])
     df = df.sort_values(["rider_id", "start_date"])
-    rider_ids = list(set(df["rider_id"].to_list()))
-    for rider_id in rider_ids:
-        this_rider = df["rider_id"] == rider_id
-        first_index = df[this_rider].index[0]
-        year_prev_row = 0
-        for row in df[this_rider].itertuples():
-            if row.Index == first_index:
-                year_prev_row = df.loc[first_index, "start_date"].year
-                df.loc[first_index, "start_date"] = pd.to_datetime(arg=f"{year_prev_row}-01-01", format="%Y-%m-%d")
-                continue
-            year = df.at[row.Index, "start_date"].year
-            if year > year_prev_row:
-                df.loc[row.Index, "start_date"] = pd.to_datetime(arg=f"{year}-01-01", format="%Y-%m-%d")
-                year_prev_row = year
+    # Rows being sorted by date within each rider, the first row of each
+    # (rider, year) pair is moved to January 1st of that year
+    years = df["start_date"].dt.year
+    first_row_of_year = ~pd.DataFrame({"rider_id": df["rider_id"], "year": years}).duplicated()
+    df.loc[first_row_of_year, "start_date"] = pd.to_datetime(
+        years[first_row_of_year].astype(str) + "-01-01", format="%Y-%m-%d"
+    )
     return df
 
 
@@ -462,12 +482,16 @@ def add_unknown_years_in_category_history(
 
     category_history_tmp: list[dict] = []
 
-    rider_ids = list(set(df["rider_id"].to_list()))
-    for rider_id in rider_ids:
-        this_rider = df["rider_id"] == rider_id
-        first_index = df[this_rider].index[0]
-        first_year = df.loc[first_index, "start_date"].year
-        last_known_category = df.loc[first_index, "rider_category"]
+    # Years with known race dates, per rider (computed once instead of once per rider)
+    years_in_known_dates_by_rider = {
+        rider_id: set(years.dropna())
+        for rider_id, years in known_dates.groupby("rider_id")["year"]
+    }
+
+    for rider_id, df_rider in df.groupby("rider_id", sort=False):
+        first_index = df_rider.index[0]
+        first_year = df_rider.loc[first_index, "start_date"].year
+        last_known_category = df_rider.loc[first_index, "rider_category"]
         if first_year > after_year:
             category_history_tmp.append(
                 {
@@ -476,25 +500,13 @@ def add_unknown_years_in_category_history(
                     "rider_category": None,
                 }
             )
-        years_in_known_dates = (
-            known_dates
-            .loc[known_dates["rider_id"] == rider_id, "year"]
-            .dropna()
-            .drop_duplicates()
-            .sort_values(ignore_index=True)
-            .to_list()
-        )
-        years_in_category_history = (
-            df.loc[this_rider, "year"]
-            .drop_duplicates()
-            .sort_values(ignore_index=True)
-            .to_list()
-        )
+        years_in_known_dates = years_in_known_dates_by_rider.get(rider_id, set())
+        years_in_category_history = set(df_rider["year"])
         years = list[int](range(first_year, this_year + 1))
         missing_category_line_already_added = False
         for year in years:
             categories_this_year = (
-                df[this_rider & (df["year"] == year)]
+                df_rider[df_rider["year"] == year]
                 .sort_values(by="start_date", ascending=False, ignore_index=True)
                 ["rider_category"]
             )
@@ -506,7 +518,7 @@ def add_unknown_years_in_category_history(
                 last_known_category = last_known_category_this_year
             if year in years_in_category_history:
                 category_history_tmp.extend(
-                    df[this_rider & (df["year"] == year)]
+                    df_rider[df_rider["year"] == year]
                     .loc[:, ["rider_id", "start_date", "rider_category"]]
                     .to_dict(orient="records")
                 )
