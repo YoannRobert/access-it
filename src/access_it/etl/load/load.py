@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 
 from access_it.etl.extract.cache import DATA_DIR
+from access_it.etl.load.checks import run_checks
 from access_it.etl.load.models import Base
 
 
@@ -151,11 +152,18 @@ def load_all(engine: Engine) -> None:
     if unknown_sync_tables:
         raise ValueError(f"Unknown tables in TABLES_TO_SYNC: {sorted(unknown_sync_tables)}")
 
+    # Read and check all the files first: nothing is written if one check fails
+    frames = {}
+    for table in Base.metadata.sorted_tables:
+        df = read_parquet(table)
+        validate_columns(df, table)
+        frames[table.name] = df
+    run_checks(frames)
+
     with engine.begin() as connection:
         for table in Base.metadata.sorted_tables:
             on_conflict: ConflictMode = "update" if table.name in TABLES_TO_UPDATE else "ignore"
-            df = read_parquet(table)
-            validate_columns(df, table)
+            df = frames[table.name]
             if table.name in TABLES_TO_SYNC:
                 deleted = delete_stale_rows(
                     connection, table, df, TABLES_TO_SYNC[table.name]
