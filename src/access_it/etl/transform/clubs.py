@@ -337,10 +337,14 @@ def add_clubs_found_in_race_html_files(
                     club_id=club_id, club_name=club_name, df_clubs=club_lookup
                 )
                 if add_this_club:
+                    # When the club was identified by the ID read in the text, keep the
+                    # name read in the text: add_club records it as an alternative name
+                    # if it differs from the known name
+                    name_to_store = club_name if club_id == club_id_2 else club_name_2
                     clubs = add_club(
                         df_clubs=clubs,
                         club_id=club_id_2,
-                        club_name=club_name_2,
+                        club_name=name_to_store,
                         season=season,
                         departemental_committees=departemental_committees
                     )
