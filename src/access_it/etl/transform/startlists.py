@@ -1,3 +1,10 @@
+"""Categories of the riders read on the startlists.
+
+Startlist tables have no standard layout: the columns (start number, names,
+club, category, nationality, time...) are recognized by heuristics, then the
+riders are identified by their full name and their club at the race date.
+"""
+
 import pandas as pd
 
 from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
@@ -216,6 +223,7 @@ def identify_riders_on_startlist(
 
 
 def has_digits(s: pd.Series) -> bool:
+    """Whether at least one value of the series holds a digit."""
     return s.str.contains(r"\d", na=False).any()
 
 
@@ -228,6 +236,28 @@ def identify_riders_categories_on_startlist(
         regional_committees: pd.DataFrame,
         club_lookup: ClubLookup | None = None
     ) -> list[dict]:
+    """Read the Access category of the identified riders on the startlists of a page.
+
+    Youth and women's startlists are skipped. In each table, the header row and
+    the empty, duplicated, time, nationality, start number, gender and youth
+    category columns are dropped; the category column (or the category of a
+    single-category startlist), the club column and the name column(s) are then
+    recognized. Only riders of clubs of Bretagne and Pays de la Loire are kept
+    (individual and foreign riders excluded); tables whose layout is not
+    recognized are skipped.
+
+    Args:
+        data: Parsed startlist page (see parse_startlists_from_organization_page).
+        clubs: Club table.
+        riders: Rider table, or its RiderLookup.
+        affiliations: Affiliation table, or its AffiliationLookup.
+        departemental_committees: Departemental committees.
+        regional_committees: Regional committees.
+        club_lookup: ClubLookup of the club table (built if None).
+
+    Returns:
+        One dict per identified rider: rider_id, race_date, category ("A1" to "A4").
+    """
     if club_lookup is None:
         club_lookup = ClubLookup(clubs)
     race_date = data["date"]
@@ -550,6 +580,19 @@ def identify_riders_categories_on_startlists(
         departemental_committees: pd.DataFrame,
         regional_committees: pd.DataFrame
     ):
+    """Read the categories of the identified riders on every cached startlist page.
+
+    Args:
+        clubs: Club table.
+        riders: Rider table.
+        affiliations: Affiliation table.
+        departemental_committees: Departemental committees.
+        regional_committees: Regional committees.
+
+    Returns:
+        One row per rider and startlist, without duplicates: rider_id,
+        race_date, category.
+    """
     startlists_data = get_startlists_data()
     # Indexes built once for all startlists
     rider_lookup = RiderLookup(riders)

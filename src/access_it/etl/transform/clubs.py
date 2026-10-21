@@ -1,3 +1,10 @@
+"""Club table of the transform step: clubs found in the results, and identification of clubs.
+
+The club table read from the FFC API is completed with former clubs
+(add_legacy_clubs) and with the clubs found in the result pages; the club of
+each result is then identified from its club text (club ID and/or name).
+"""
+
 import pandas as pd
 import re
 
@@ -19,6 +26,7 @@ from access_it.etl.transform.parse import (
 
 
 def is_valid_season(season: int):
+    """Whether the season is between 2023 and the current year."""
     return 2023 <= season <= datetime.now().year
 
 
@@ -30,6 +38,32 @@ def add_club(
         departemental_committees: pd.DataFrame | list[dict],
         verbose: bool = False
     ) -> pd.DataFrame:
+    """Add a club to the club table, or update it if it already exists.
+
+    An existing club gets the name read as an alternative name (when it
+    differs from its name and alternative names, ignoring case and accents),
+    and its year range is extended to the season. An unknown club is added
+    only if its ID is a valid French club ID; otherwise the table is
+    returned unchanged.
+
+    Args:
+        df_clubs: Club table (club_id, name, departemental_committee_id,
+            min_year, max_year, alternative_names). It is not modified.
+        club_id: FFC club ID (7 digits), or None.
+        club_name: Club name as read in the results, or None.
+        season: Season in which the club was observed.
+        departemental_committees: Departemental committees, used to find
+            the committee of a new club.
+        verbose: Whether to print the changes made.
+
+    Returns:
+        A new club table including the change, or a copy of `df_clubs`
+        if `club_id` or `club_name` is None.
+
+    Raises:
+        ValueError: If the season is outside 2023 to the current year, or
+            if the departemental committee of a new club is not found.
+    """
     df = df_clubs.copy()
     if club_id is None or club_name is None:
         return df
@@ -102,6 +136,18 @@ RE_CLUB = re.compile(r"^(?:(\d{7})\s*-?\s*)?(.*)$")
 
 
 def parse_club_text(text: str | None) -> tuple[str | None, str | None]:
+    """Split a club text of the results into club ID and club name.
+
+    Examples: "5244001 - VC NANTAIS" gives ("5244001", "VC NANTAIS"), and
+    "VC NANTAIS" gives (None, "VC NANTAIS").
+
+    Args:
+        text: Club text, or None.
+
+    Returns:
+        The club ID (7 digits at the start of the text, or None) and the club
+        name (whitespace collapsed), or (None, None) if `text` is None.
+    """
     if text is None:
         return None, None
     text = " ".join(text.split())
@@ -131,6 +177,7 @@ class ClubLookup:
     """
 
     def __init__(self, df_clubs: pd.DataFrame):
+        """Build the indexes from the club table (club_id, name, alternative_names)."""
         self.club_ids: list = []
         self.names: list[str] = []
         self.collapsed_names: list[str] = []
@@ -147,6 +194,7 @@ class ClubLookup:
             self._append(club_id, name, alternative_names)
 
     def _add_name_owner(self, folded_name: str, club_id) -> None:
+        """Record that the (normalized) name belongs to the club."""
         if folded_name:
             self.club_ids_by_folded_name.setdefault(folded_name, set()).add(club_id)
 
@@ -155,6 +203,7 @@ class ClubLookup:
         return len(self.club_ids_by_folded_name.get(folded_name, ())) > 1
 
     def _append(self, club_id, name: str, alternative_names: str) -> None:
+        """Add a club at the end of the indexes."""
         position = len(self.club_ids)
         collapsed_name = " ".join(name.split())
         folded_name = normalize_string_and_fold_case(collapsed_name)
@@ -175,6 +224,7 @@ class ClubLookup:
             self._add_name_owner(folded_alternative_name, club_id)
 
     def _rebuild_alternative_name_index(self) -> None:
+        """Rebuild the indexes of the alternative names and of the name owners."""
         self.position_by_folded_alternative_name = {}
         self.club_ids_by_folded_name = {}
         for position, folded_alternative_names in enumerate(self.folded_alternative_names):
@@ -276,6 +326,7 @@ def identify_club(
 
 
 def identify_clubs(s: pd.Series, df_clubs: pd.DataFrame | ClubLookup) -> pd.Series:
+    """Identify the club ID of each club text of a series (None when not identified)."""
     clubs = df_clubs if isinstance(df_clubs, ClubLookup) else ClubLookup(df_clubs)
     club_ids_out = []
     for club_text in s:
@@ -296,6 +347,18 @@ def add_legacy_clubs(
         df_clubs: pd.DataFrame,
         departemental_committees: pd.DataFrame | list[dict],
     ) -> pd.DataFrame:
+    """Add the former clubs, missing from the FFC API but found in the results.
+
+    To add a club, append (club ID, name, a season in which it is observed)
+    to the list `legacy_clubs`.
+
+    Args:
+        df_clubs: Club table.
+        departemental_committees: Departemental committees.
+
+    Returns:
+        The club table including the former clubs.
+    """
     df = df_clubs.copy()
     legacy_clubs = [
         ("4356456", "TEAM IMMO GOLFE", 2024),
@@ -340,6 +403,18 @@ def add_clubs_found_in_race_html_files(
         departemental_committees: pd.DataFrame | list[dict]
     ) -> pd.DataFrame:
     # Indexes over the club table, kept in sync with the clubs added below
+    """Add or update the clubs found in the rankings of every cached result page.
+
+    A club identified by its ID gets the name read with the ID as an
+    alternative name; clubs that cannot be identified are ignored.
+
+    Args:
+        clubs: Club table.
+        departemental_committees: Departemental committees.
+
+    Returns:
+        The completed club table.
+    """
     club_lookup = ClubLookup(clubs)
     for race_html_file in get_results_html_files():
         season = int(race_html_file.parent.stem)

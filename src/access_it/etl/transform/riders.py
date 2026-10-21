@@ -1,3 +1,5 @@
+"""Riders and affiliations: rider IDs, rider table, lookups of riders and affiliations."""
+
 import hashlib
 import pandas as pd
 import re
@@ -15,6 +17,7 @@ MAX_REPORTED_CLUB_TEXTS = 10  # club texts listed in the report of dropped rows
 
 
 def is_valid_uci_id(uci_id: str | None) -> bool:
+    """Whether `uci_id` is an 11-digit UCI ID with valid check digits (first 9 digits modulo 97)."""
     if uci_id is None:
         return False
     if not bool(re.fullmatch(r"\d{11}", uci_id)):
@@ -41,6 +44,10 @@ def define_rider_id(uci_id: str | None, last_name: str, first_name: str) -> str:
 
 
 def split_race_data_into_rider_data(races_data: list[dict]) -> list[dict]:
+    """Flatten the rankings of the races into results (one dict per rider and race).
+
+    The race ID, season and race date are added to each result (in place).
+    """
     rider_x_race_data: list[dict] = []
     for race_data in races_data:
         season = race_data["season"]
@@ -95,8 +102,21 @@ def report_unidentified_club_texts(unidentified_club_texts: Counter[str]) -> Non
 
 
 def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
+    """Create the rider table from the results.
 
+    One rider is created per valid UCI ID, and per names for the red-list
+    riders, the individual licensees and the riders without UCI ID (names
+    already used by red-list or individual riders are not duplicated). Results
+    without names are skipped. A summary is printed.
+
+    Args:
+        rider_x_race_data: Results of the riders.
+
+    Returns:
+        One row per rider: rider_id, uci_id, last_name, first_name.
+    """
     def print_summary(n: int, i_list: list[int], label_list: list[str]):
+        """Print the number of results per type of rider, and whether all are covered."""
         print('-' * 120)
         print("Summary:")
         i_cum = 0
@@ -116,6 +136,7 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
 
 
     def print_summary_line(i: int, i_tot: int, n: int, label: str):
+        """Print the number and share of results of one type of rider."""
         msg = f"{label:24s}:"
         msg += "   added"
         msg += f" {i:9d}"
@@ -232,6 +253,7 @@ class RiderLookup:
     """
 
     def __init__(self, db: pd.DataFrame):
+        """Build the indexes from the rider table (rider_id, uci_id, last_name, first_name)."""
         self.rider_ids: list[str] = db["rider_id"].to_list()
         self.uci_ids: list[str] = db["uci_id"].to_list()
         stripped_last_names = [x.strip() for x in db["last_name"]]
@@ -271,6 +293,33 @@ class RiderLookup:
             broader_search: bool = False,
             output: Literal["first", "last", "all"] = "first"
         ) -> str | list[str]:
+        """Find rider ID(s), by UCI ID, names, full name or red-list names.
+
+        The search mode depends on the arguments given:
+        - a valid UCI ID: the rider with this UCI ID;
+        - `broader_search`: riders whose names contain the given names (all returned);
+        - UCI ID "Liste Rouge" with `output="all"`: red-list riders with the last
+          name and the initial of the first name;
+        - last and first names: riders with these names;
+        - full name ("<last name> <first name>"): riders with this full name (all returned).
+
+        Args:
+            uci_id: UCI ID, "Liste Rouge" or "".
+            last_name: Last name.
+            first_name: First name.
+            full_name: Last and first names joined by a space.
+            case_sensitive: Whether names are compared with their case and accents.
+            broader_search: Whether names may be contained in the rider names.
+            output: Rider returned when several match: "first", "last" or "all".
+
+        Returns:
+            A rider ID, or a list of rider IDs if `output` is "all".
+
+        Raises:
+            ValueError: If the UCI ID is invalid, if no rider is found, if several
+                riders are found while only one is asked, or if the arguments are
+                not enough to search.
+        """
         if case_sensitive:
             last_name = last_name.strip()
             first_name = first_name.strip()
@@ -518,6 +567,7 @@ class AffiliationLookup:
     """
 
     def __init__(self, affiliations: pd.DataFrame):
+        """Build the periods of each club from the affiliations (rider_id, start_date, club_id)."""
         df = affiliations.sort_values(["rider_id", "start_date"])
         end_dates = df.groupby("rider_id")["start_date"].shift(-1)  # exclusive end
         is_first_period = df.groupby("rider_id").cumcount() == 0

@@ -1,3 +1,9 @@
+"""Results of the riders (one row per rider and race): corrections, completion, rankings.
+
+The hard-coded corrections fix errors of the FFC result pages, identified
+by race ID and finish rank.
+"""
+
 import pandas as pd
 
 from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME
@@ -10,6 +16,21 @@ def fill_missing_values_by_groups(
         not_na_col: str,
         df: pd.DataFrame
     ) -> pd.DataFrame:
+    """Fill the missing values of a column within groups of rows.
+
+    Only the rows where `not_na_col` is known are considered; within each
+    group of `grouping_cols`, missing values of `col_to_fill` are filled with
+    the known ones (forward then backward fill).
+
+    Args:
+        col_to_fill: Column to fill.
+        grouping_cols: Columns defining the groups.
+        not_na_col: Column that must be known for a row to be considered.
+        df: Results of the riders.
+
+    Returns:
+        A copy of `df` with the column filled.
+    """
     df = df.copy()
     mask_known_keys = df[not_na_col].notna()
     df.loc[mask_known_keys, col_to_fill] = (
@@ -21,6 +42,7 @@ def fill_missing_values_by_groups(
 
 
 def fill_missing_club_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill missing club IDs from the results of the same rider (names, UCI ID) and season."""
     grouping_cols = ["last_name", "first_name", "season", "uci_id"]
     df = fill_missing_values_by_groups(
         col_to_fill="club_id",
@@ -32,6 +54,7 @@ def fill_missing_club_ids(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fill_missing_uci_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill missing UCI IDs from the results of the same rider (names, club) and season."""
     grouping_cols = ["last_name", "first_name", "season", "club_id"]
     df = fill_missing_values_by_groups(
         col_to_fill="uci_id",
@@ -43,14 +66,21 @@ def fill_missing_uci_ids(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fill_missing_club_and_uci_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill missing club IDs, then missing UCI IDs (see the two functions above)."""
     df = fill_missing_club_ids(df)
     df = fill_missing_uci_ids(df)
     return df
 
 
 def fill_missing_uci_ids_deep_mode(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill missing UCI IDs from the results of riders with the same names, any season.
 
+    A single UCI ID known for the names fills every missing one. With several
+    UCI IDs (homonyms), a missing one is filled only if exactly one of them has
+    no result in the season of the row; ambiguous rows are left missing.
+    """
     def _fill_uci_ids(group):
+        """Fill the missing UCI IDs of one group of rows with the same names."""
         known_ids = group.loc[group["uci_id"].notna(), "uci_id"].unique()
 
         # No known uci_id for this (last_name, first_name): nothing to do
@@ -87,6 +117,11 @@ def fill_missing_uci_ids_deep_mode(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def correct_wrong_uci_ids(data: list[dict]) -> list[dict]:
+    """Correct UCI IDs that are wrong on the result pages.
+
+    To add a correction, append (race ID, finish rank, wrong UCI ID or "" if
+    missing, correct UCI ID) to the list `corrections`.
+    """
     corrections = [
         ("25e7949a45ba0148", 52, "10137846680", "10051737861"),
         ("163378aa7e736570", 7, "10137846680", "10051737861"),
@@ -172,6 +207,16 @@ def apply_corrections_for_missing_club_labels(
         corrections: list[tuple[str, int]],
         correction_value: str
     ) -> list[dict]:
+    """Set the club of the results identified by (race ID, finish rank), when it is empty.
+
+    Args:
+        data: Results of the riders.
+        corrections: (race ID, finish rank) of the results to correct.
+        correction_value: Club label to set.
+
+    Returns:
+        The corrected results (modified in place).
+    """
     for d in data:
         d_club = d["club"] if isinstance(d["club"], str) else ""
         for race_id, finish_rank in corrections:
@@ -184,6 +229,10 @@ def apply_corrections_for_missing_club_labels(
     return data
 
 def add_missing_individual_labels(data: list[dict]) -> list[dict]:
+    """Set the club "Individuel" of results whose club is missing on the result pages.
+
+    To add a correction, append (race ID, finish rank) to the list `corrections`.
+    """
     corrections = [
         ("7c605505e10d81a6", 49)
     ]
@@ -191,6 +240,10 @@ def add_missing_individual_labels(data: list[dict]) -> list[dict]:
 
 
 def add_missing_foreign_labels(data: list[dict]) -> list[dict]:
+    """Set the club "Etranger" of results whose club is missing on the result pages.
+
+    To add a correction, append (race ID, finish rank) to the list `corrections`.
+    """
     corrections = [
         ("88cf222e097b8b6b", 23),
         ("3dfce1e035f3e7ca", 28),
@@ -208,6 +261,15 @@ def create_ranking_table(
         rider_x_race_data: pd.DataFrame,
         rider_db: pd.DataFrame
     ) -> pd.DataFrame:
+    """Create the ranking table: one row per rider and race.
+
+    Args:
+        rider_x_race_data: Results of the riders.
+        rider_db: Rider table.
+
+    Returns:
+        One row per result: race_id, rider_id, finish_rank.
+    """
     df = rider_x_race_data.copy()
     riders = RiderLookup(rider_db)
     df["rider_id"] = [

@@ -1,3 +1,5 @@
+"""Parsing of the cached HTML pages: FFC result pages and startlist pages."""
+
 import json
 import re
 
@@ -28,6 +30,7 @@ TRANSLATIONS = {
 
 
 def get_text_safe(tag: Tag | None) -> str | None:
+    """Text of a tag without surrounding whitespace, or None if the tag is None."""
     if tag is None:
         page_element = None
     else:
@@ -36,10 +39,12 @@ def get_text_safe(tag: Tag | None) -> str | None:
 
 
 def get_results_html_files() -> list[Path]:
+    """HTML files of the kept result pages of the cache, sorted."""
     return sorted(RESULTS_DIR.rglob("*.html"))
 
 
 def parse_clubs_in_organisation_page(html: str) -> list[str]:
+    """Club texts found in the rankings of a result page, without duplicates."""
     try:
         rankings = get_rankings(html)
     except ValueError:
@@ -91,6 +96,20 @@ def get_elements_from_results_page(bs: BeautifulSoup) -> dict[str, str]:
 
 
 def parse_results_from_organization_page(html: str) -> dict[str, Any]:
+    """Parse a result page: general information and rankings.
+
+    Women's rankings (name starting with "femme" or "dame") are left out when
+    the page holds several rankings.
+
+    Args:
+        html: HTML of the result page.
+
+    Returns:
+        A dict with discipline, race_date ('YYYY-MM-DD'), title, departement,
+        the general information (see TRANSLATIONS) and rankings: ranking ID
+        mapped to {'name': ranking name, 'data': rows with finish_rank,
+        last_name, first_name, uci_id and club}.
+    """
     bs = BeautifulSoup(html, features="html.parser")
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
     race_date = convert_date(get_text_safe(bs.find(name="div", class_="date")))
@@ -133,6 +152,11 @@ def parse_results_from_organization_page(html: str) -> dict[str, Any]:
 
 
 def get_rankings(html: str) -> list[dict]:
+    """Rankings of a result page, read in its JavaScript variable resultatsJson.
+
+    Raises:
+        ValueError: If the variable is not found in the page.
+    """
     m = re.compile(pattern=r"var resultatsJson = (\{.*?\});", flags=re.S).search(html)
     if m is None:
         raise ValueError("resultatsJson not found")
@@ -140,6 +164,7 @@ def get_rankings(html: str) -> list[dict]:
 
 
 def get_startlists_html_files() -> list[Path]:
+    """HTML files of the kept startlist pages of the cache, sorted."""
     return sorted(STARTLISTS_DIR.rglob("*.html"))
 
 
@@ -186,6 +211,26 @@ def correct_startlist_date(title_date: str, publication_date: str) -> str:
 
 
 def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
+    """Parse a startlist page: race date, name and startlist tables.
+
+    The race date is read in the title ("<name> <day> <month> <year> ...") and
+    checked against the publication date of the page (see
+    correct_startlist_date); without date in the title, the publication date
+    is used. Each table preceded by a heading is a startlist; cell values are
+    cleaned, and the labels of riders without club are replaced by "Individuel".
+
+    Args:
+        html: HTML of the startlist page.
+
+    Returns:
+        A dict with title, description, date (race date), title_date (date read
+        in the title), fallback_date (publication date), name and startlists:
+        heading mapped to the rows of the table ({'col0': value, ...}). An empty
+        dict if the page has no article.
+
+    Raises:
+        ValueError: If the title, description or publication date is missing.
+    """
     bs = BeautifulSoup(html, features="html.parser")
     title = get_text_safe(bs.find(name="h1"))
     description = get_text_safe(bs.find(name="div", class_="description"))
