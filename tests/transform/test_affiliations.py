@@ -157,3 +157,24 @@ def test_homonyms_are_separated_by_the_club_at_the_race_date():
     ) == "r2"
     with pytest.raises(ValueError, match="Multiple rider IDs"):
         get_rider_id_using_affiliations(["r1", "r2"], AFFILIATIONS, "A")
+
+
+# ---------------------------------------------------------------- create_affiliation_clubs_riders
+
+def test_results_without_identified_club_are_ignored_for_affiliations(capsys):
+    from access_it.etl.transform.riders import create_affiliation_clubs_riders
+
+    uci_id = "10012345656"
+    rider_x_race = pd.DataFrame({
+        "uci_id": [uci_id] * 3, "last_name": "X", "first_name": "Y",
+        "club_id": ["A", None, "A"], "race_id": ["r1", "r2", "r3"],
+        "race_date": ["2025-03-01", "2025-04-01", "2025-05-01"],
+    })
+    races = rider_x_race[["race_id", "race_date"]]
+    riders = pd.DataFrame({"rider_id": ["id1"], "uci_id": [uci_id], "last_name": ["X"],
+                           "first_name": ["Y"]})
+    result = create_affiliation_clubs_riders(rider_x_race, races, riders)
+    assert result.to_dict(orient="records") == [
+        {"rider_id": "id1", "start_date": pd.Timestamp("2025-01-01"), "club_id": "A"}
+    ]
+    assert "1 result(s) without identified club ignored" in capsys.readouterr().out

@@ -482,17 +482,18 @@ def create_affiliation_clubs_riders(
     cols = ["uci_id", "last_name", "first_name", "club_id", "race_id", "race_date"]
     rider_x_race_data = rider_x_race_data.drop(columns=["race_date"])
     df = rider_x_race_data.merge(race_dates, on="race_id", how="inner")[cols]
+    # Results without identified club (e.g. ambiguous club name) give no observation
+    unknown_club = df["club_id"].map(lambda club_id: not isinstance(club_id, str))
+    if unknown_club.any():
+        print(f"Info: {unknown_club.sum()} result(s) without identified club "
+              f"ignored for affiliations")
+    df = df[~unknown_club].copy()
     riders = RiderLookup(rider_db)
     rider_ids = []
     for row in df.itertuples():
         uci_id = row.uci_id if isinstance(row.uci_id, str) else ""
         last_name = row.last_name if isinstance(row.last_name, str) else ""
         first_name = row.first_name if isinstance(row.first_name, str) else ""
-        if not isinstance(row.club_id, str):
-            raise TypeError(
-                f"Invalid data type for club_id (should be str): {row.club_id!r} "
-                f"(uci_id={uci_id}, last_name={last_name}, first_name={first_name})"
-            )
         rider_id = riders.get_rider_id(uci_id=uci_id, last_name=last_name, first_name=first_name)
         if not isinstance(rider_id, str):
             raise TypeError(

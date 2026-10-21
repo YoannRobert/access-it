@@ -125,8 +125,9 @@ class ClubLookup:
     """Indexes over the club table, built once and queried many times.
 
     Replaces the normalization of every club name previously done at every
-    call of `identify_club`. Results are identical: when several clubs match,
-    the first one in table order is returned.
+    call of `identify_club`. When several clubs match, the first one in table
+    order is returned, except for an ambiguous name (exact name or alternative
+    name of several clubs, see `is_ambiguous`).
     """
 
     def __init__(self, df_clubs: pd.DataFrame):
@@ -139,10 +140,19 @@ class ClubLookup:
         self.position_by_id: dict = {}
         self.position_by_folded_name: dict[str, int] = {}
         self.position_by_folded_alternative_name: dict[str, int] = {}
+        self.club_ids_by_folded_name: dict[str, set] = {}  # names and alternative names
         for club_id, name, alternative_names in zip(
                 df_clubs["club_id"], df_clubs["name"], df_clubs["alternative_names"]
         ):
             self._append(club_id, name, alternative_names)
+
+    def _add_name_owner(self, folded_name: str, club_id) -> None:
+        if folded_name:
+            self.club_ids_by_folded_name.setdefault(folded_name, set()).add(club_id)
+
+    def is_ambiguous(self, folded_name: str) -> bool:
+        """Whether the name (or alternative name) belongs to several clubs."""
+        return len(self.club_ids_by_folded_name.get(folded_name, ())) > 1
 
     def _append(self, club_id, name: str, alternative_names: str) -> None:
         position = len(self.club_ids)
@@ -160,14 +170,21 @@ class ClubLookup:
         self.position_by_folded_name.setdefault(folded_name, position)
         for folded_alternative_name in folded_alternative_names:
             self.position_by_folded_alternative_name.setdefault(folded_alternative_name, position)
+        self._add_name_owner(folded_name, club_id)
+        for folded_alternative_name in folded_alternative_names:
+            self._add_name_owner(folded_alternative_name, club_id)
 
     def _rebuild_alternative_name_index(self) -> None:
         self.position_by_folded_alternative_name = {}
+        self.club_ids_by_folded_name = {}
         for position, folded_alternative_names in enumerate(self.folded_alternative_names):
+            club_id = self.club_ids[position]
+            self._add_name_owner(self.folded_names[position], club_id)
             for folded_alternative_name in folded_alternative_names:
                 self.position_by_folded_alternative_name.setdefault(
                     folded_alternative_name, position
                 )
+                self._add_name_owner(folded_alternative_name, club_id)
 
     def sync(self, df_clubs: pd.DataFrame, club_id: str | None) -> None:
         """Apply the changes made by `add_club` to the club `club_id` of `df_clubs`.
@@ -204,6 +221,9 @@ def identify_club(
     ) -> tuple[bool, str | None, str | None]:
     """Identify a club from its ID and/or name.
 
+    Without a valid club ID, an empty name or an ambiguous name (shared by
+    several clubs) gives an unknown club (False, None, None): the club of the
+    rider may then be completed from his other results (fill_missing_club_ids).
     For repeated calls, pass a `ClubLookup` built once instead of the DataFrame.
     """
     clubs = df_clubs if isinstance(df_clubs, ClubLookup) else ClubLookup(df_clubs)
@@ -226,18 +246,14 @@ def identify_club(
             return False, None, None
         n_club_name = normalize_string_and_fold_case(club_name)
         n_club_name = " ".join(n_club_name.split())
+        if n_club_name == "" or clubs.is_ambiguous(n_club_name):
+            return False, None, None
         if is_individual_club(club_name):
             club_id = INDIVIDUAL_CLUB_ID
             club_name = INDIVIDUAL_NAME
         elif is_foreign_club(club_name):
             club_id = FOREIGN_CLUB_ID
             club_name = FOREIGN_NAME
-        elif n_club_name.find("VC CHATILLONNAIS".lower()) != -1:
-            # Problem with a name shared by 2 clubs: "VC CHATILLONNAIS"
-            # (FFC IDs "4436087" and "5079082")
-            # For now, we'll just take the first one.
-            club_id, club_name = "4436087", "VC CHATILLONNAIS"
-            add_this_club = True
         else:
             position = clubs.position_by_folded_name.get(n_club_name)
             if position is None:
