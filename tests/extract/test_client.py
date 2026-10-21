@@ -3,7 +3,9 @@
 import httpx
 import pytest
 
-from access_it.etl.extract.client import MAX_MIN_DELAY, RequestThrottle, get
+from access_it.etl.extract.client import (
+    MAX_MIN_DELAY, RequestFailures, RequestThrottle, get, try_get
+)
 
 FFC = "https://competitions.ffc.fr/resultats/"
 API = "https://velo.ffc.fr/wp-json/sn/terms/region"
@@ -135,3 +137,41 @@ def test_403_slows_down_and_raises():
 def test_404_is_returned():
     clock = FakeClock()
     assert get(FakeClient(404), FFC, throttle=make_throttle(clock)).status_code == 404
+
+
+# ---------------------------------------------------------------- try_get and RequestFailures
+
+class ClientRaising:
+    def get(self, url: str) -> httpx.Response:
+        raise httpx.ConnectTimeout("timeout", request=httpx.Request("GET", url))
+
+
+def test_try_get_returns_the_response():
+    failures = RequestFailures()
+    response = try_get(FakeClient(200), FFC, throttle=make_throttle(FakeClock()), failures=failures)
+    assert response.status_code == 200
+    assert failures.summary() == "All requests succeeded."
+
+
+def test_try_get_records_an_http_error_instead_of_raising(capsys):
+    failures = RequestFailures()
+    response = try_get(FakeClient(403), FFC, throttle=make_throttle(FakeClock()), failures=failures)
+    assert response is None
+    assert "request failed (HTTP 403)" in capsys.readouterr().out
+    summary = failures.summary()
+    assert "1 request(s) failed" in summary
+    assert "competitions.ffc.fr: HTTP 403 x 1" in summary
+
+
+def test_try_get_records_a_network_error_after_all_retries():
+    failures = RequestFailures()
+    throttle = make_throttle(FakeClock())
+    assert try_get(ClientRaising(), API, throttle=throttle, failures=failures) is None
+    assert "velo.ffc.fr: ConnectTimeout x 1" in failures.summary()
+
+
+def test_try_get_returns_a_404():
+    failures = RequestFailures()
+    response = try_get(FakeClient(404), FFC, throttle=make_throttle(FakeClock()), failures=failures)
+    assert response.status_code == 404
+    assert failures.failures == []

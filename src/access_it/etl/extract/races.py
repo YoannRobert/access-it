@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from access_it.etl.extract.cache import (
     RESULTS_DIR, write_results_sidecar_and_html_files, results_sidecar_exists
 )
-from access_it.etl.extract.client import BASE_URL, get
+from access_it.etl.extract.client import BASE_URL, try_get
 from access_it.etl.transform.parse import get_text_safe, get_elements_from_results_page
 
 
@@ -23,16 +23,19 @@ def extract_results_from_organization_page(
         return
 
     url = f"{results_base_url}/{season_str}/{code}"
-    race_response = get(client=client, url=url)
+    race_response = try_get(client=client, url=url)
 
-    # any error
+    # Request failed for good: nothing is cached, the page is requested again at the next run
     if not isinstance(race_response, httpx.Response):
-        print(f"{org_ref} network error")
+        print(f"{org_ref} request failed, skipped")
         return
 
-    # 404 error
+    # 404 error (HTTP status, or redirection to the error page)
     dst_url = str(race_response.url)
-    page_not_found = dst_url.find("error") != -1 and dst_url.find("404") != -1
+    page_not_found = (
+        race_response.status_code == 404
+        or (dst_url.find("error") != -1 and dst_url.find("404") != -1)
+    )
     if page_not_found:
         write_results_sidecar_and_html_files(season, code, race_response, force_404=True)
         print(f"{org_ref} page not found")
@@ -79,9 +82,11 @@ def extract_organization_pages_from_search_url(
     page = 1
     while True and (max_pages == -1 or page <= max_pages):
         search_url = f"{results_url}/?discipline=1&departement={dept}&page={page}"
-        page_response = get(client=client, url=search_url)
+        page_response = try_get(client=client, url=search_url)
         if not isinstance(page_response, httpx.Response):
-            continue
+            # The next search pages cannot be trusted: stop for this departement
+            print(f"Search of departement {dept!r} stopped at page {page} (request failed)")
+            break
         html = page_response.text
         soup = BeautifulSoup(html, features="html.parser")
         results = soup.find(name="div", id="resultats")

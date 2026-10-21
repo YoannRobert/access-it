@@ -25,6 +25,7 @@ DEFAULT_MIN_DELAY = 1.0
 DELAY_JITTER = 0.2  # each delay is randomly increased by up to 20%
 MAX_MIN_DELAY = 10.0  # upper bound of the delay after slowdowns
 SLOWDOWN_STATUS_CODES = {403, 429}  # the delay of the host doubles on these responses
+MAX_LISTED_FAILURES = 5  # failed URLs listed in the summary of the run
 
 
 class RequestThrottle:
@@ -148,3 +149,57 @@ def get(
         r.raise_for_status()
         return r
     return None
+
+
+class RequestFailures:
+    """Requests that failed for good during the run (after all retries)."""
+
+    def __init__(self):
+        self.failures: list[tuple[str, str, str]] = []  # (host, reason, url)
+
+    def record(self, url: str, error: httpx.HTTPError) -> str:
+        """Record a failure and return its reason (e.g. 'HTTP 403', 'ConnectTimeout')."""
+        if isinstance(error, httpx.HTTPStatusError):
+            reason = f"HTTP {error.response.status_code}"
+        else:
+            reason = type(error).__name__
+        self.failures.append((urlsplit(url).hostname or "", reason, url))
+        return reason
+
+    def summary(self) -> str:
+        """Number of failed requests per host and reason, with a few URLs."""
+        if not self.failures:
+            return "All requests succeeded."
+        counts: dict[tuple[str, str], int] = {}
+        for host, reason, _ in self.failures:
+            counts[(host, reason)] = counts.get((host, reason), 0) + 1
+        lines = [f"Warning: {len(self.failures)} request(s) failed, retried at the next run:"]
+        lines += [
+            f"  {host}: {reason} x {count}" for (host, reason), count in sorted(counts.items())
+        ]
+        lines += [f"  e.g. {url}" for _, _, url in self.failures[:MAX_LISTED_FAILURES]]
+        return "\n".join(lines)
+
+
+FAILURES = RequestFailures()  # failures of the whole process, summarized by scripts/extract.py
+
+
+def try_get(
+        client: httpx.Client,
+        url: str,
+        throttle: RequestThrottle | None = None,
+        failures: RequestFailures | None = None
+    ) -> httpx.Response | None:
+    """Like get(), but return None instead of raising when the request fails for good.
+
+    The failure is recorded (in FAILURES by default) and printed: the caller
+    skips the page without caching it, so that it is requested again at the
+    next run. A 404 response is returned, as by get().
+    """
+    failures = failures if failures is not None else FAILURES
+    try:
+        return get(client, url, throttle=throttle)
+    except httpx.HTTPError as error:
+        reason = failures.record(url, error)
+        print(f"Warning: request failed ({reason}): {url}")
+        return None

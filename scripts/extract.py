@@ -4,7 +4,7 @@ from access_it.etl.extract.cache import (
     REGCOM_PARQUET_FILE, DEPCOM_PARQUET_FILE, CLUBS_PARQUET_FILE,
     DEPARTEMENTS_PARQUET_FILE, create_cache_dir
 )
-from access_it.etl.extract.client import make_client
+from access_it.etl.extract.client import FAILURES, make_client
 from access_it.etl.extract.departements import get_departement_mapping
 from access_it.etl.extract.races import (
     extract_organization_pages_from_search_url,
@@ -42,6 +42,8 @@ def extract():
         pd.DataFrame(dep_committees).to_parquet(DEPCOM_PARQUET_FILE, index=False)
         pd.DataFrame(clubs).to_parquet(CLUBS_PARQUET_FILE, index=False)
         pd.DataFrame(departements).to_parquet(DEPARTEMENTS_PARQUET_FILE, index=False)
+
+    print(FAILURES.summary())
 
 
 if __name__ == "__main__":

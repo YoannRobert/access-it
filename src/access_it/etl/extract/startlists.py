@@ -6,7 +6,7 @@ from access_it.config import get_settings
 from access_it.etl.extract.cache import (
     startlists_json_file_exists, write_startlists_json_and_html_files
 )
-from access_it.etl.extract.client import get
+from access_it.etl.extract.client import try_get
 from access_it.etl.transform.categories import find_access_categories_from_name
 from access_it.etl.transform.parse import get_text_safe
 
@@ -27,11 +27,11 @@ def extract_startlists_from_organization_page(
         print(f"{org_ref} already exists")
         return
 
-    race_response = get(client=client, url=url)
+    race_response = try_get(client=client, url=url)
 
-    # any error
+    # Request failed for good: nothing is cached, the page is requested again at the next run
     if not isinstance(race_response, httpx.Response):
-        print(f"{org_ref} network error")
+        print(f"{org_ref} request failed, skipped")
         return
 
     # No errors
@@ -76,9 +76,10 @@ def extract_startlists_pages_from_search_url(
     organization_count = 0
     search_url = ROAD_STARTLISTS_URL
     while True and (max_pages == -1 or page <= max_pages):
-        page_response = get(client=client, url=search_url)
+        page_response = try_get(client=client, url=search_url)
         if not isinstance(page_response, httpx.Response):
-            continue
+            print(f"Startlists listing stopped at page {page} (request failed)")
+            break
         html = page_response.text
         soup = BeautifulSoup(html, features="html.parser")
         results = soup.find(name="div", id="newsList")
