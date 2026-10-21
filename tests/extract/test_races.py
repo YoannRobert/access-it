@@ -101,3 +101,14 @@ def test_search_stops_at_the_first_failed_page(monkeypatch):
     races.extract_organization_pages_from_search_url(client, dept=44)
     assert pages == [(2026, "C4400001001")]
     assert len(client.urls) == 2
+
+
+def test_page_without_race_code_is_not_cached(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cache, "RESULTS_DIR", tmp_path / "results")
+    url = "https://competitions.ffc.fr/resultats/resultat/2026/C4400001001"
+    html = "<h1 class='titre'>Course</h1><div class='discipline'>Route</div>"
+    response = httpx.Response(200, text=html, request=httpx.Request("GET", url))
+    monkeypatch.setattr(races, "try_get", lambda client, url: response)
+    races.extract_results_from_organization_page(None, 2026, "C4400001001")
+    assert not cache.results_sidecar_exists(2026, "C4400001001")
+    assert "no race code found on the page" in capsys.readouterr().out

@@ -47,7 +47,11 @@ def extract_results_from_organization_page(
     name = get_text_safe(bs.find(name="h1", class_="titre"))
     discipline = get_text_safe(bs.find(name="div", class_="discipline"))
     general_info = get_elements_from_results_page(bs)
-    race_code = general_info["race_code"]
+    race_code = general_info.get("race_code")
+    # Unexpected page layout: not cached, so that the page is read again at the next run
+    if race_code is None:
+        print(f"Warning: {org_ref} no race code found on the page, skipped: {name}")
+        return
     included = (
         discipline == "Route"
         and (
