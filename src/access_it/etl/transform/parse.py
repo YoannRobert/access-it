@@ -1,6 +1,8 @@
 import json
 import re
 
+from datetime import date as Date, timedelta
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from pathlib import Path
@@ -126,6 +128,48 @@ def get_startlists_html_files() -> list[Path]:
     return sorted(STARTLISTS_DIR.rglob("*.html"))
 
 
+# A race takes place a few days after the publication of its startlist page:
+# a date read in the title outside this window is considered wrong
+MAX_DAYS_BEFORE_PUBLICATION = 7
+MAX_DAYS_AFTER_PUBLICATION = 120
+
+
+def is_day_number(word: str) -> bool:
+    """Whether a word of a title is a day of the month ("1er" included)."""
+    try:
+        return 1 <= int(word.replace("1er", "1")) <= 31
+    except ValueError:
+        return False
+
+
+def correct_startlist_date(title_date: str, publication_date: str) -> str:
+    """Return the race date, corrected when the date read in the title is not plausible.
+
+    The title date must lie between MAX_DAYS_BEFORE_PUBLICATION days before and
+    MAX_DAYS_AFTER_PUBLICATION days after the publication date of the page.
+    Otherwise (e.g. a typo in the year of the title), the day and month are
+    kept with the year bringing the date into this window; if no year does,
+    the publication date is returned. Dates are 'YYYY-MM-DD' strings.
+    """
+    publication = Date.fromisoformat(publication_date)
+    window_start = publication - timedelta(days=MAX_DAYS_BEFORE_PUBLICATION)
+    window_end = publication + timedelta(days=MAX_DAYS_AFTER_PUBLICATION)
+    try:
+        date = Date.fromisoformat(title_date)
+    except ValueError:
+        return publication_date
+    if window_start <= date <= window_end:
+        return title_date
+    for year in (publication.year, publication.year + 1):
+        try:
+            candidate = date.replace(year=year)
+        except ValueError:  # February 29th in a non-leap year
+            continue
+        if window_start <= candidate <= window_end:
+            return candidate.isoformat()
+    return publication_date
+
+
 def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
     bs = BeautifulSoup(html, features="html.parser")
     title = get_text_safe(bs.find(name="h1"))
@@ -161,14 +205,13 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
             day = words[i - 3].replace("1er", "1").zfill(2)
             name = " ".join(words_org[: i - 3])
         else:
-            j = 1
-            while i - j >= 0:
-                try:
-                    int(words[i - j].replace("1er", "1"))
-                except ValueError:
-                    j -= 1
-                    break
+            # Walk back over the numbers preceding the month that can be days (1 to 31),
+            # so that a number like a departement code ("Adainville 78 31 mai") is not
+            # taken as the day; the earliest of them is the day ("1 2 mars": 1)
+            j = 0
+            while i - j - 1 >= 0 and is_day_number(words[i - j - 1]):
                 j += 1
+            # j == 0: no day before the month, words[i] is the month and int(day) fails below
             day = words[i - j].replace("1er", "1").zfill(2)
             name = " ".join(words_org[: i - j])
         if words[i + 1] == "et":
@@ -181,6 +224,9 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
             date = f"{year:4s}-{month:2s}-{day:2s}"
         except ValueError:
             date = fallback_date
+
+    title_date = date
+    date = correct_startlist_date(title_date, fallback_date)
 
     startlists = {}
     article = bs.find(name="div", id="article")
@@ -245,6 +291,7 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
         "title": title,
         "description": description,
         "date": date,
+        "title_date": title_date,
         "fallback_date": fallback_date,
         "name": name,
         "startlists": startlists

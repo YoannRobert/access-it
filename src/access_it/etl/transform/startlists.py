@@ -24,11 +24,22 @@ CLUB_SHORT_REFERENCES = [
 
 
 def get_startlists_data() -> list[dict]:
+    """Parse every cached startlist page; print the race dates corrected (see parse.py)."""
     startlists_data = []
+    corrections = []
     for startlists_html_file in get_startlists_html_files():
         html = startlists_html_file.read_text()
         data = parse_startlists_from_organization_page(html)
         startlists_data.append(data)
+        if data and data["date"] != data["title_date"]:
+            corrections.append(
+                f"  {startlists_html_file.parent.name}/{startlists_html_file.name}: "
+                f"{data['title_date']} -> {data['date']} "
+                f"(published {data['fallback_date']}): {data['title']!r}"
+            )
+    if corrections:
+        print(f"Info: {len(corrections)} startlist date(s) corrected:")
+        print("\n".join(corrections))
     return startlists_data
 
 
