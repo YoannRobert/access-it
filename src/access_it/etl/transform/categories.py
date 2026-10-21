@@ -559,10 +559,26 @@ def delete_rows_for_riders_having_duplicated_keys(
         add_unknown_category_row: bool = True,
         after_year: int = 2023
     ) -> pd.DataFrame:
+    """Replace the category history of riders having duplicated keys by an unknown category.
+
+    Duplicated keys (two periods starting on the same day) come from two
+    classifications on the same day with different categories, which only
+    happens to women riders (a mixed race and a women's ranking of the same
+    organization). The riders concerned and their duplicated dates are printed,
+    so that any unexpected case is noticed.
+    """
     df = category_history.copy()
     duplicated_keys = df.duplicated(["rider_id", "start_date"], keep=False)
-    print(f"Found {df[duplicated_keys].shape[0]} duplicated keys.")
     riders_removed = df.loc[duplicated_keys, "rider_id"].drop_duplicates().to_list()
+    if riders_removed:
+        print(
+            f"Info: category history replaced by an unknown category for {len(riders_removed)} "
+            f"rider(s) with duplicated keys (rider_id: duplicated start dates):"
+        )
+        dates_by_rider = df[duplicated_keys].groupby("rider_id")["start_date"]
+        for rider_id, dates in dates_by_rider:
+            dates = sorted(pd.to_datetime(dates).dt.strftime("%Y-%m-%d").unique())
+            print(f"  {rider_id}: {', '.join(dates)}")
     df = df[~df["rider_id"].isin(riders_removed)]
     if not add_unknown_category_row:
         return df
