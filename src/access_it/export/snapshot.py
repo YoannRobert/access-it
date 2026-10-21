@@ -1,3 +1,5 @@
+"""Snapshot of the database: one Parquet file per table in a ZIP archive."""
+
 import io
 import pandas as pd
 import zipfile

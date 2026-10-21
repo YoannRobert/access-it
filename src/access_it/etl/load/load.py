@@ -41,7 +41,11 @@ ConflictMode = Literal["ignore", "update"]
 
 
 def read_parquet(table: Table) -> pd.DataFrame:
-    """Read the Parquet file matching the table name."""
+    """Read the Parquet file of a table, in the data directory of the cache.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    """
     path = DATA_DIR / f"{table.name}.parquet"
     if not path.exists():
         raise FileNotFoundError(f"Missing Parquet file for table '{table.name}': {path}")
@@ -49,7 +53,11 @@ def read_parquet(table: Table) -> pd.DataFrame:
 
 
 def validate_columns(df: pd.DataFrame, table: Table) -> None:
-    """Check that the DataFrame columns match the table columns."""
+    """Check that the DataFrame columns match the table columns.
+
+    Raises:
+        ValueError: If a column is unknown, or a required column is missing.
+    """
     unexpected = set(df.columns) - set(table.columns.keys())
     required = {
         column.name
@@ -74,7 +82,18 @@ def write_rows(
 ) -> int:
     """Insert new rows; on a primary key conflict, ignore the row or update it if changed.
 
-    Return the number of rows inserted or updated.
+    Rows are written by chunks of CHUNK_SIZE; an existing row is updated only
+    if at least one column differs.
+
+    Args:
+        connection: Open connection, within a transaction.
+        table: Table to write.
+        df: Rows to write.
+        on_conflict: "ignore" to leave existing rows untouched, "update" to
+            update them when they differ.
+
+    Returns:
+        The number of rows inserted or updated.
     """
     key_columns = [column.name for column in table.primary_key.columns]
     update_columns = [name for name in df.columns if name not in key_columns]
@@ -109,8 +128,20 @@ def delete_stale_rows(
 ) -> int:
     """Delete the rows of the groups present in the DataFrame whose key is missing from it.
 
-    Groups absent from the DataFrame are left untouched.
-    Return the number of rows deleted.
+    Groups absent from the DataFrame are left untouched. The keys of the
+    DataFrame are uploaded into a temporary table, dropped afterwards.
+
+    Args:
+        connection: Open connection, within a transaction.
+        table: Synchronized table.
+        df: Rows of the file.
+        group_column: Primary key column defining the groups (e.g. rider_id).
+
+    Returns:
+        The number of rows deleted.
+
+    Raises:
+        ValueError: If `group_column` is not part of the primary key.
     """
     if df.empty:
         return 0
@@ -144,7 +175,19 @@ def delete_stale_rows(
 
 
 def load_all(engine: Engine) -> None:
-    """Load every table in foreign-key order, within a single transaction."""
+    """Load every table in foreign-key order, within a single transaction.
+
+    All the Parquet files are read and checked first (see checks.py): if a
+    check fails, nothing is written to the database.
+
+    Args:
+        engine: Engine of the database.
+
+    Raises:
+        ValueError: If TABLES_TO_UPDATE or TABLES_TO_SYNC names an unknown
+            table, or if the columns of a file do not match its table.
+        DataValidationError: If a check fails.
+    """
     unknown_tables = TABLES_TO_UPDATE - set(Base.metadata.tables)
     if unknown_tables:
         raise ValueError(f"Unknown tables in TABLES_TO_UPDATE: {sorted(unknown_tables)}")

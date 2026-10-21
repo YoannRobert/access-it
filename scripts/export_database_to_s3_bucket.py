@@ -1,3 +1,10 @@
+"""Export a snapshot of the database to the S3 storage, keeping the 10 most recent ones.
+
+The whole database is read (data transfer of a few megabytes).
+
+Usage, from the repository root: python scripts/export_database_to_s3_bucket.py
+"""
+
 import tempfile
 
 from pathlib import Path
@@ -14,6 +21,7 @@ from access_it.export.snapshot import build_snapshot_zip
 
 
 def export_database_to_s3_bucket():
+    """Export a snapshot of every table, then delete the old snapshots."""
     settings = get_settings()
     s3_bucket = settings.s3_bucket
     engine = get_engine()

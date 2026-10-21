@@ -60,8 +60,22 @@ def prune_stale_riders(
     ) -> PruneReport:
     """Delete (or count, in a dry run) the stale riders and every row referring to them.
 
-    `riders` is the riders file; `frames` holds the files of the tables referring
-    to riders, used to report the missing rows that are not deleted.
+    Everything is done in a single transaction.
+
+    Args:
+        engine: Engine of the database.
+        riders: Riders file.
+        frames: Files of the tables referring to riders, keyed by table
+            name, used to report the missing rows that are not deleted.
+        apply: Whether to delete (False: dry run, rows are only counted).
+        max_riders: Maximum number of stale riders.
+
+    Returns:
+        What was (or would be) deleted.
+
+    Raises:
+        TooManyStaleRiders: If more than `max_riders` riders are stale
+            (nothing is deleted).
     """
     report = PruneReport(applied=apply)
     with engine.begin() as connection:

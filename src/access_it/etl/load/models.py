@@ -1,3 +1,9 @@
+"""Database schema: one SQLAlchemy model per table.
+
+Identifiers (rider_id, race_id) are 16-character hashes computed by the
+transform step. Constraint names follow NAMING_CONVENTION.
+"""
+
 from datetime import date
 from sqlalchemy import ForeignKey, MetaData, SmallInteger, String, CheckConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -13,10 +19,12 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
+    """Declarative base of the models, with explicit constraint names."""
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 class Departement(Base):
+    """Departement of France (plus 'Autre' for the foreign pseudo-club)."""
     __tablename__ = "departements"
 
     departement_code: Mapped[str] = mapped_column(String(3), primary_key=True)
@@ -24,6 +32,7 @@ class Departement(Base):
 
 
 class RegionalCommittee(Base):
+    """Regional committee of the FFC (2-character ID)."""
     __tablename__ = "regional_committees"
 
     regional_committee_id: Mapped[str] = mapped_column(
@@ -34,6 +43,7 @@ class RegionalCommittee(Base):
 
 
 class DepartementalCommittee(Base):
+    """Departemental committee of the FFC (4-character ID), in a regional committee."""
     __tablename__ = "departemental_committees"
 
     departemental_committee_id: Mapped[str] = mapped_column(
@@ -52,6 +62,10 @@ class DepartementalCommittee(Base):
 
 
 class Rider(Base):
+    """Rider, identified by a hash of the UCI ID when valid, of the names otherwise.
+
+    uci_id is the UCI ID, "Liste Rouge" for red-list riders, or empty.
+    """
     __tablename__ = "riders"
 
     rider_id: Mapped[str] = mapped_column(String(16), primary_key=True)
@@ -61,6 +75,12 @@ class Rider(Base):
 
 
 class Club(Base):
+    """Club (7-digit FFC ID), with a range of years (min_year to max_year).
+
+    max_year is the current year for the clubs of the FFC API.
+
+    alternative_names lists the other names read in the results, separated by commas.
+    """
     __tablename__ = "clubs"
     __table_args__ = (
         CheckConstraint(
@@ -89,6 +109,7 @@ class Club(Base):
 
 
 class Race(Base):
+    """Race: one Access ranking of a result page (an organization may hold several races)."""
     __tablename__ = "races"
     __table_args__ = (
         CheckConstraint(
@@ -115,6 +136,7 @@ class Race(Base):
 
 
 class Ranking(Base):
+    """Result of a rider in a race (ties are allowed: several riders may share a finish rank)."""
     __tablename__ = "rankings"
     __table_args__ = (
         CheckConstraint(

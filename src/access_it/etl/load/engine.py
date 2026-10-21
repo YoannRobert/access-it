@@ -1,3 +1,5 @@
+"""SQLAlchemy engine of the database (DATABASE_URL setting)."""
+
 from functools import lru_cache
 from sqlalchemy import create_engine, Engine
 from access_it.config import get_settings

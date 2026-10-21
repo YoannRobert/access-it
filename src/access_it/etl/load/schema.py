@@ -26,6 +26,10 @@ def reset_tables(engine: Engine) -> None:
 
 
 def main() -> None:
+    """Run an action on the database schema from the command line.
+
+    Usage: python -m access_it.etl.load.schema {create,drop,reset}
+    """
     parser = argparse.ArgumentParser(description="Manage the database schema.")
     parser.add_argument("action", choices=["create", "drop", "reset"])
     args = parser.parse_args()

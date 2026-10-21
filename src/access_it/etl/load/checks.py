@@ -55,6 +55,7 @@ class DataValidationError(Exception):
     """Raised when the data to load fails at least one check."""
 
     def __init__(self, problems: list[str]):
+        """Build the message from the list of problems."""
         self.problems = problems
         message = f"{len(problems)} problem(s) found, nothing was loaded:\n"
         message += "\n".join(f"- {problem}" for problem in problems)
@@ -102,7 +103,15 @@ def find_existing_values(
     """Return the subset of `values` present in `table.column` of the database.
 
     Only the values asked for can be returned, so the transfer stays minimal.
-    A None connection stands for an empty database.
+
+    Args:
+        connection: Open connection, or None for an empty database.
+        table: Table to search.
+        column: Column to search.
+        values: Values to look for (queried by chunks of QUERY_CHUNK_SIZE).
+
+    Returns:
+        The values found.
     """
     if connection is None or not values:
         return set()
@@ -194,8 +203,18 @@ def find_missing_rows(
     """Return the number of rows of the database table absent from the file, and some of them.
 
     The primary keys of the file are uploaded into a temporary table, and the
-    database only sends back the count and at most `limit` missing rows,
-    restricted to `columns` (default: the primary key columns).
+    database only sends back the count and at most `limit` missing rows.
+
+    Args:
+        connection: Open connection.
+        table: Table of the database.
+        df: Rows of the file.
+        columns: Columns of the missing rows returned (default: the
+            primary key columns).
+        limit: Maximum number of missing rows returned.
+
+    Returns:
+        The number of missing rows, and at most `limit` of them (tuples).
     """
     key_columns = [column.name for column in table.primary_key.columns]
     columns = columns or key_columns
@@ -346,10 +365,17 @@ def check_missing_rows(table: Table, df: pd.DataFrame, connection: Connection | 
 
 
 def run_checks(frames: dict[str, pd.DataFrame], engine: Engine | None = None) -> None:
-    """Run every check on the DataFrames to load, keyed by table name.
+    """Run every check on the DataFrames to load.
 
-    The database is only read, never written. A None engine stands for an
-    empty database. Raise a DataValidationError listing all the problems found.
+    The database is only read, never written.
+
+    Args:
+        frames: DataFrames to load, keyed by table name.
+        engine: Engine of the database, or None for an empty database.
+
+    Raises:
+        DataValidationError: If at least one check fails (all the problems
+            found are listed).
     """
     problems = []
     with (engine.connect() if engine is not None else nullcontext()) as connection:

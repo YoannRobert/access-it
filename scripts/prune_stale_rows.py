@@ -20,6 +20,7 @@ from access_it.etl.load.prune import (
 
 
 def prune_stale_rows() -> None:
+    """Parse the arguments, then delete (or count) the stale riders."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="delete the rows (default: dry run)")
     parser.add_argument(

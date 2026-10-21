@@ -1,3 +1,13 @@
+"""Extract step: download the result and startlist pages, and the FFC reference data.
+
+Pages are cached in the cache directory (see access_it.etl.extract.cache);
+cached pages are not requested again. The reference data (committees,
+departements, clubs) are written to Parquet files of the cache. A summary of
+the failed requests is printed at the end.
+
+Usage, from the repository root: python scripts/extract.py
+"""
+
 import pandas as pd
 
 from access_it.etl.extract.cache import (
@@ -16,6 +26,7 @@ from access_it.etl.extract.startlists import extract_startlists_pages_from_searc
 
 
 def extract():
+    """Run the extract step (departements of Pays de la Loire and Bretagne)."""
     create_cache_dir()
 
     with make_client() as client:

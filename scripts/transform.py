@@ -1,3 +1,12 @@
+"""Transform step: build the tables to load from the cached pages.
+
+Reads the cached result and startlist pages and the Parquet files of the
+extract step, and writes one Parquet file per table (clubs, races, riders,
+rankings, affiliations, rider_categories) to the cache.
+
+Usage, from the repository root: python scripts/transform.py
+"""
+
 import pandas as pd
 
 from access_it.etl.extract.cache import (
@@ -24,6 +33,7 @@ from access_it.etl.transform.categories import create_category_table
 def transform():
 
     # Reading Parquet files obtained in the extract step of the ETL
+    """Run the transform step."""
     departements = pd.read_parquet(DEPARTEMENTS_PARQUET_FILE)
     departemental_committees = pd.read_parquet(DEPCOM_PARQUET_FILE)
     regional_committees = pd.read_parquet(REGCOM_PARQUET_FILE)

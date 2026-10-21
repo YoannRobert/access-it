@@ -1,3 +1,9 @@
+"""Read queries on the database.
+
+These queries read whole tables: on a database billed by data transfer
+(e.g. the Neon free plan), use them sparingly.
+"""
+
 import pandas as pd
 
 from sqlalchemy import Engine, Select, Table, select

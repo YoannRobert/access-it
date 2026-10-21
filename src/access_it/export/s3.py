@@ -1,3 +1,8 @@
+"""Snapshots of the database on an S3 storage: upload, listing, rotation, download.
+
+Snapshot keys are 'snapshots/snapshot_<UTC timestamp>.zip'.
+"""
+
 from __future__ import annotations
 
 import boto3
@@ -88,7 +93,17 @@ def delete_old_snapshots(
     ) -> list[str]:
     """Delete all snapshots except the `keep` most recent ones.
 
-    Returns the list of deleted keys.
+    Args:
+        bucket: S3 bucket.
+        keep: Number of most recent snapshots kept.
+        client: S3 client (created from the settings if None).
+
+    Returns:
+        The deleted keys.
+
+    Raises:
+        ValueError: If `keep` is less than 1.
+        RuntimeError: If some snapshots could not be deleted.
     """
     if keep < 1:
         raise ValueError(f"'keep' must be >= 1, got {keep}.")
@@ -115,7 +130,11 @@ def download_latest_snapshot(
         dest_dir: Path,
         client: S3Client | None = None
     ) -> Path:
-    """Download the most recent snapshot into `dest_dir` and return the local file path."""
+    """Download the most recent snapshot into `dest_dir` and return the local file path.
+
+    Raises:
+        FileNotFoundError: If the bucket holds no snapshot.
+    """
     client = client or get_s3_client()
     keys = list_snapshot_keys(bucket, client=client)
     if not keys:
