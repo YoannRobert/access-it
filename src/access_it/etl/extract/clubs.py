@@ -1,3 +1,5 @@
+"""Regions, committees and clubs read from the FFC API, and checks on club IDs."""
+
 import httpx
 import pandas as pd
 import re
@@ -10,10 +12,31 @@ from access_it.etl.extract.departements import get_departement_mapping
 
 
 def get_regions(client: httpx.Client) -> list[dict]:
+    """Return the regions of the FFC API (label and value of each region)."""
     return get_required(client, "https://velo.ffc.fr/wp-json/sn/terms/region").json()
 
 
 def get_region_bloc_data(data: dict, departements: pd.DataFrame, overseas: bool=False) -> tuple[list, list]:
+    """Read the regional committee and its departemental committees in a region block.
+
+    A departemental committee ID is the regional committee ID followed by the
+    first two characters of the departement code.
+
+    Args:
+        data: Region block of the FFC API (keys 'region', 'extra_data' and
+            'committees').
+        departements: Departements (departement_code, departement_name), used
+            to find the departement of each committee from its name. It is
+            not modified.
+        overseas: Unused.
+
+    Returns:
+        The regional committee (a list of one dict) and its departemental
+        committees, or two empty lists if the block is incomplete (reported).
+
+    Raises:
+        IndexError: If the departement of a committee is not found.
+    """
     missing_keys = [k for k in ["region", "extra_data", "committees"] if k not in data]
     if missing_keys:
         region = data.get("region")
@@ -70,6 +93,20 @@ def get_region_bloc_data(data: dict, departements: pd.DataFrame, overseas: bool=
 
 
 def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Read the regional and departemental committees of every region from the FFC API.
+
+    The pseudo-committees of the individual and foreign riders are added.
+    Regions whose data are incomplete are skipped and reported.
+
+    Args:
+        client: HTTP client.
+        verbose: Whether to print each region.
+
+    Returns:
+        The regional committees (regional_committee_id, name) and the
+        departemental committees (departemental_committee_id, name,
+        regional_committee_id, departement_code).
+    """
     reg_committees = []
     dep_committees = []
     regions = get_regions(client=client)
@@ -145,6 +182,25 @@ def get_clubs(
         departemental_committees: pd.DataFrame | list[dict],
         verbose: bool = False,
     ) -> pd.DataFrame:
+    """Read the clubs of every region from the FFC API.
+
+    The pseudo-clubs of the individual and foreign riders are added. The year
+    range of every club is set to the current year (it is extended by the
+    transform step with the seasons in which the club is observed).
+
+    Args:
+        client: HTTP client.
+        departemental_committees: Departemental committees, used to find the
+            committee of each club from its ID.
+        verbose: Whether to print each region and committee.
+
+    Returns:
+        One row per club (club_id, name, departemental_committee_id,
+        min_year, max_year, alternative_names).
+
+    Raises:
+        ValueError: If a club ID is invalid or its committee is not found.
+    """
     departemental_committees = pd.DataFrame(departemental_committees)
     clubs = []
     this_year = datetime.now().year
@@ -217,6 +273,7 @@ def get_clubs(
 
 
 def get_disciplines(client: httpx.Client) -> list[dict[str, str]]:
+    """Return the disciplines of the FFC API."""
     return get_required(client, "https://velo.ffc.fr/wp-json/sn/terms/disciplines").json()
 
 
@@ -224,6 +281,20 @@ def get_departemental_committee_id(
         club_id: str,
         departemental_committees: pd.DataFrame | list[dict]
     ) -> str:
+    """Return the departemental committee ID of a club (its first four digits).
+
+    The two committee IDs of Guadeloupe (6097 and 6098) are merged into 6097.
+
+    Args:
+        club_id: FFC club ID (7 digits).
+        departemental_committees: Departemental committees.
+
+    Returns:
+        The departemental committee ID.
+
+    Raises:
+        ValueError: If the club ID is invalid or the committee is not found.
+    """
     df = departemental_committees.copy()
     try:
         df = pd.DataFrame(df)
@@ -245,6 +316,13 @@ def is_valid_french_club_id(
         club_id: str | None,
         include_specific_cases: bool = True
     ) -> bool:
+    """Whether `club_id` is a 7-digit FFC club ID.
+
+    Args:
+        club_id: Club ID, or None.
+        include_specific_cases: Whether individual licenses and foreign
+            licenses are rejected too.
+    """
     if club_id is None:
         return False
     if include_specific_cases:
@@ -254,24 +332,28 @@ def is_valid_french_club_id(
 
 
 def is_individual_license(club_id: str | None) -> bool:
+    """Whether the club ID is that of an individual license (ending with 800)."""
     if club_id is None:
         return False
     return club_id.endswith("800")
 
 
 def is_individual_club(club_name: str | None) -> bool:
+    """Whether the club name is that of individual licenses ('Individuel')."""
     if club_name is None:
         return False
     return normalize_string_and_fold_case(club_name).find("individuel") != -1
 
 
 def is_foreign_license(club_id: str | None) -> bool:
+    """Whether the club ID is that of a foreign license (starting with 00)."""
     if club_id is None:
         return False
     return club_id.startswith("00")
 
 
 def is_foreign_club(club_name: str | None) -> bool:
+    """Whether the club name is that of foreign riders ('Etranger', 'Licenciés UCI', ...)."""
     if club_name is None:
         return False
     foreign_names = ["etranger", "licencies uci", "autres federations"]

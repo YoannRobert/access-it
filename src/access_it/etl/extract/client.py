@@ -53,6 +53,7 @@ class RequestThrottle:
         self.last_request_time: dict[str, float] = {}
 
     def min_delay(self, host: str) -> float:
+        """Minimal delay between two requests to the host, in seconds."""
         return self.min_delay_by_host.get(host, self.default_min_delay)
 
     def wait(self, url: str) -> None:
@@ -98,6 +99,7 @@ def default_throttle() -> RequestThrottle:
 
 
 def make_client() -> httpx.Client:
+    """Create the HTTP client of the extract step (user agent, timeout, redirections)."""
     return httpx.Client(
         headers=HEADERS,
         timeout=REQUEST_TIMEOUT,

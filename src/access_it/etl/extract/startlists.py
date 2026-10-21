@@ -1,3 +1,8 @@
+"""Extraction of the startlist pages of the startlists website (road races).
+
+The address of the website is read from the STARTLISTS_URL setting.
+"""
+
 import httpx
 
 from bs4 import BeautifulSoup
@@ -21,6 +26,19 @@ def extract_startlists_from_organization_page(
         code: str,
         url: str
     ):
+    """Request and cache a startlist page, unless it is already cached.
+
+    The page is kept if its description mentions Access and one of its
+    startlists has an Access category in its name. A page whose request
+    fails is skipped without being cached, so that it is requested again at
+    the next run.
+
+    Args:
+        client: HTTP client.
+        season: Season of the page (year of its publication).
+        code: Identifier of the page on the startlists website.
+        url: URL of the page.
+    """
     season_str = f"{season:4d}"
     org_ref = f"{season_str:4s}/{code:s}".ljust(10)
     if startlists_json_file_exists(season, code):
@@ -72,6 +90,15 @@ def extract_startlists_pages_from_search_url(
         client: httpx.Client,
         max_pages: int = -1
     ):
+    """Extract the startlist pages listed by the startlists website, page by page.
+
+    The listing stops at its last page, or at the first listing page whose
+    request fails.
+
+    Args:
+        client: HTTP client.
+        max_pages: Maximum number of listing pages (-1: no limit).
+    """
     page = 1
     organization_count = 0
     search_url = ROAD_STARTLISTS_URL

@@ -1,3 +1,10 @@
+"""Extraction of the FFC result pages (road races of the Access categories).
+
+Result pages are found by the search engine of the FFC website, by
+departement, and, for the completed seasons only, by requesting the known
+organization codes and every number of each known organizer.
+"""
+
 import httpx
 
 from bs4 import BeautifulSoup
@@ -14,7 +21,17 @@ def extract_results_from_organization_page(
         season: int,
         code: str
     ):
+    """Request and cache a result page, unless it is already cached.
 
+    The page is kept if it is a road race with an Access race code. A page
+    whose request fails, or without race code, is skipped without being
+    cached, so that it is requested again at the next run.
+
+    Args:
+        client: HTTP client.
+        season: Season of the page.
+        code: Organization code of the page (e.g. 'C4400001001').
+    """
     results_base_url = f"{BASE_URL}/resultats/resultat"
     season_str = f"{season:4d}"
     org_ref = f"{season_str:4s}/{code:11s}"
@@ -76,6 +93,19 @@ def extract_organization_pages_from_search_url(
         dept: int | None = None,
         max_pages: int = -1
     ):
+    """Extract the result pages listed by the search engine of the FFC website.
+
+    The search pages of the departement are read until an empty page; the
+    search stops at the first search page whose request fails.
+
+    Args:
+        client: HTTP client.
+        dept: Departement number, or None for every departement.
+        max_pages: Maximum number of search pages (-1: no limit).
+
+    Raises:
+        ValueError: If `dept` is neither an int nor None.
+    """
     if dept is None:
         dept = ""
     elif isinstance(dept, int):
@@ -128,6 +158,15 @@ def extract_former_organization_pages_from_existing_ones(
         client: httpx.Client,
         start_year: int = 2023
     ):
+    """Request every cached organization code for every completed season.
+
+    A race is often organized every year under the same code: this finds the
+    pages of the former seasons of the races already known.
+
+    Args:
+        client: HTTP client.
+        start_year: First season requested.
+    """
     saved_sidecar_files = [
         [p.parent.name, p.name.removesuffix(".meta.json")]
         for p in RESULTS_DIR.rglob("*.meta.json")
@@ -145,6 +184,17 @@ def extract_former_organization_pages_using_bruteforce(
         start_year: int = 2023,
         margin: int = 0
     ):
+    """Request every number of each known organizer, for every completed season.
+
+    An organization code is 'C' followed by the 7-digit club ID of the
+    organizer and a 3-digit number: numbers from 1 to the highest number
+    known for the organizer are requested.
+
+    Args:
+        client: HTTP client.
+        start_year: First season requested.
+        margin: Number of extra numbers requested after the highest known one.
+    """
     known_organization_codes = [
         p.name.removesuffix(".meta.json")
         for p in RESULTS_DIR.rglob("*.meta.json")

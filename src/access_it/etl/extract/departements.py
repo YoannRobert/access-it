@@ -1,3 +1,5 @@
+"""Departements of France, read from the search form of the FFC result pages."""
+
 import httpx
 import pandas as pd
 
@@ -8,6 +10,19 @@ from access_it.etl.extract.constants import FOREIGN_CLUB_ID
 
 
 def get_departement_mapping(client: httpx.Client) -> pd.DataFrame:
+    """Read the departements from the search form of the FFC result pages.
+
+    Args:
+        client: HTTP client.
+
+    Returns:
+        One row per departement (departement_code, departement_name), plus
+        the departement 'Autre' of the foreign pseudo-club.
+
+    Raises:
+        RuntimeError: If the page cannot be requested.
+        ValueError: If the departement selector is not found on the page.
+    """
     response = get_required(client, "https://competitions.ffc.fr/resultats/")
 
     bs = BeautifulSoup(response.text, "html.parser")
