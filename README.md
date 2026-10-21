@@ -131,8 +131,9 @@ Toutes les commandes se lancent depuis la racine du dépôt.
 | `python -m access_it.etl.load.schema {create,drop,reset}` | création, suppression ou réinitialisation des tables |
 
 Ne lancez pas le load après un extract seul : l'extract remplace les fichiers Parquet des
-clubs et des référentiels, que seul le transform complète. La procédure d'exploitation
-(contrôles bloquants, nettoyage de la base) est décrite dans un document dédié.
+clubs et des référentiels, que seul le transform complète. La
+[procédure d'exploitation](docs/exploitation.md) décrit les messages de l'ETL, les contrôles
+bloquants et le nettoyage de la base.
 
 ## Tests
 
