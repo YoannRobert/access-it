@@ -35,7 +35,7 @@ TABLES_TO_UPDATE = {
 
 # Synchronized tables, mapped to their group column: for every group present
 # in the Parquet file, rows missing from the file are deleted.
-TABLES_TO_SYNC = {"rider_categories": "rider_id"}
+TABLES_TO_SYNC = {"rider_categories": "rider_id", "affiliations": "rider_id"}
 
 ConflictMode = Literal["ignore", "update"]
 

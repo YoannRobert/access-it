@@ -363,9 +363,108 @@ def get_rider_id(
     )
 
 
-def define_affiliation_id(rider_id: str, club_id: str) -> str:
-    key = f"{rider_id}|{club_id}".encode()
-    return hashlib.blake2b(key, digest_size=8).hexdigest()
+# An isolated club observation has at most this number of results
+MAX_ISOLATED_RESULTS = 2
+
+
+def group_club_runs(observations: list[tuple]) -> list[dict]:
+    """Group observations (race_date, club_id), sorted by date, into runs of the same club."""
+    runs: list[dict] = []
+    for race_date, club_id in observations:
+        if runs and runs[-1]["club_id"] == club_id:
+            runs[-1]["dates"].append(race_date)
+        else:
+            runs.append({"club_id": club_id, "dates": [race_date]})
+    return runs
+
+
+def is_isolated_run(before: dict, run: dict, after: dict) -> bool:
+    """Whether `run` is an isolated observation between two runs of one same other club.
+
+    The run must have at most MAX_ISOLATED_RESULTS results, and the surrounding
+    results must be in the same calendar year as the run (e.g. a single result
+    with another club between two results of the usual club, a few weeks apart).
+    """
+    year = run["dates"][0].year
+    return (
+        before["club_id"] == after["club_id"]
+        and len(run["dates"]) <= MAX_ISOLATED_RESULTS
+        and before["dates"][-1].year == year
+        and run["dates"][-1].year == year
+        and after["dates"][0].year == year
+    )
+
+
+def compute_rider_affiliation_periods(observations: list[tuple]) -> tuple[list[dict], int]:
+    """Compute the affiliation periods of one rider from its observations (race_date, club_id).
+
+    Observations must be sorted by date. Return the periods (start_date, club_id),
+    sorted by start date, and the number of isolated observations ignored.
+    Rules:
+    - isolated observations (see is_isolated_run) are ignored;
+    - a period starts on January 1st of the year of its first result, unless
+      another club was observed earlier the same year: it then starts on the
+      date of its first result;
+    - a period ends the day before the next one starts, or is still ongoing:
+      years without results are covered by the previous club.
+    """
+    runs = group_club_runs(observations)
+    isolated = {
+        k for k in range(1, len(runs) - 1) if is_isolated_run(runs[k - 1], runs[k], runs[k + 1])
+    }
+    n_ignored = sum(len(runs[k]["dates"]) for k in isolated)
+    if isolated:
+        kept = [
+            (race_date, run["club_id"])
+            for k, run in enumerate(runs) if k not in isolated
+            for race_date in run["dates"]
+        ]
+        runs = group_club_runs(kept)
+
+    periods: list[dict] = []
+    previous_last_date = None
+    for run in runs:
+        first_date = run["dates"][0]
+        if previous_last_date is not None and previous_last_date.year == first_date.year:
+            start_date = first_date
+        else:
+            start_date = pd.Timestamp(year=first_date.year, month=1, day=1)
+        previous_last_date = run["dates"][-1]
+        # Same-day observations with different clubs: the latest one wins
+        if periods and periods[-1]["start_date"] >= start_date:
+            periods.pop()
+        if periods and periods[-1]["club_id"] == run["club_id"]:
+            continue
+        periods.append({"start_date": start_date, "club_id": run["club_id"]})
+    return periods, n_ignored
+
+
+def compute_affiliation_periods(observations: pd.DataFrame) -> pd.DataFrame:
+    """Compute the affiliation periods of all riders.
+
+    `observations` has one row per result: rider_id, race_id, race_date, club_id.
+    Return one row per period: rider_id, start_date, club_id (see
+    compute_rider_affiliation_periods), and print the number of isolated
+    observations ignored.
+    """
+    df = observations.sort_values(["rider_id", "race_date", "race_id"], kind="stable")
+    rows = []
+    n_ignored, riders_with_ignored = 0, 0
+    for rider_id, results in df.groupby("rider_id", sort=True):
+        periods, n = compute_rider_affiliation_periods(
+            list(zip(results["race_date"], results["club_id"]))
+        )
+        rows += [{"rider_id": rider_id, **period} for period in periods]
+        n_ignored += n
+        riders_with_ignored += n > 0
+    if n_ignored:
+        print(
+            f"Info: {n_ignored} isolated club observation(s) of {riders_with_ignored} rider(s) "
+            f"ignored for affiliations"
+        )
+    periods = pd.DataFrame(rows, columns=["rider_id", "start_date", "club_id"])
+    periods["start_date"] = pd.to_datetime(periods["start_date"])
+    return periods
 
 
 def create_affiliation_clubs_riders(
@@ -373,44 +472,28 @@ def create_affiliation_clubs_riders(
         races_data: pd.DataFrame,
         rider_db: pd.DataFrame
     ) -> pd.DataFrame:
+    """Create the affiliation table: one row per rider and period with the same club.
+
+    Columns: rider_id, start_date, club_id. A period ends the day before the
+    next start_date of the same rider, or is still ongoing if there is none.
+    """
     race_dates = races_data[["race_id", "race_date"]].copy()
     race_dates["race_date"] = pd.to_datetime(race_dates["race_date"])
-    cols = ["uci_id", "last_name", "first_name", "club_id", "race_date"]
+    cols = ["uci_id", "last_name", "first_name", "club_id", "race_id", "race_date"]
     rider_x_race_data = rider_x_race_data.drop(columns=["race_date"])
     df = rider_x_race_data.merge(race_dates, on="race_id", how="inner")[cols]
-    aff = pd.DataFrame(
-        {
-            "affiliation_id": pd.Series(dtype="str"),
-            "rider_id": pd.Series(dtype="str"),
-            "club_id": pd.Series(dtype="str"),
-            "start_date": pd.Series(dtype="datetime64[ns]"),
-            "end_date": pd.Series(dtype="datetime64[ns]")
-        }
-    )
     riders = RiderLookup(rider_db)
-    aff_data = {}
+    rider_ids = []
     for row in df.itertuples():
-        uci_id = row.uci_id
-        last_name = row.last_name
-        first_name = row.first_name
-        club_id = row.club_id
-        race_date = row.race_date
-        uci_id = uci_id if isinstance(uci_id, str) else ""
-        last_name = last_name if isinstance(last_name, str) else ""
-        first_name = first_name if isinstance(first_name, str) else ""
-        if (
-                not isinstance(uci_id, str)
-                or not isinstance(last_name, str)
-                or not isinstance(first_name, str)
-                or not isinstance(club_id, str)
-        ):
+        uci_id = row.uci_id if isinstance(row.uci_id, str) else ""
+        last_name = row.last_name if isinstance(row.last_name, str) else ""
+        first_name = row.first_name if isinstance(row.first_name, str) else ""
+        if not isinstance(row.club_id, str):
             raise TypeError(
-                "Invalid data type for uci_id, last_name, or first_name "
-                + "(should be str)."
+                f"Invalid data type for club_id (should be str): {row.club_id!r} "
+                f"(uci_id={uci_id}, last_name={last_name}, first_name={first_name})"
             )
-        rider_id = riders.get_rider_id(
-            uci_id=uci_id, last_name=last_name, first_name=first_name
-        )
+        rider_id = riders.get_rider_id(uci_id=uci_id, last_name=last_name, first_name=first_name)
         if not isinstance(rider_id, str):
             raise TypeError(
                 "Invalid data type for rider_id (should be str).\n"
@@ -418,46 +501,9 @@ def create_affiliation_clubs_riders(
                 + f"value: {str(rider_id)}\n"
                 + f"arguments: uci_id={uci_id}, last_name={last_name}, first_name={first_name}"
             )
-        affiliation_id = define_affiliation_id(rider_id, club_id)
-        if rider_id in aff_data:
-            if club_id in aff_data[rider_id]:
-                aff_data[rider_id][club_id]["start_date"] = min(
-                    race_date,
-                    aff_data[rider_id][club_id]["start_date"]
-                )
-                aff_data[rider_id][club_id]["end_date"] = max(
-                    race_date,
-                    aff_data[rider_id][club_id]["end_date"]
-                )
-            else:
-                aff_data[rider_id][club_id] = {
-                    "affiliation_id": affiliation_id,
-                    "start_date": race_date,
-                    "end_date": race_date
-                }
-        else:
-            aff_data[rider_id] = {
-                club_id: {
-                    "affiliation_id": affiliation_id,
-                    "start_date": race_date,
-                    "end_date": race_date
-                }
-            }
-    # flattening the dictionary into a list of single-level dictionaries
-    aff_data_list = []
-    for rider_id, clubs in aff_data.items():
-        for club_id, affiliation in clubs.items():
-            aff_data_list.append(
-                {
-                    "affiliation_id": affiliation["affiliation_id"],
-                    "rider_id": rider_id,
-                    "club_id": club_id,
-                    "start_date": affiliation["start_date"],
-                    "end_date": affiliation["end_date"]
-                }
-            )
-    aff = pd.concat([aff, pd.DataFrame(aff_data_list)], ignore_index=True)
-    return aff
+        rider_ids.append(rider_id)
+    df["rider_id"] = rider_ids
+    return compute_affiliation_periods(df[["rider_id", "race_id", "race_date", "club_id"]])
 
 
 def build_riders_by_club(affiliations: pd.DataFrame) -> dict[str, set[str]]:

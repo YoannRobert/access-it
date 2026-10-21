@@ -136,19 +136,20 @@ class Ranking(Base):
 
 
 class Affiliation(Base):
-    __tablename__ = "affiliations"
-    __table_args__ = (
-        CheckConstraint(
-            sqltext="start_date <= end_date",
-            name="date_order"
-        ),
-    )
+    """Club history: one row per period with the same club, starting at start_date.
 
-    affiliation_id: Mapped[str] = mapped_column(String(16), primary_key=True)
-    rider_id: Mapped[str] = mapped_column(String(16), ForeignKey("riders.rider_id"))
+    A period ends the day before the next start_date of the same rider,
+    or is still ongoing if there is none, so periods never overlap.
+    """
+
+    __tablename__ = "affiliations"
+
+    rider_id: Mapped[str] = mapped_column(
+        String(16), ForeignKey("riders.rider_id"),
+        primary_key=True
+    )
+    start_date: Mapped[date] = mapped_column(primary_key=True)
     club_id: Mapped[str] = mapped_column(String(7), ForeignKey("clubs.club_id"))
-    start_date: Mapped[date]
-    end_date: Mapped[date]
 
 
 class RiderCategory(Base):

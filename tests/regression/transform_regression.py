@@ -58,7 +58,7 @@ OUTPUT_TABLES = {
     "races": ["race_id"],
     "riders": ["rider_id"],
     "rankings": ["race_id", "rider_id", "finish_rank"],
-    "affiliations": ["affiliation_id"],
+    "affiliations": ["rider_id", "start_date"],
     "rider_categories": ["rider_id", "start_date"],
 }
 

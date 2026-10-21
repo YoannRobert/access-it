@@ -24,11 +24,8 @@ def rider(rider_id: str, uci_id: str, last_name: str, first_name: str) -> dict:
     }
 
 
-def affiliation(affiliation_id: str, rider_id: str) -> dict:
-    return {
-        "affiliation_id": affiliation_id, "rider_id": rider_id, "club_id": "4400001",
-        "start_date": DAY, "end_date": DAY,
-    }
+def affiliation(rider_id: str) -> dict:
+    return {"rider_id": rider_id, "start_date": DAY, "club_id": "4400001"}
 
 
 def database_with_stale_rider():
@@ -47,7 +44,7 @@ def database_with_stale_rider():
             {"race_id": "race2", "rider_id": "r_old", "finish_rank": 1},
             {"race_id": "race1", "rider_id": "r2", "finish_rank": 3},
         ],
-        "affiliations": [affiliation("f1", "r1"), affiliation("f_old", "r_old")],
+        "affiliations": [affiliation("r1"), affiliation("r_old")],
         "rider_categories": [
             {"rider_id": "r1", "start_date": DAY, "rider_category": 2},
             {"rider_id": "r_old", "start_date": DAY, "rider_category": 3},
@@ -72,7 +69,7 @@ def files() -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
             "rider_id": ["r1", "r_new", "r_new"],
             "finish_rank": [1, 2, 1],
         }),
-        "affiliations": pd.DataFrame([affiliation("f1", "r1"), affiliation("f_new", "r_new")]),
+        "affiliations": pd.DataFrame([affiliation("r1"), affiliation("r_new")]),
         "rider_categories": pd.DataFrame({
             "rider_id": ["r1", "r_new"], "start_date": [DAY, DAY], "rider_category": [2, 3],
         }),

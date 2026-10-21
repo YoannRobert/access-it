@@ -64,10 +64,7 @@ def valid_frames() -> dict[str, pd.DataFrame]:
             "duration": "1 jour", "race_code": "1.27.1",
         },
         "rankings": {"race_id": "race1", "rider_id": "r1", "finish_rank": 1},
-        "affiliations": {
-            "affiliation_id": "f1", "rider_id": "r1", "club_id": "5244001",
-            "start_date": date, "end_date": date,
-        },
+        "affiliations": {"rider_id": "r1", "start_date": date, "club_id": "5244001"},
         "rider_categories": {"rider_id": "r1", "start_date": date, "rider_category": 1},
     }
     return {name: pd.DataFrame([row]) for name, row in rows.items()}
@@ -164,11 +161,9 @@ def test_find_existing_values_without_database():
 def affiliations(club_ids: list) -> pd.DataFrame:
     n = len(club_ids)
     return pd.DataFrame({
-        "affiliation_id": [f"f{k}" for k in range(n)],
         "rider_id": ["r1"] * n,
+        "start_date": pd.date_range("2023-01-01", periods=n, freq="YS"),
         "club_id": club_ids,
-        "start_date": pd.Timestamp("2025-01-01"),
-        "end_date": pd.Timestamp("2025-01-01"),
     })
 
 
@@ -384,6 +379,12 @@ def test_missing_rows_temporary_table_is_dropped():
     with engine.connect() as connection:
         assert find_missing_rows(connection, TABLES["riders"], df) == (1, [("r2",)])
         assert find_missing_rows(connection, TABLES["riders"], df) == (1, [("r2",)])
+
+
+def test_missing_rows_not_checked_for_affiliations():
+    connection = ConnectionThatMustNotBeQueried()
+    df = affiliations(["4400001"])
+    assert check_missing_rows(TABLES["affiliations"], df, connection) == []
 
 
 def test_missing_rows_not_checked_for_rider_categories():

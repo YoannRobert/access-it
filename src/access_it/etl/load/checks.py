@@ -38,17 +38,17 @@ MAX_ROW_DECREASE = {
     "races": 0.0,
     "rankings": 0.0,
     "riders": 0.0,
-    "affiliations": 0.0,
-    # The category inference heuristic may legitimately produce fewer rows
+    # Periods recomputed at every run (synchronized tables): fewer rows may be legitimate
+    "affiliations": 0.05,
     "rider_categories": 0.05,
 }
 
 # Tables whose rows already in the database must all be present in the file.
 # A missing row usually means that an identifier changed between two runs
 # (e.g. rider_id, computed from the names and the UCI ID): the database would
-# keep the old row next to the new one. rider_categories is left out on
-# purpose: its rows may change with the inference heuristic and are synchronized.
-NO_MISSING_ROWS = ["riders", "rankings", "affiliations"]
+# keep the old row next to the new one. affiliations and rider_categories are
+# left out on purpose: their periods are recomputed at every run and synchronized.
+NO_MISSING_ROWS = ["riders", "rankings"]
 
 
 class DataValidationError(Exception):
