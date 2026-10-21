@@ -3,12 +3,12 @@ import pandas as pd
 
 from bs4 import BeautifulSoup
 
+from access_it.etl.extract.client import get_required
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID
 
 
 def get_departement_mapping(client: httpx.Client) -> pd.DataFrame:
-    response = client.get("https://competitions.ffc.fr/resultats/")
-    response.raise_for_status()
+    response = get_required(client, "https://competitions.ffc.fr/resultats/")
 
     bs = BeautifulSoup(response.text, "html.parser")
     select = bs.find("select", id="filtreDepartementID")

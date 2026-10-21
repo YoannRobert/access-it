@@ -203,3 +203,21 @@ def try_get(
         reason = failures.record(url, error)
         print(f"Warning: request failed ({reason}): {url}")
         return None
+
+
+def get_required(client: httpx.Client, url: str) -> httpx.Response:
+    """GET a resource the extract step cannot do without (API, reference pages).
+
+    Same delays and retries as get(), but any error response (404 included)
+    or network error raises a RuntimeError naming the URL: the extract step
+    stops, since the reference data (clubs, committees...) would be incomplete.
+    """
+    try:
+        response = get(client, url)
+        response.raise_for_status()
+    except httpx.HTTPError as error:
+        raise RuntimeError(
+            f"Required request failed ({error}): {url}. The extract step is stopped, "
+            f"since the reference data would be incomplete; run it again later."
+        ) from error
+    return response

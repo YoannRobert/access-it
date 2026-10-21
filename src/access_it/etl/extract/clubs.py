@@ -4,18 +4,20 @@ import re
 
 from datetime import datetime
 from access_it.common.text import normalize_string_and_fold_case
+from access_it.etl.extract.client import get_required
 from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME, INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 from access_it.etl.extract.departements import get_departement_mapping
 
 
 def get_regions(client: httpx.Client) -> list[dict]:
-    r = client.get("https://velo.ffc.fr/wp-json/sn/terms/region")
-    r.raise_for_status()
-    return r.json()
+    return get_required(client, "https://velo.ffc.fr/wp-json/sn/terms/region").json()
 
 
 def get_region_bloc_data(data: dict, departements: pd.DataFrame, overseas: bool=False) -> tuple[list, list]:
-    if not any([k in data.keys() for k in ["region", "extra_data", "committees"]]):
+    missing_keys = [k for k in ["region", "extra_data", "committees"] if k not in data]
+    if missing_keys:
+        region = data.get("region")
+        print(f"Warning: region block skipped, missing keys {missing_keys}: {region!r}")
         return [], []
     extra_data = data['extra_data']
     if 'id_api' not in extra_data:
@@ -29,8 +31,11 @@ def get_region_bloc_data(data: dict, departements: pd.DataFrame, overseas: bool=
         dep_committees_data = [{"post_title": "CD MAYOTTE"}]
     if len(dep_committees_data) == 0:
         return [], []
-    departements["tmp_name"] = departements["departement_name"].apply(
-        lambda x: normalize_string_and_fold_case(x).replace("-", " ")
+    # Normalized names on a copy: the DataFrame of the caller is left unchanged
+    departements = departements.assign(
+        tmp_name=departements["departement_name"].apply(
+            lambda x: normalize_string_and_fold_case(x).replace("-", " ")
+        )
     )
     dep_committees = []
     for dep_committee_data in dep_committees_data:
@@ -74,8 +79,8 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[pd.Data
         region_value = region["value"]
         if verbose:
             print(f"{region_label}")
-        r = client.get(f"https://velo.ffc.fr/wp-json/sn/cpt/comite?region={region_value}")
-        r.raise_for_status()
+        url = f"https://velo.ffc.fr/wp-json/sn/cpt/comite?region={region_value}"
+        r = get_required(client, url)
         try:
             reg_committee_data = r.json()
             if "overseas" in reg_committee_data:
@@ -89,7 +94,8 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[pd.Data
                 if len(cur_reg_committee) > 0 and len(cur_dep_committees) > 0:
                     reg_committees.extend(cur_reg_committee)
                     dep_committees.extend(cur_dep_committees)
-        except KeyError:
+        except KeyError as error:
+            print(f"Warning: committees of region {region_label!r} skipped, missing key {error}")
             continue
     reg_committees.extend(
         [
@@ -151,8 +157,8 @@ def get_clubs(
             continue
         if verbose:
             print(f"{region_label}")
-        r = client.get(f"https://velo.ffc.fr/wp-json/sn/cpt/clubs?region={region_value}")
-        r.raise_for_status()
+        url = f"https://velo.ffc.fr/wp-json/sn/cpt/clubs?region={region_value}"
+        r = get_required(client, url)
         try:
             data = r.json()
             if "committees" not in data:
@@ -179,7 +185,8 @@ def get_clubs(
                             "alternative_names": alternative_names
                         }
                     )
-        except KeyError:
+        except KeyError as error:
+            print(f"Warning: clubs of region {region_label!r} skipped, missing key {error}")
             continue
     clubs.extend(
         [
@@ -210,9 +217,7 @@ def get_clubs(
 
 
 def get_disciplines(client: httpx.Client) -> list[dict[str, str]]:
-    r = client.get("https://velo.ffc.fr/wp-json/sn/terms/disciplines")
-    r.raise_for_status()
-    return r.json()
+    return get_required(client, "https://velo.ffc.fr/wp-json/sn/terms/disciplines").json()
 
 
 def get_departemental_committee_id(
