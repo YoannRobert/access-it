@@ -19,6 +19,8 @@ def export_database_to_s3_bucket():
     engine = get_engine()
     client = get_s3_client()
     tables = read_all_tables(engine)
+    # The cache directories may not exist yet (e.g. on a new machine)
+    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=SNAPSHOTS_DIR) as tmp_dir:
         zip_path = build_snapshot_zip(tables, Path(tmp_dir) / "snapshot.zip")
         s3_uri = upload_to_s3(
