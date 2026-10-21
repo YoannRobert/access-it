@@ -1,3 +1,11 @@
+"""Access categories: reading them in names, and inferring the category history of riders.
+
+The Access categories range from A1 (highest level) to A4. A race is open to
+one or several consecutive categories; the category of a rider is inferred
+from the races he takes part in (results and startlists), then aggregated
+into a history of periods (one row per period, starting at start_date).
+"""
+
 import pandas as pd
 import re
 
@@ -10,8 +18,23 @@ from access_it.common.text import normalize_string_and_fold_case
 def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[int, bool]:
     """Return, for each Access subcategory (1 to 4), whether it appears in `name`.
 
-    Results are cached (the same labels are parsed many times); a new dict is
-    returned at every call so callers can safely modify it.
+    Usual notations and spelling mistakes are recognized; "Access" alone means
+    all the subcategories, and the text after "sauf" (riders excluded) is
+    ignored. Results are cached (the same labels are parsed many times); a new
+    dict is returned at every call, so that callers can modify it.
+
+    Args:
+        name: Race title, ranking name or startlist name.
+        verbose: Whether to print each normalization step (not cached).
+
+    Returns:
+        A dict {1: bool, 2: bool, 3: bool, 4: bool}.
+
+    Examples:
+        >>> find_access_categories_from_name("ACCESS 3/4 SAUF FEMMES")
+        {1: False, 2: False, 3: True, 4: True}
+        >>> find_access_categories_from_name("Acc 1 et 2")
+        {1: True, 2: True, 3: False, 4: False}
     """
     if verbose:
         return _compute_access_categories_from_name(name, verbose=True)
@@ -20,10 +43,17 @@ def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[i
 
 @lru_cache(maxsize=None)
 def _cached_access_categories_from_name(name: str) -> tuple[bool, ...]:
+    """Cached categories of a name, as a tuple (see find_access_categories_from_name)."""
     return tuple(_compute_access_categories_from_name(name).values())
 
 
 def _compute_access_categories_from_name(name: str, verbose: bool = False) -> dict[int, bool]:
+    """Read the Access categories in a name (see find_access_categories_from_name).
+
+    The name is normalized (case, accents, spelling mistakes, separators such as
+    "1-2", "3/4" or "1 et 2"), then every category is written "a<i>" and the
+    categories between the first and the last "a<i>" found are read.
+    """
     categories = {k: False for k in range(1, 5)}
     if verbose:
         print(f"name={name}")
@@ -98,20 +128,49 @@ def _compute_access_categories_from_name(name: str, verbose: bool = False) -> di
 
 
 def count_nb_access_subcategories_from_name(name: str) -> int:
+    """Number of Access categories found in the name."""
     return sum(
         [int(v) for v in find_access_categories_from_name(name.strip()).values()]
     )
 
 
 def has_access_subcategories(name: str) -> bool:
+    """Whether at least one Access category is found in the name."""
     return count_nb_access_subcategories_from_name(name) >= 1
 
 
 def get_higher_access_subcategory(name: str) -> int:
+    """Highest Access category found in the name (the smallest number, e.g. 3 for "Access 3/4").
+
+    Raises:
+        IndexError: If no Access category is found.
+    """
     return [k for k, v in find_access_categories_from_name(name.strip()).items() if v][0]
 
 
 def find_ranking_categories(organization_data: dict[str, Any]) -> dict[str, dict[int, bool]]:
+    """Assign Access categories to each ranking of an organization (a result page).
+
+    The rules are applied by decreasing confidence:
+    0. One ranking only, and categories in the title of the organization: the
+       ranking gets these categories.
+    1. Every ranking name holds categories: each ranking gets its own.
+    2. All the rankings but one hold categories: the last one gets the
+       categories of the title not taken by the others.
+    3. N categories in the title, none in the N ranking names: one category
+       per ranking, in their order of appearance.
+    4. N categories in the title, none in the M ranking names (M < N, N a
+       multiple of M): N/M categories per ranking, in order (e.g. A1-A2 then
+       A3-A4 for two rankings).
+
+    Args:
+        organization_data: Parsed result page (see
+            parse_results_from_organization_page), with 'title' and 'rankings'.
+
+    Returns:
+        Categories ({1: bool, ..., 4: bool}) by ranking ID. Rankings for which
+        no rule applies are missing, or have no category.
+    """
     org_name = organization_data["title"]
     org_categories = find_access_categories_from_name(org_name)
     nb_org_categories = sum([int(v) for v in org_categories.values()])
@@ -198,6 +257,7 @@ def find_ranking_categories(organization_data: dict[str, Any]) -> dict[str, dict
 
 
 def convert_categories_from_dict_to_list(categories: dict[int, bool]) -> list[str]:
+    """Categories found, as a list of labels (e.g. ["A1", "A2"])."""
     return [f"A{i}" for i, v in categories.items() if v]
 
 
@@ -212,9 +272,38 @@ def search_rider_category(
         categories_from_startlists: pd.DataFrame,
         after: str | None = None
     ) -> pd.DataFrame:
+    """Infer the Access category of each rider at each race date.
 
+    Observations are the results (the race categories, e.g. "A1,A2", and the
+    finish rank) and the startlists (a single category), from `after` on. The
+    races of a rider bound his category: his possible range [hc, lc] (highest
+    and lowest category, A1 being the highest) is narrowed race after race, and
+    moved when he enters races of other categories (category change). A win in
+    a race whose highest category is above his range moves him up at the next
+    race. The category is known when the range holds one category only.
+
+    Unknown categories are then filled:
+    1. backward propagation of the known categories, within each range;
+    2. riders with no known category at all get A1 when limited to A1-A2, A3
+       when limited to A3-A4, A1 otherwise; other unknown categories get A1;
+    3. forward then backward propagation.
+
+    Args:
+        races: Race table (race_id, categories, race_date).
+        rankings: Ranking table (race_id, rider_id, finish_rank).
+        categories_from_startlists: Categories read on the startlists
+            (rider_id, race_date, category).
+        after: First date taken into account ('YYYY-MM-DD'; default 2023-01-01).
+
+    Returns:
+        One row per observation: rider_id, race_date, rider_category (1 to 4).
+    """
     def forward_search(df_rider: pd.DataFrame) -> pd.DataFrame:
+        """Narrow the category range of one rider, race after race (rows sorted by date).
 
+        Fills the columns rider_hc, rider_lc and event, and rider_category when the
+        range holds one category only.
+        """
         rider_hc_prev, rider_lc_prev = 100, -100
         first_index = df_rider.index[0]
         rider_hc_next, rider_lc_next = None, None
@@ -284,7 +373,11 @@ def search_rider_category(
             df_rider: pd.DataFrame,
             step: int
         ) -> pd.DataFrame:
+        """Fill the unknown categories of one rider from the last known one.
 
+        The known category is moved forward or backward (`mode`) and clipped to the
+        range [rider_hc, rider_lc] of each row; `step` is written in the event column.
+        """
         last_known_category = None
         direction = 1 if mode == "forward" else -1
 
@@ -316,9 +409,11 @@ def search_rider_category(
         return df_rider
 
     def backward_propagation(df_rider: pd.DataFrame, step: int) -> pd.DataFrame:
+        """Propagate the known categories backward (see propagation)."""
         return propagation(mode="backward", df_rider=df_rider, step=step)
 
     def forward_propagation(df_rider: pd.DataFrame, step: int) -> pd.DataFrame:
+        """Propagate the known categories forward (see propagation)."""
         return propagation(mode="forward", df_rider=df_rider, step=step)
 
 
@@ -435,6 +530,11 @@ def compute_category_history(category_at_given_times: pd.DataFrame) -> pd.DataFr
 
 
 def advance_start_dates_in_category_history(category_history: pd.DataFrame) -> pd.DataFrame:
+    """Move the first period of each rider and year to January 1st of that year.
+
+    A category is valid for the whole season: a period observed first in April
+    starts on January 1st, unless another period starts earlier the same year.
+    """
     df = category_history.copy()
     df["start_date"] = pd.to_datetime(df["start_date"])
     df = df.sort_values(["rider_id", "start_date"])
@@ -455,7 +555,32 @@ def add_unknown_years_in_category_history(
         categories_from_startlists: pd.DataFrame,
         after_year: int = 2023
     ) -> pd.DataFrame:
+    """Add the periods of unknown category, for the years without observation.
 
+    - A rider first observed after `after_year` gets an unknown category from
+      January 1st of `after_year`.
+    - A year without any race of the rider starts an unknown category period
+      on January 1st (once, until his next race).
+    - A rider racing again after such a year gets back his last known category
+      on January 1st of the year of his return, if no period starts that year.
+
+    The current year is included: a rider without race yet this year gets an
+    unknown category from January 1st.
+
+    Args:
+        category_history: Category history (rider_id, start_date, rider_category).
+        races: Race table, for the race dates.
+        rankings: Ranking table, for the races of each rider.
+        categories_from_startlists: Categories read on the startlists, for
+            the startlist dates of each rider.
+        after_year: First year of the history.
+
+    Returns:
+        The completed history, rider_category as a nullable integer (Int8).
+
+    Raises:
+        ValueError: If `after_year` is before 2023 or after the current year.
+    """
     this_year = datetime.now().year
     if after_year < 2023 or after_year > this_year:
         raise ValueError(
@@ -606,6 +731,21 @@ def create_category_table(
     rankings: pd.DataFrame,
     categories_from_startlists: pd.DataFrame
     ) -> pd.DataFrame:
+    """Create the category history of the riders (table rider_categories).
+
+    Steps: search_rider_category, compute_category_history,
+    advance_start_dates_in_category_history, add_unknown_years_in_category_history,
+    then delete_rows_for_riders_having_duplicated_keys.
+
+    Args:
+        races: Race table.
+        rankings: Ranking table.
+        categories_from_startlists: Categories read on the startlists.
+
+    Returns:
+        One row per rider and period: rider_id, start_date, rider_category (a
+        period ends the day before the next start_date of the rider).
+    """
     category_at_given_times = search_rider_category(
         races=races,
         rankings=rankings,
