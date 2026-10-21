@@ -103,6 +103,18 @@ def extract_organization_pages_from_search_url(
         page += 1
 
 
+def completed_seasons(start_year: int, now: datetime | None = None) -> range:
+    """Seasons from `start_year` to the previous one (the current season is excluded).
+
+    Requesting a page of the current season by its number may cache a "not
+    found" page for a race not held yet, which would then block its results
+    once published: pages of the current season are only found by the search
+    engine (see extract_organization_pages_from_search_url).
+    """
+    now = now or datetime.now(timezone.utc)
+    return range(start_year, now.year)
+
+
 def extract_former_organization_pages_from_existing_ones(
         client: httpx.Client,
         start_year: int = 2023
@@ -112,7 +124,7 @@ def extract_former_organization_pages_from_existing_ones(
         for p in RESULTS_DIR.rglob("*.meta.json")
     ]
     saved_sidecar_files = sorted(saved_sidecar_files)
-    seasons = range(start_year, datetime.now(timezone.utc).year + 1)
+    seasons = completed_seasons(start_year)
     org_codes = list(set([org_code for _, org_code in saved_sidecar_files]))
     for season in seasons:
         for code in org_codes:
@@ -140,7 +152,7 @@ def extract_former_organization_pages_using_bruteforce(
         )
         for organizer_id in organizer_ids
     }
-    seasons = range(start_year, datetime.now(timezone.utc).year + 1)
+    seasons = completed_seasons(start_year)
     for season in seasons:
         for organizer_id in organizer_ids:
             organization_codes = [
