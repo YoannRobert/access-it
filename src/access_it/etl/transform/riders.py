@@ -506,29 +506,57 @@ def create_affiliation_clubs_riders(
     return compute_affiliation_periods(df[["rider_id", "race_id", "race_date", "club_id"]])
 
 
-def build_riders_by_club(affiliations: pd.DataFrame) -> dict[str, set[str]]:
-    """Map each club ID to the set of rider IDs affiliated with it."""
-    riders_by_club: dict[str, set[str]] = defaultdict(set)
-    for club_id, rider_id in zip(affiliations["club_id"], affiliations["rider_id"]):
-        riders_by_club[club_id].add(rider_id)
-    return dict(riders_by_club)
+class AffiliationLookup:
+    """Affiliation periods indexed by club, to find the riders of a club at a given date.
+
+    A period starts at its start_date and ends the day before the next
+    start_date of the same rider, or is still ongoing if there is none.
+    For the lookup only, the first period of a rider also covers the dates
+    before its start: before his first result, nothing contradicts his club
+    (e.g. a rider on a startlist before his first result with the club).
+    """
+
+    def __init__(self, affiliations: pd.DataFrame):
+        df = affiliations.sort_values(["rider_id", "start_date"])
+        end_dates = df.groupby("rider_id")["start_date"].shift(-1)  # exclusive end
+        is_first_period = df.groupby("rider_id").cumcount() == 0
+        self.periods_by_club: dict[str, list[tuple]] = defaultdict(list)
+        for rider_id, club_id, start_date, end_date, is_first in zip(
+                df["rider_id"], df["club_id"], df["start_date"], end_dates, is_first_period
+        ):
+            start_date = None if is_first else pd.Timestamp(start_date)
+            end_date = None if pd.isna(end_date) else pd.Timestamp(end_date)
+            self.periods_by_club[club_id].append((rider_id, start_date, end_date))
+
+    def riders_of_club(self, club_id: str, on_date: pd.Timestamp | None = None) -> set[str]:
+        """Riders affiliated with the club on the date (at any time if no date is given)."""
+        periods = self.periods_by_club.get(club_id, [])
+        if on_date is None:
+            return {rider_id for rider_id, _, _ in periods}
+        return {
+            rider_id
+            for rider_id, start_date, end_date in periods
+            if (start_date is None or start_date <= on_date)
+            and (end_date is None or on_date < end_date)
+        }
 
 
 def get_rider_id_using_affiliations(
         rider_ids: list[str],
-        affiliations: pd.DataFrame | dict[str, set[str]],
-        club_id: str
+        affiliations: pd.DataFrame | AffiliationLookup,
+        club_id: str,
+        on_date: pd.Timestamp | None = None
     ) -> str:
-    """Return the only rider among `rider_ids` affiliated with `club_id`.
+    """Return the only rider among `rider_ids` affiliated with `club_id` on the date.
 
-    For repeated calls, pass the mapping returned by `build_riders_by_club`
-    instead of the affiliation DataFrame.
+    Without date, any affiliation period with the club is accepted. For
+    repeated calls, pass an AffiliationLookup built once instead of the DataFrame.
     """
     if len(rider_ids) == 0:
         raise ValueError("No rider IDs provided")
     if isinstance(affiliations, pd.DataFrame):
-        affiliations = build_riders_by_club(affiliations)
-    rider_ids_out = list(set(rider_ids) & affiliations.get(club_id, set()))
+        affiliations = AffiliationLookup(affiliations)
+    rider_ids_out = list(set(rider_ids) & affiliations.riders_of_club(club_id, on_date))
     n = len(rider_ids_out)
     if n == 0:
         raise ValueError(f"No rider ID found for club ID {club_id}")

@@ -1,9 +1,11 @@
 """Unit tests of the computation of the affiliation periods."""
 
 import pandas as pd
+import pytest
 
 from access_it.etl.transform.riders import (
-    compute_affiliation_periods, compute_rider_affiliation_periods
+    AffiliationLookup, compute_affiliation_periods, compute_rider_affiliation_periods,
+    get_rider_id_using_affiliations
 )
 
 
@@ -105,3 +107,53 @@ def test_compute_affiliation_periods_for_several_riders(capsys):
         {"rider_id": "r2", "start_date": pd.Timestamp("2025-01-01"), "club_id": "B"},
     ]
     assert "1 isolated club observation(s) of 1 rider(s) ignored" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- AffiliationLookup
+
+# r1: club A in 2024, club B from 2025-06-01 (ongoing); r2: club A from 2025 (ongoing)
+AFFILIATIONS = pd.DataFrame({
+    "rider_id": ["r1", "r1", "r2"],
+    "start_date": pd.to_datetime(["2024-01-01", "2025-06-01", "2025-01-01"]),
+    "club_id": ["A", "B", "A"],
+})
+
+
+def test_riders_of_club_on_a_date():
+    lookup = AffiliationLookup(AFFILIATIONS)
+    assert lookup.riders_of_club("A", pd.Timestamp("2025-05-31")) == {"r1", "r2"}
+    assert lookup.riders_of_club("A", pd.Timestamp("2025-06-01")) == {"r2"}
+    assert lookup.riders_of_club("B", pd.Timestamp("2030-01-01")) == {"r1"}
+
+
+def test_first_period_also_covers_the_dates_before_its_start():
+    lookup = AffiliationLookup(AFFILIATIONS)
+    # r2 is first seen with club A in 2025: before that, nothing contradicts club A
+    assert lookup.riders_of_club("A", pd.Timestamp("2024-05-01")) == {"r1", "r2"}
+    assert lookup.riders_of_club("A", pd.Timestamp("2023-12-31")) == {"r1", "r2"}
+    # A later period does not: r1 was in club A before joining club B
+    assert lookup.riders_of_club("B", pd.Timestamp("2025-05-31")) == set()
+
+
+def test_riders_of_club_without_date():
+    lookup = AffiliationLookup(AFFILIATIONS)
+    assert lookup.riders_of_club("A") == {"r1", "r2"}
+    assert lookup.riders_of_club("C") == set()
+
+
+def test_former_club_no_longer_identifies_a_rider():
+    on_date = pd.Timestamp("2025-08-01")
+    with pytest.raises(ValueError, match="No rider ID found"):
+        get_rider_id_using_affiliations(["r1"], AFFILIATIONS, "A", on_date)
+    assert get_rider_id_using_affiliations(["r1"], AFFILIATIONS, "B", on_date) == "r1"
+
+
+def test_homonyms_are_separated_by_the_club_at_the_race_date():
+    # Before June 2025, both riders are in club A: ambiguous; after, only r2 is
+    with pytest.raises(ValueError, match="Multiple rider IDs"):
+        get_rider_id_using_affiliations(["r1", "r2"], AFFILIATIONS, "A", pd.Timestamp("2025-03-01"))
+    assert get_rider_id_using_affiliations(
+        ["r1", "r2"], AFFILIATIONS, "A", pd.Timestamp("2025-08-01")
+    ) == "r2"
+    with pytest.raises(ValueError, match="Multiple rider IDs"):
+        get_rider_id_using_affiliations(["r1", "r2"], AFFILIATIONS, "A")
