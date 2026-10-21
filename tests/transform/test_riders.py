@@ -3,8 +3,11 @@
 import hashlib
 
 import pandas as pd
+import pytest
 
-from access_it.etl.transform.riders import define_rider_id, identify_club_of_riders
+from access_it.etl.transform.riders import (
+    define_rider_id, identify_club_of_riders, is_valid_uci_id
+)
 
 CLUBS = pd.DataFrame({
     "club_id": ["4976038"],
@@ -76,3 +79,21 @@ def test_rider_id_without_valid_uci_id_is_unchanged():
     assert define_rider_id("10012345699", "MARTIN", "Jean") == names_based_id(
         "10012345699", "martin", "jean"
     )
+
+
+# ---------------------------------------------------------------- is_valid_uci_id
+
+@pytest.mark.parametrize(
+    "uci_id, expected",
+    [
+        ("10012345656", True),  # 100123456 % 97 == 56
+        ("10012345601", False),  # wrong check digits
+        ("1001234565", False),  # 10 digits
+        ("1001234565a", False),
+        ("Liste Rouge", False),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_is_valid_uci_id(uci_id, expected):
+    assert is_valid_uci_id(uci_id) is expected
