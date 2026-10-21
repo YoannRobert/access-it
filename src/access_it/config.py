@@ -11,7 +11,19 @@ TRUE_VALUES = {"1", "true", "yes"}
 
 @dataclass(frozen=True)
 class Settings:
-    """Immutable application settings."""
+    """Immutable application settings, read from the environment by get_settings.
+
+    Attributes:
+        database_url: SQLAlchemy URL of the PostgreSQL database (DATABASE_URL).
+        aws_endpoint_url_s3: Endpoint of the S3 storage of the snapshots
+            (AWS_ENDPOINT_URL_S3).
+        aws_access_key_id: Access key of the S3 storage (AWS_ACCESS_KEY_ID).
+        aws_secret_access_key: Secret key of the S3 storage (AWS_SECRET_ACCESS_KEY).
+        aws_region: Region of the S3 storage (AWS_REGION).
+        s3_bucket: Bucket of the snapshots (S3_BUCKET).
+        startlists_url: Base URL of the startlists website (STARTLISTS_URL).
+        sql_info: Whether SQLAlchemy prints the SQL statements (SQL_INFO).
+    """
 
     database_url: str
     aws_endpoint_url_s3: str
@@ -33,7 +45,16 @@ def _read_bool(name: str, default: bool = False) -> bool:
 
 @lru_cache
 def get_settings() -> Settings:
-    """Load the .env file once and return the application settings."""
+    """Load the .env file once and return the application settings.
+
+    The settings are cached: the environment is read at the first call only.
+
+    Returns:
+        The application settings.
+
+    Raises:
+        RuntimeError: If a required environment variable is not set.
+    """
     load_dotenv()
     database_url = os.getenv("DATABASE_URL")
     aws_endpoint_url_s3 = os.getenv("AWS_ENDPOINT_URL_S3")

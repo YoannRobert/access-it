@@ -1,3 +1,6 @@
+"""Conversion of the race dates written in French on the FFC result pages."""
+
+# French month names (lowercase) mapped to their two-digit number
 MONTH_CONVERT = {
     "janvier": "01", "février": "02", "mars": "03",
     "avril": "04", "mai": "05", "juin": "06",
@@ -7,6 +10,19 @@ MONTH_CONVERT = {
 
 
 def convert_date(date: str | None) -> str | None:
+    """Convert a French date of a result page into a 'YYYY-MM-DD' string.
+
+    The weekday is dropped and the month name is replaced by its number
+    (e.g. "Samedi 12 avril 2025" gives "2025-04-12"). The day is kept as
+    written: the FFC pages always write it with two digits.
+
+    Args:
+        date: Date as written on the page ("<weekday> <day> <month> <year>"),
+            or None.
+
+    Returns:
+        The date as 'YYYY-MM-DD', or None if `date` is None.
+    """
     if date is None:
         return None
     date = date.lower().strip()
