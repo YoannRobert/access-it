@@ -58,7 +58,7 @@ def add_club(
         season: Season in which the club was observed.
         departemental_committees: Departemental committees, used to find
             the committee of a new club.
-        verbose: Whether to print the changes made.
+        verbose: Whether to log (level INFO) the changes made.
 
     Returns:
         A new club table including the change, or a copy of `df_clubs`

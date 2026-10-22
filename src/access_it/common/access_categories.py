@@ -4,11 +4,14 @@ Shared by the extract step (selection of the startlist pages) and the
 transform step (categories of the races and riders).
 """
 
+import logging
 import re
 
 from functools import lru_cache
 
 from access_it.common.text import normalize_string_and_fold_case
+
+logger = logging.getLogger(__name__)
 
 
 def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[int, bool]:
@@ -21,7 +24,7 @@ def find_access_categories_from_name(name: str, verbose: bool = False) -> dict[i
 
     Args:
         name: Race title, ranking name or startlist name.
-        verbose: Whether to print each normalization step (not cached).
+        verbose: Whether to log (level INFO) each normalization step (not cached).
 
     Returns:
         A dict {1: bool, 2: bool, 3: bool, 4: bool}.
@@ -52,72 +55,72 @@ def _compute_access_categories_from_name(name: str, verbose: bool = False) -> di
     """
     categories = {k: False for k in range(1, 5)}
     if verbose:
-        print(f"name={name}")
+        logger.info(f"name={name}")
     n = normalize_string_and_fold_case(name)  # lowering the case and removing accentuation
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     n = n.replace("accc", "acc")  # correcting spelling mistakes
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     for org in ["acess", "acces", "accesss"]:
         n = n.replace(org, "access")
         if verbose:
-            print(f"n={n}")
+            logger.info(f"n={n}")
     n = re.sub(r"[^A-Za-z0-9 ]", "", n)  # keeping only letters and figures
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     n = n.replace(" et ", "")
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     n = re.sub(r" {2,}", " ", n)  # removing extra spaces
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     n = re.sub(r"^\d+(?=.*[a-zA-Z])", "", n)  # removing leading figures, only if letters follow
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     for i in range(1, 4):
         for sep in [" ", "-", "+", "/"]:
             if verbose:
                 old = f"{i}{sep}{i+1}"
                 new = f"{i}{i+1}"
-                print(f"{old} -> {new}")
+                logger.info(f"{old} -> {new}")
             n = n.replace(f"{i}{sep}{i+1}", f"{i}{i+1}")
             if verbose:
-                print(f"n={n}")
+                logger.info(f"n={n}")
     for i in range(1, 5):
         for org in [f"access {i}", f"acc {i}", f"acc{i}", f"ac {i}", f"ac{i}"]:
             n = n.replace(org, f"access{i}")
             if verbose:
-                print(f"n={n}")
+                logger.info(f"n={n}")
     for seq in ["1234", "234", "123", "34", "23", "12"]:
         org = "access" + seq
         dst = "a" + "a".join(seq)
         n = n.replace(org, dst)
         if verbose:
-            print(f"n={n}")
+            logger.info(f"n={n}")
     for i in range(1, 5):
         n = n.replace(f"access{i}", f"a{i}")
         if verbose:
-            print(f"n={n}")
+            logger.info(f"n={n}")
     if n.find("access") != -1:
         if any([(f"a{i}" in n) for i in range(1, 5)]):
             n = n.replace("access", "")
         else:
             n = n.replace("access", "a1a2a3a4")
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     if n.find(" sauf ") != -1:
        n = n[:n.find(" sauf ")]
     n = n.replace(" ", "")
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     start, end = len(n), 0
     for s in ["a1", "a2", "a3", "a4"]:
         start = min(start, n.find(s)) if n.find(s) != -1 else start
         end = max(end, n.find(s) + 1)
     n = n[start: end + 1]
     if verbose:
-        print(f"n={n}")
+        logger.info(f"n={n}")
     for i in categories.keys():
         categories[i] = n.find(f"a{i}") != -1
     return categories

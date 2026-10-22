@@ -21,11 +21,12 @@ def test_result_page_elements_are_translated():
     assert get_elements_from_results_page(bs) == {"season": 2026, "race_code": "1.27.1"}
 
 
-def test_unknown_label_is_ignored_and_reported_once(capsys):
+def test_unknown_label_is_ignored_and_reported_once(caplog):
     bs = results_page(("Nouveau champ FFC", "x"), ("Code épreuve", "1.27.1"))
     assert get_elements_from_results_page(bs) == {"race_code": "1.27.1"}
     assert get_elements_from_results_page(bs) == {"race_code": "1.27.1"}
-    assert capsys.readouterr().out.count("unknown label on a result page") == 1
+    assert caplog.text.count("unknown label on a result page") == 1
+    assert caplog.records[-1].levelname == "WARNING"
 
 
 def test_empty_label_or_value_is_ignored():

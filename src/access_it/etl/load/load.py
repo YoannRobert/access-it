@@ -10,6 +10,7 @@ groups that are missing from the file are deleted. Groups absent from the
 file are left untouched.
 """
 
+import logging
 import pandas as pd
 
 from typing import Literal
@@ -22,6 +23,8 @@ from sqlalchemy.dialects.postgresql import insert
 from access_it.etl.extract.cache import DATA_DIR
 from access_it.etl.load.checks import run_checks
 from access_it.etl.load.models import Base
+
+logger = logging.getLogger(__name__)
 
 
 CHUNK_SIZE = 1_000  # rows per INSERT statement
@@ -212,9 +215,9 @@ def load_all(engine: Engine) -> None:
                 deleted = delete_stale_rows(
                     connection, table, df, TABLES_TO_SYNC[table.name]
                 )
-                print(f"{table.name} [sync]: {deleted} deleted")
+                logger.info(f"{table.name} [sync]: {deleted} deleted")
             written = write_rows(connection, table, df, on_conflict)
-            print(
+            logger.info(
                 f"{table.name} [{on_conflict}]: "
                 f"{written} written, {len(df) - written} unchanged"
             )

@@ -103,7 +103,7 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[pd.Data
 
     Args:
         client: HTTP client.
-        verbose: Whether to print each region.
+        verbose: Whether to log (level INFO) each region.
 
     Returns:
         The regional committees (regional_committee_id, name) and the
@@ -195,7 +195,7 @@ def get_clubs(
         client: HTTP client.
         departemental_committees: Departemental committees, used to find the
             committee of each club from its ID.
-        verbose: Whether to print each region and committee.
+        verbose: Whether to log (level INFO) each region and committee.
 
     Returns:
         One row per club (club_id, name, departemental_committee_id,

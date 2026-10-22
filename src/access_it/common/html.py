@@ -1,7 +1,11 @@
 """Reading of the FFC pages, shared by the extract and transform steps."""
 
+import logging
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag
+
+logger = logging.getLogger(__name__)
 
 
 TRANSLATIONS = {
@@ -49,7 +53,7 @@ def get_elements_from_results_page(bs: BeautifulSoup) -> dict[str, str]:
         if key not in TRANSLATIONS:
             if key not in _reported_unknown_labels:
                 _reported_unknown_labels.add(key)
-                print(f"Warning: unknown label on a result page, ignored: {key!r}")
+                logger.warning(f"unknown label on a result page, ignored: {key!r}")
             continue
         key2 = TRANSLATIONS[key]
         data[key2] = value

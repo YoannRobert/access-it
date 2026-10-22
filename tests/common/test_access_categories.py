@@ -1,5 +1,7 @@
 """Characterization tests of the reading of Access categories in names and titles."""
 
+import logging
+
 import pytest
 
 from access_it.common.access_categories import (
@@ -57,3 +59,11 @@ def test_helpers_on_access_categories():
 def test_returned_dict_can_be_modified_safely():
     find_access_categories_from_name("Access 1-2")[1] = False
     assert categories("Access 1-2") == [1, 2]
+
+
+def test_verbose_logs_each_normalization_step(caplog):
+    caplog.set_level(logging.INFO)
+    find_access_categories_from_name("Access 1-2", verbose=True)
+    messages = [record.getMessage() for record in caplog.records]
+    assert messages[0] == "name=Access 1-2"
+    assert messages[-1] == "n=a1a2"
