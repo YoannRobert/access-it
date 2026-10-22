@@ -555,7 +555,8 @@ def add_unknown_years_in_category_history(
         races: pd.DataFrame,
         rankings: pd.DataFrame,
         categories_from_startlists: pd.DataFrame,
-        after_year: int = FIRST_SEASON
+        after_year: int = FIRST_SEASON,
+        current_year: int | None = None
     ) -> pd.DataFrame:
     """Add the periods of unknown category, for the years without observation.
 
@@ -566,8 +567,10 @@ def add_unknown_years_in_category_history(
     - A rider racing again after such a year gets back his last known category
       on January 1st of the year of his return, if no period starts that year.
 
-    The current year is included: a rider without race yet this year gets an
-    unknown category from January 1st.
+    The current year is not complete: a rider without race yet this year keeps
+    his last period, and gets an unknown category from January 1st of this
+    year only once the year is over. The history of the riders is thus not
+    changed at the start of each year.
 
     Args:
         category_history: Category history (rider_id, start_date, rider_category).
@@ -576,6 +579,7 @@ def add_unknown_years_in_category_history(
         categories_from_startlists: Categories read on the startlists, for
             the startlist dates of each rider.
         after_year: First year of the history.
+        current_year: Current year (default: the year of the current date).
 
     Returns:
         The completed history, rider_category as a nullable integer (Int8).
@@ -583,7 +587,7 @@ def add_unknown_years_in_category_history(
     Raises:
         ValueError: If `after_year` is before FIRST_SEASON or after the current year.
     """
-    this_year = datetime.now().year
+    this_year = current_year if current_year is not None else datetime.now().year
     if after_year < FIRST_SEASON or after_year > this_year:
         raise ValueError(
             f"'after_year' must be greater than or equal to {FIRST_SEASON}"
@@ -661,7 +665,7 @@ def add_unknown_years_in_category_history(
                             }
                         )
                         missing_category_line_already_added = False
-                else:
+                elif year < this_year:  # the current year is not over
                     if not missing_category_line_already_added:
                         category_history_tmp.append(
                             {
