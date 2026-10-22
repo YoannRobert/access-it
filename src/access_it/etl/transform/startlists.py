@@ -7,12 +7,12 @@ riders are identified by their full name and their club at the race date.
 
 import pandas as pd
 
-from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
-from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
-from access_it.etl.transform.categories import (
+from access_it.common.access_categories import (
     count_nb_access_subcategories_from_name,
     has_access_subcategories, get_higher_access_subcategory
 )
+from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
+from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 from access_it.etl.transform.clubs import ClubLookup, identify_clubs
 from access_it.etl.transform.parse import get_startlists_html_files, parse_startlists_from_organization_page
 from access_it.etl.transform.riders import (

@@ -14,7 +14,7 @@ from access_it.etl.extract.cache import (
     RESULTS_DIR, write_results_sidecar_and_html_files, results_sidecar_exists
 )
 from access_it.etl.extract.client import BASE_URL, try_get
-from access_it.etl.transform.parse import get_text_safe, get_elements_from_results_page
+from access_it.common.html import get_text_safe, get_elements_from_results_page
 
 
 def extract_results_from_organization_page(

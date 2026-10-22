@@ -17,7 +17,7 @@ from sqlalchemy import (
 
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.load.models import Base
-from access_it.etl.transform.riders import is_valid_uci_id
+from access_it.common.uci import is_valid_uci_id
 
 MAX_EXAMPLES = 3  # example values shown in each problem message
 QUERY_CHUNK_SIZE = 1_000  # values per IN (...) clause

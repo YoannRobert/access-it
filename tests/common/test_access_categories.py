@@ -2,7 +2,7 @@
 
 import pytest
 
-from access_it.etl.transform.categories import (
+from access_it.common.access_categories import (
     count_nb_access_subcategories_from_name, find_access_categories_from_name,
     get_higher_access_subcategory, has_access_subcategories
 )

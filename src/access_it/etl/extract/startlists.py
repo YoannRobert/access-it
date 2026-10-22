@@ -12,8 +12,8 @@ from access_it.etl.extract.cache import (
     startlists_json_file_exists, write_startlists_json_and_html_files
 )
 from access_it.etl.extract.client import try_get
-from access_it.etl.transform.categories import find_access_categories_from_name
-from access_it.etl.transform.parse import get_text_safe
+from access_it.common.access_categories import find_access_categories_from_name
+from access_it.common.html import get_text_safe
 
 
 STARTLISTS_URL = get_settings().startlists_url

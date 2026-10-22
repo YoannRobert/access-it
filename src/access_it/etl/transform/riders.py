@@ -2,12 +2,12 @@
 
 import hashlib
 import pandas as pd
-import re
 
 from collections import Counter, defaultdict
 from typing import Literal
 
 from access_it.common.text import normalize_string_and_fold_case
+from access_it.common.uci import is_valid_uci_id
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 from access_it.etl.transform.clubs import ClubLookup, parse_club_text, identify_club
 
@@ -15,15 +15,6 @@ from access_it.etl.transform.clubs import ClubLookup, parse_club_text, identify_
 RED_LIST = "Liste Rouge"
 MAX_REPORTED_CLUB_TEXTS = 10  # club texts listed in the report of dropped rows
 MAX_REPORTED_RESULTS = 5  # results listed per reason in the report of dropped rows
-
-
-def is_valid_uci_id(uci_id: str | None) -> bool:
-    """Whether `uci_id` is an 11-digit UCI ID with valid check digits (first 9 digits modulo 97)."""
-    if uci_id is None:
-        return False
-    if not bool(re.fullmatch(r"\d{11}", uci_id)):
-        return False
-    return int(uci_id[:9]) % 97 == int(uci_id[9:])
 
 
 def define_rider_id(uci_id: str | None, last_name: str, first_name: str) -> str:
