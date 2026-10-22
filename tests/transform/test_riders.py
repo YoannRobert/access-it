@@ -153,7 +153,7 @@ def test_results_without_rider_are_dropped_and_reported(capsys):
     assert list(out["race_id"]) == ["r4"]
     output = capsys.readouterr().out
     assert "Warning: 3 result row(s) dropped, rider not identified:" in output
-    assert "invalid UCI ID, to fix in correct_wrong_uci_ids: 1" in output
+    assert "invalid UCI ID, to fix in UCI_ID_CORRECTIONS: 1" in output
     assert "race_id=r1, finish_rank=1, uci_id='10012345600'" in output
     assert "missing names: 2" in output
 

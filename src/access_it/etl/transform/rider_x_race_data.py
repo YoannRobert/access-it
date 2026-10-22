@@ -9,6 +9,41 @@ import pandas as pd
 from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME
 
 
+# UCI IDs wrong or missing on the result pages: (race ID, finish rank,
+# wrong UCI ID or "" if missing, correct UCI ID)
+UCI_ID_CORRECTIONS: list[tuple] = [
+    ("25e7949a45ba0148", 52, "10137846680", "10051737861"),
+    ("163378aa7e736570", 7, "10137846680", "10051737861"),
+    ("e226c6b3c04081ba", 2, "10137846680", "10051737861"),
+    ("46729e14b576fd3a", 1, "10025630818", "10165044369"),
+    ("fd3d489f5e2e2c76", 16, "10025630818", "10165044369"),
+    ("e7bf6f878a51c77e", 28, "", "10145288705"),
+    ("2a11e53992ee34a1", 4, "", "10158245881"),
+    ("a0e48493fb6fc308", 12, "", "10158245881"),
+    ("1361d0b2d93516e9", 34, "", "10025488651"),
+    ("797041cd80520893", 28, "", "10127344816"),
+    ("16d947c7ec2eeebe", 46, "", "10145307596"),
+    ("7bc45e816a53236d", 64, "", "10145307596")
+]
+
+# Results of individual licensees whose club is missing on the result pages:
+# (race ID, finish rank)
+INDIVIDUAL_LABEL_CORRECTIONS: list[tuple] = [
+    ("7c605505e10d81a6", 49)
+]
+
+# Results of foreign riders whose club is missing on the result pages:
+# (race ID, finish rank)
+FOREIGN_LABEL_CORRECTIONS: list[tuple] = [
+    ("88cf222e097b8b6b", 23),
+    ("3dfce1e035f3e7ca", 28),
+    ("58fd279416dc2e71", 17),
+    ("58fd279416dc2e71", 44),
+    ("3dfce1e035f3e7ca", 25),
+    ("3dfce1e035f3e7ca", 37)
+]
+
+
 def fill_missing_values_by_groups(
         col_to_fill: str,
         grouping_cols: list[str],
@@ -119,24 +154,10 @@ def correct_wrong_uci_ids(data: list[dict]) -> list[dict]:
     """Correct UCI IDs that are wrong on the result pages.
 
     To add a correction, append (race ID, finish rank, wrong UCI ID or "" if
-    missing, correct UCI ID) to the list `corrections`.
+    missing, correct UCI ID) to UCI_ID_CORRECTIONS.
     """
-    corrections = [
-        ("25e7949a45ba0148", 52, "10137846680", "10051737861"),
-        ("163378aa7e736570", 7, "10137846680", "10051737861"),
-        ("e226c6b3c04081ba", 2, "10137846680", "10051737861"),
-        ("46729e14b576fd3a", 1, "10025630818", "10165044369"),
-        ("fd3d489f5e2e2c76", 16, "10025630818", "10165044369"),
-        ("e7bf6f878a51c77e", 28, "", "10145288705"),
-        ("2a11e53992ee34a1", 4, "", "10158245881"),
-        ("a0e48493fb6fc308", 12, "", "10158245881"),
-        ("1361d0b2d93516e9", 34, "", "10025488651"),
-        ("797041cd80520893", 28, "", "10127344816"),
-        ("16d947c7ec2eeebe", 46, "", "10145307596"),
-        ("7bc45e816a53236d", 64, "", "10145307596")
-    ]
     for d in data:
-        for race_id, finish_rank, wrong_uci_id, correct_uci_id in corrections:
+        for race_id, finish_rank, wrong_uci_id, correct_uci_id in UCI_ID_CORRECTIONS:
             d_uci_id = d["uci_id"] if isinstance(d["uci_id"], str) else ""
             if ((
                     d["race_id"] == race_id)
@@ -230,30 +251,21 @@ def apply_corrections_for_missing_club_labels(
 def add_missing_individual_labels(data: list[dict]) -> list[dict]:
     """Set the club "Individuel" of results whose club is missing on the result pages.
 
-    To add a correction, append (race ID, finish rank) to the list `corrections`.
+    To add a correction, append (race ID, finish rank) to INDIVIDUAL_LABEL_CORRECTIONS.
     """
-    corrections = [
-        ("7c605505e10d81a6", 49)
-    ]
-    return apply_corrections_for_missing_club_labels(data, corrections, INDIVIDUAL_NAME)
+    return apply_corrections_for_missing_club_labels(
+        data, INDIVIDUAL_LABEL_CORRECTIONS, INDIVIDUAL_NAME
+    )
 
 
 def add_missing_foreign_labels(data: list[dict]) -> list[dict]:
     """Set the club "Etranger" of results whose club is missing on the result pages.
 
-    To add a correction, append (race ID, finish rank) to the list `corrections`.
+    To add a correction, append (race ID, finish rank) to FOREIGN_LABEL_CORRECTIONS.
     """
-    corrections = [
-        ("88cf222e097b8b6b", 23),
-        ("3dfce1e035f3e7ca", 28),
-        ("58fd279416dc2e71", 17),
-        ("58fd279416dc2e71", 44),
-        ("3dfce1e035f3e7ca", 25),
-        ("88cf222e097b8b6b", 23),
-        ("3dfce1e035f3e7ca", 28),
-        ("3dfce1e035f3e7ca", 37)
-    ]
-    return apply_corrections_for_missing_club_labels(data, corrections, FOREIGN_NAME)
+    return apply_corrections_for_missing_club_labels(
+        data, FOREIGN_LABEL_CORRECTIONS, FOREIGN_NAME
+    )
 
 
 def create_ranking_table(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:

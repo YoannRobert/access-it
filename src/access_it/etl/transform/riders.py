@@ -284,7 +284,7 @@ def assign_rider_ids(rider_x_race_data: pd.DataFrame, rider_db: pd.DataFrame) ->
             rider_id = None
         if rider_id is None:
             if has_names and uci_id not in ("", RED_LIST) and not is_valid_uci_id(uci_id):
-                reason = "invalid UCI ID, to fix in correct_wrong_uci_ids"
+                reason = "invalid UCI ID, to fix in UCI_ID_CORRECTIONS"
             elif not has_names:
                 reason = "missing names"
             else:
