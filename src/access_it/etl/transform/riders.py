@@ -14,6 +14,7 @@ from access_it.etl.transform.clubs import ClubLookup, parse_club_text, identify_
 
 RED_LIST = "Liste Rouge"
 MAX_REPORTED_CLUB_TEXTS = 10  # club texts listed in the report of dropped rows
+MAX_REPORTED_RESULTS = 5  # results listed per reason in the report of dropped rows
 
 
 def is_valid_uci_id(uci_id: str | None) -> bool:
@@ -234,6 +235,85 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
     )
 
     return db
+
+
+def _text(value) -> str:
+    """Stripped text of a value of the results, or "" if it is missing."""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def assign_rider_ids(rider_x_race_data: pd.DataFrame, rider_db: pd.DataFrame) -> pd.DataFrame:
+    """Add the rider ID of each result, with the rules of add_riders_to_database.
+
+    - a valid UCI ID gives the rider with this UCI ID;
+    - "Liste Rouge" gives the red-list rider with the same names;
+    - a missing UCI ID, or any UCI ID of an individual licensee, gives the
+      rider without valid UCI ID with the same names (red-list riders last).
+
+    Results without rider (invalid UCI ID, missing names) are dropped and
+    reported, so that one atypical result cannot stop the transform step.
+
+    Args:
+        rider_x_race_data: Results of the riders.
+        rider_db: Rider table (see add_riders_to_database).
+
+    Returns:
+        A copy of the identified results, with a rider_id column.
+    """
+    by_uci_id: dict[str, str] = {}
+    red_list_by_names: dict[tuple[str, str], str] = {}
+    other_by_names: dict[tuple[str, str], str] = {}
+    for rider_id, uci_id, last_name, first_name in zip(
+            rider_db["rider_id"], rider_db["uci_id"], rider_db["last_name"], rider_db["first_name"]
+    ):
+        uci_id = _text(uci_id)
+        names = (_text(last_name), _text(first_name))
+        if is_valid_uci_id(uci_id):
+            by_uci_id[uci_id] = rider_id
+        elif uci_id == RED_LIST:
+            red_list_by_names.setdefault(names, rider_id)
+        else:
+            other_by_names.setdefault(names, rider_id)
+
+    rider_ids = []
+    dropped: dict[str, list[str]] = defaultdict(list)
+    for row in rider_x_race_data.itertuples():
+        uci_id = _text(row.uci_id)
+        names = (_text(row.last_name), _text(row.first_name))
+        has_names = names[0] != "" and names[1] != ""
+        if is_valid_uci_id(uci_id):
+            rider_id = by_uci_id.get(uci_id)
+        elif not has_names:
+            rider_id = None
+        elif uci_id == RED_LIST:
+            rider_id = red_list_by_names.get(names)
+        elif uci_id == "" or row.club_id == INDIVIDUAL_CLUB_ID:
+            rider_id = other_by_names.get(names) or red_list_by_names.get(names)
+        else:
+            rider_id = None
+        if rider_id is None:
+            if has_names and uci_id not in ("", RED_LIST) and not is_valid_uci_id(uci_id):
+                reason = "invalid UCI ID, to fix in correct_wrong_uci_ids"
+            elif not has_names:
+                reason = "missing names"
+            else:
+                reason = "rider not found"
+            dropped[reason].append(
+                f"race_id={row.race_id}, finish_rank={row.finish_rank}, "
+                f"uci_id='{uci_id}', names='{names[0]} {names[1]}'"
+            )
+        rider_ids.append(rider_id)
+
+    df = rider_x_race_data.copy()
+    df["rider_id"] = rider_ids
+    if dropped:
+        n = sum(len(results) for results in dropped.values())
+        print(f"Warning: {n} result row(s) dropped, rider not identified:")
+        for reason, results in dropped.items():
+            print(f"  {reason}: {len(results)}")
+            for result in results[:MAX_REPORTED_RESULTS]:
+                print(f"    {result}")
+    return df[df["rider_id"].notna()].copy()
 
 
 def _group_positions(keys: list) -> dict:
@@ -518,17 +598,21 @@ def compute_affiliation_periods(observations: pd.DataFrame) -> pd.DataFrame:
 
 def create_affiliation_clubs_riders(
         rider_x_race_data: pd.DataFrame,
-        races_data: pd.DataFrame,
-        rider_db: pd.DataFrame
+        races_data: pd.DataFrame
     ) -> pd.DataFrame:
     """Create the affiliation table: one row per rider and period with the same club.
 
     Columns: rider_id, start_date, club_id. A period ends the day before the
     next start_date of the same rider, or is still ongoing if there is none.
+
+    Args:
+        rider_x_race_data: Results of the riders, with their rider ID (see
+            assign_rider_ids).
+        races_data: Races, for the race dates.
     """
     race_dates = races_data[["race_id", "race_date"]].copy()
     race_dates["race_date"] = pd.to_datetime(race_dates["race_date"])
-    cols = ["uci_id", "last_name", "first_name", "club_id", "race_id", "race_date"]
+    cols = ["rider_id", "club_id", "race_id", "race_date"]
     rider_x_race_data = rider_x_race_data.drop(columns=["race_date"])
     df = rider_x_race_data.merge(race_dates, on="race_id", how="inner")[cols]
     # Results without identified club (e.g. ambiguous club name) give no observation
@@ -537,22 +621,6 @@ def create_affiliation_clubs_riders(
         print(f"Info: {unknown_club.sum()} result(s) without identified club "
               f"ignored for affiliations")
     df = df[~unknown_club].copy()
-    riders = RiderLookup(rider_db)
-    rider_ids = []
-    for row in df.itertuples():
-        uci_id = row.uci_id if isinstance(row.uci_id, str) else ""
-        last_name = row.last_name if isinstance(row.last_name, str) else ""
-        first_name = row.first_name if isinstance(row.first_name, str) else ""
-        rider_id = riders.get_rider_id(uci_id=uci_id, last_name=last_name, first_name=first_name)
-        if not isinstance(rider_id, str):
-            raise TypeError(
-                "Invalid data type for rider_id (should be str).\n"
-                + f"type: {type(rider_id)}\n"
-                + f"value: {str(rider_id)}\n"
-                + f"arguments: uci_id={uci_id}, last_name={last_name}, first_name={first_name}"
-            )
-        rider_ids.append(rider_id)
-    df["rider_id"] = rider_ids
     return compute_affiliation_periods(df[["rider_id", "race_id", "race_date", "club_id"]])
 
 

@@ -16,7 +16,7 @@ from access_it.etl.extract.cache import (
 )
 from access_it.etl.transform.clubs import add_legacy_clubs
 from access_it.etl.transform.riders import (
-    add_riders_to_database, split_race_data_into_rider_data,
+    add_riders_to_database, assign_rider_ids, split_race_data_into_rider_data,
     identify_club_of_riders, create_affiliation_clubs_riders
 )
 from access_it.etl.transform.rider_x_race_data import (
@@ -70,12 +70,13 @@ def transform():
 
     # Creating rider database
     rider_db = add_riders_to_database(rider_x_race_data=rider_x_race_data)
+    rider_x_race_data = assign_rider_ids(rider_x_race_data, rider_db)
 
     # Creating ranking database
-    rankings = create_ranking_table(rider_x_race_data, rider_db)
+    rankings = create_ranking_table(rider_x_race_data)
 
     # Creating the club-rider affiliation database
-    aff_club_rider = create_affiliation_clubs_riders(rider_x_race_data, races, rider_db)
+    aff_club_rider = create_affiliation_clubs_riders(rider_x_race_data, races)
 
     # Creating the category database
     categories_from_startlists = identify_riders_categories_on_startlists(

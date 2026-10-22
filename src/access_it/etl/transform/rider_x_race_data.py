@@ -7,7 +7,6 @@ by race ID and finish rank.
 import pandas as pd
 
 from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME
-from access_it.etl.transform.riders import RiderLookup
 
 
 def fill_missing_values_by_groups(
@@ -257,25 +256,14 @@ def add_missing_foreign_labels(data: list[dict]) -> list[dict]:
     return apply_corrections_for_missing_club_labels(data, corrections, FOREIGN_NAME)
 
 
-def create_ranking_table(
-        rider_x_race_data: pd.DataFrame,
-        rider_db: pd.DataFrame
-    ) -> pd.DataFrame:
+def create_ranking_table(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
     """Create the ranking table: one row per rider and race.
 
     Args:
-        rider_x_race_data: Results of the riders.
-        rider_db: Rider table.
+        rider_x_race_data: Results of the riders, with their rider ID (see
+            assign_rider_ids).
 
     Returns:
         One row per result: race_id, rider_id, finish_rank.
     """
-    df = rider_x_race_data.copy()
-    riders = RiderLookup(rider_db)
-    df["rider_id"] = [
-        riders.get_rider_id(uci_id=uci_id, last_name=last_name, first_name=first_name)
-        for uci_id, last_name, first_name in zip(
-            df["uci_id"], df["last_name"], df["first_name"]
-        )
-    ]
-    return df[["race_id", "rider_id", "finish_rank"]]
+    return rider_x_race_data[["race_id", "rider_id", "finish_rank"]].copy()
