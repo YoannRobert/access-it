@@ -14,6 +14,7 @@ from collections import Counter
 
 import pandas as pd
 
+from access_it.common.log import setup_logging
 from access_it.etl.extract.cache import (
     AFFILIATIONS_PARQUET_FILE, CLUBS_PARQUET_FILE, DEPCOM_PARQUET_FILE,
     REGCOM_PARQUET_FILE, RIDERS_PARQUET_FILE
@@ -52,4 +53,5 @@ def check_startlist_matches():
 
 
 if __name__ == "__main__":
+    setup_logging()
     check_startlist_matches()

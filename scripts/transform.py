@@ -9,6 +9,7 @@ Usage, from the repository root: python scripts/transform.py
 
 import pandas as pd
 
+from access_it.common.log import setup_logging
 from access_it.etl.extract.cache import (
     RACES_PARQUET_FILE, RIDERS_PARQUET_FILE, RIDER_CATEGORIES_PARQUET_FILE,
     CLUBS_PARQUET_FILE, AFFILIATIONS_PARQUET_FILE, RANKINGS_PARQUET_FILE,
@@ -102,4 +103,5 @@ def transform():
 
 
 if __name__ == "__main__":
+    setup_logging()
     transform()

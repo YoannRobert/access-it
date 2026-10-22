@@ -3,6 +3,7 @@
 Usage, from the repository root: python scripts/etl.py
 """
 
+from access_it.common.log import setup_logging
 from extract import extract
 from transform import transform
 from load import load
@@ -16,4 +17,5 @@ def etl():
 
 
 if __name__ == "__main__":
+    setup_logging()
     etl()

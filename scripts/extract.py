@@ -10,6 +10,7 @@ Usage, from the repository root: python scripts/extract.py
 
 import pandas as pd
 
+from access_it.common.log import setup_logging
 from access_it.etl.extract.cache import (
     REGCOM_PARQUET_FILE, DEPCOM_PARQUET_FILE, CLUBS_PARQUET_FILE,
     DEPARTEMENTS_PARQUET_FILE, create_cache_dir
@@ -58,4 +59,5 @@ def extract():
 
 
 if __name__ == "__main__":
+    setup_logging()
     extract()

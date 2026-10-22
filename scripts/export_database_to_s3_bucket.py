@@ -9,6 +9,7 @@ import tempfile
 
 from pathlib import Path
 
+from access_it.common.log import setup_logging
 from access_it.config import get_settings
 from access_it.export.s3 import (
     get_s3_client, upload_to_s3, build_snapshot_key,
@@ -44,4 +45,5 @@ def export_database_to_s3_bucket():
 
 
 if __name__ == "__main__":
+    setup_logging()
     export_database_to_s3_bucket()

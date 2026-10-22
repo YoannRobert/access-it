@@ -6,6 +6,7 @@ access_it.etl.load.checks).
 Usage, from the repository root: python scripts/load.py
 """
 
+from access_it.common.log import setup_logging
 from access_it.etl.load.engine import get_engine
 from access_it.etl.load.load import load_all
 from access_it.etl.load.schema import create_tables
@@ -19,4 +20,5 @@ def load():
 
 
 if __name__ == "__main__":
+    setup_logging()
     load()

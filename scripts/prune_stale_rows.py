@@ -10,6 +10,7 @@ Then run the load again: python scripts/load.py
 import argparse
 import sys
 
+from access_it.common.log import setup_logging
 from access_it.etl.load.engine import get_engine
 from access_it.etl.load.load import read_parquet
 from access_it.etl.load.models import Base
@@ -44,4 +45,5 @@ def prune_stale_rows() -> None:
 
 
 if __name__ == "__main__":
+    setup_logging()
     prune_stale_rows()
