@@ -126,7 +126,11 @@ def identify_riders_on_startlist(
     """Identify the riders of a startlist from their full name and club.
 
     A rider is identified through the club he is affiliated with on `on_date`
-    (the race date), or with any affiliation if no date is given.
+    (the race date), or with any affiliation if no date is given. The names
+    are searched in this order: exact full name, red-list name (last name and
+    initial of the first name), then broader search (names contained in the
+    rider names). The match_method column gives the search that identified
+    the rider ("exact", "red list" or "broader"), None if none did.
     """
     # Indexes built once for all rows (no-op if already built by the caller)
     if not isinstance(riders, RiderLookup):
@@ -134,9 +138,10 @@ def identify_riders_on_startlist(
     if isinstance(affiliations, pd.DataFrame):
         affiliations = AffiliationLookup(affiliations)
     df = df.copy()
-    rider_ids = []
+    rider_ids, match_methods = [], []
     for row in df.itertuples():
         found_rider_id = False
+        match_method = None
         full_name = row.full_name
         club_id = row.club_id
         rider_id_out = None
@@ -159,6 +164,7 @@ def identify_riders_on_startlist(
                 on_date=on_date
             )
             found_rider_id = True
+            match_method = "exact"
         except ValueError:
             pass
 
@@ -187,6 +193,7 @@ def identify_riders_on_startlist(
                     on_date=on_date
                 )
                 found_rider_id = True
+                match_method = "red list"
             except ValueError:
                 pass
             i += 1
@@ -213,12 +220,15 @@ def identify_riders_on_startlist(
                     on_date=on_date
                 )
                 found_rider_id = True
+                match_method = "broader"
             except ValueError:
                 pass
             i += 1
 
         rider_ids.append(rider_id_out)
+        match_methods.append(match_method)
     df["rider_id"] = pd.Series(rider_ids, index=df.index)
+    df["match_method"] = pd.Series(match_methods, index=df.index, dtype="object")
     return df
 
 
@@ -234,7 +244,8 @@ def identify_riders_categories_on_startlist(
         affiliations: pd.DataFrame | AffiliationLookup,
         departemental_committees: pd.DataFrame,
         regional_committees: pd.DataFrame,
-        club_lookup: ClubLookup | None = None
+        club_lookup: ClubLookup | None = None,
+        details: bool = False
     ) -> list[dict]:
     """Read the Access category of the identified riders on the startlists of a page.
 
@@ -254,9 +265,12 @@ def identify_riders_categories_on_startlist(
         departemental_committees: Departemental committees.
         regional_committees: Regional committees.
         club_lookup: ClubLookup of the club table (built if None).
+        details: Whether to add the name read on the startlist (full_name)
+            and the search that identified the rider (match_method).
 
     Returns:
-        One dict per identified rider: rider_id, race_date, category ("A1" to "A4").
+        One dict per identified rider: rider_id, race_date, category ("A1" to
+        "A4"), plus full_name and match_method if `details` is True.
     """
     if club_lookup is None:
         club_lookup = ClubLookup(clubs)
@@ -277,6 +291,8 @@ def identify_riders_categories_on_startlist(
         "category", "club", "race_date", "rider_id", "club_id", "full_name"
     )
     categories_table_cols = [rider_id_col, date_col, cat_col]
+    if details:
+        categories_table_cols += [full_name_col, "match_method"]
     output = []
     for table_name, table_data in data["startlists"].items():
         n_table_name = normalize_string_and_fold_case(table_name)
@@ -578,7 +594,8 @@ def identify_riders_categories_on_startlists(
         riders: pd.DataFrame,
         affiliations: pd.DataFrame,
         departemental_committees: pd.DataFrame,
-        regional_committees: pd.DataFrame
+        regional_committees: pd.DataFrame,
+        details: bool = False
     ):
     """Read the categories of the identified riders on every cached startlist page.
 
@@ -588,10 +605,13 @@ def identify_riders_categories_on_startlists(
         affiliations: Affiliation table.
         departemental_committees: Departemental committees.
         regional_committees: Regional committees.
+        details: Whether to add the name read on the startlist (full_name)
+            and the search that identified the rider (match_method).
 
     Returns:
         One row per rider and startlist, without duplicates: rider_id,
-        race_date, category.
+        race_date, category, plus full_name and match_method if `details`
+        is True.
     """
     startlists_data = get_startlists_data()
     # Indexes built once for all startlists
@@ -607,7 +627,8 @@ def identify_riders_categories_on_startlists(
             affiliations=affiliation_lookup,
             departemental_committees=departemental_committees,
             regional_committees=regional_committees,
-            club_lookup=club_lookup
+            club_lookup=club_lookup,
+            details=details
         )
         output.extend(new_output)
     return pd.DataFrame(output).drop_duplicates(keep="first").reset_index(drop=True)
