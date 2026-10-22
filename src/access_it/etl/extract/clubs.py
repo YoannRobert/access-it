@@ -1,5 +1,6 @@
 """Regions, committees and clubs read from the FFC API, and checks on club IDs."""
 
+import logging
 import httpx
 import pandas as pd
 import re
@@ -9,6 +10,8 @@ from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.client import get_required
 from access_it.etl.extract.constants import INDIVIDUAL_NAME, FOREIGN_NAME, INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
 from access_it.etl.extract.departements import get_departement_mapping
+
+logger = logging.getLogger(__name__)
 
 
 def get_regions(client: httpx.Client) -> list[dict]:
@@ -40,7 +43,7 @@ def get_region_bloc_data(data: dict, departements: pd.DataFrame, overseas: bool=
     missing_keys = [k for k in ["region", "extra_data", "committees"] if k not in data]
     if missing_keys:
         region = data.get("region")
-        print(f"Warning: region block skipped, missing keys {missing_keys}: {region!r}")
+        logger.warning(f"region block skipped, missing keys {missing_keys}: {region!r}")
         return [], []
     extra_data = data['extra_data']
     if 'id_api' not in extra_data:
@@ -86,7 +89,7 @@ def get_region_bloc_data(data: dict, departements: pd.DataFrame, overseas: bool=
             }
             dep_committees.append(dep_committee)
         except IndexError as e:
-            print(f"Can not find a department for '{dep_committee_name}'.")
+            logger.error(f"Can not find a department for '{dep_committee_name}'.")
             raise e
     reg_committees = [{"regional_committee_id": reg_committee_id, "name": reg_committee_name}]
     return reg_committees, dep_committees
@@ -115,7 +118,7 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[pd.Data
         region_label = region["label"]
         region_value = region["value"]
         if verbose:
-            print(f"{region_label}")
+            logger.info(f"{region_label}")
         url = f"https://velo.ffc.fr/wp-json/sn/cpt/comite?region={region_value}"
         r = get_required(client, url)
         try:
@@ -132,7 +135,7 @@ def get_committees(client: httpx.Client, verbose: bool = False) -> tuple[pd.Data
                     reg_committees.extend(cur_reg_committee)
                     dep_committees.extend(cur_dep_committees)
         except KeyError as error:
-            print(f"Warning: committees of region {region_label!r} skipped, missing key {error}")
+            logger.warning(f"committees of region {region_label!r} skipped, missing key {error}")
             continue
     reg_committees.extend(
         [
@@ -212,7 +215,7 @@ def get_clubs(
         if region_value == "outre-mer":  # because it is a duplicate of Polynésie
             continue
         if verbose:
-            print(f"{region_label}")
+            logger.info(f"{region_label}")
         url = f"https://velo.ffc.fr/wp-json/sn/cpt/clubs?region={region_value}"
         r = get_required(client, url)
         try:
@@ -222,7 +225,7 @@ def get_clubs(
             for dep_committee_data in data['committees']:
                 dep_committee_name = dep_committee_data['title']
                 if verbose:
-                    print(f"\t{dep_committee_name}")
+                    logger.info(f"\t{dep_committee_name}")
                 for club_data in dep_committee_data['items']:
                     club_name = str(club_data['post_title'])
                     club_id = str(club_data['extra_data']['id_ffc'])
@@ -242,7 +245,7 @@ def get_clubs(
                         }
                     )
         except KeyError as error:
-            print(f"Warning: clubs of region {region_label!r} skipped, missing key {error}")
+            logger.warning(f"clubs of region {region_label!r} skipped, missing key {error}")
             continue
     clubs.extend(
         [

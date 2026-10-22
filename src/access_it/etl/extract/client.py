@@ -1,5 +1,6 @@
 """HTTP client of the extract step, with a minimal delay between requests to a same site."""
 
+import logging
 import random
 import time
 
@@ -7,6 +8,8 @@ from collections.abc import Callable
 from urllib.parse import urlsplit
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://competitions.ffc.fr"
 USER_AGENT = "Mozilla/5.0"
@@ -71,8 +74,10 @@ class RequestThrottle:
         host = urlsplit(url).hostname or ""
         delay = min(2 * self.min_delay(host), MAX_MIN_DELAY)
         if delay > self.min_delay(host):
-            print(f"Warning: HTTP {status_code} from {host}, delay between requests "
-                  f"increased to {delay:.1f} s")
+            logger.warning(
+                f"HTTP {status_code} from {host}, delay between requests "
+                f"increased to {delay:.1f} s"
+            )
         self.min_delay_by_host[host] = delay
 
 
@@ -203,7 +208,7 @@ def try_get(
         return get(client, url, throttle=throttle)
     except httpx.HTTPError as error:
         reason = failures.record(url, error)
-        print(f"Warning: request failed ({reason}): {url}")
+        logger.warning(f"request failed ({reason}): {url}")
         return None
 
 

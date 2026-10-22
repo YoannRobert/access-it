@@ -3,6 +3,7 @@
 The address of the website is read from the STARTLISTS_URL setting.
 """
 
+import logging
 import httpx
 
 from bs4 import BeautifulSoup
@@ -14,6 +15,8 @@ from access_it.etl.extract.cache import (
 from access_it.etl.extract.client import try_get
 from access_it.common.access_categories import find_access_categories_from_name
 from access_it.common.html import get_text_safe
+
+logger = logging.getLogger(__name__)
 
 
 STARTLISTS_URL = get_settings().startlists_url
@@ -42,14 +45,14 @@ def extract_startlists_from_organization_page(
     season_str = f"{season:4d}"
     org_ref = f"{season_str:4s}/{code:s}".ljust(10)
     if startlists_json_file_exists(season, code):
-        print(f"{org_ref} already exists")
+        logger.debug(f"{org_ref} already exists")
         return
 
     race_response = try_get(client=client, url=url)
 
     # Request failed for good: nothing is cached, the page is requested again at the next run
     if not isinstance(race_response, httpx.Response):
-        print(f"{org_ref} request failed, skipped")
+        logger.info(f"{org_ref} request failed, skipped")
         return
 
     # No errors
@@ -79,11 +82,11 @@ def extract_startlists_from_organization_page(
     # Races not kept:
     if not included:
         write_startlists_json_and_html_files(season, code, race_response, kept=False)
-        print(f"{org_ref} excluded race: {title}")
+        logger.info(f"{org_ref} excluded race: {title}")
         return
     # Races kept:
     write_startlists_json_and_html_files(season, code, race_response, kept=True)
-    print(f"{org_ref}: cached")
+    logger.info(f"{org_ref}: cached")
 
 
 def extract_startlists_pages_from_search_url(
@@ -105,7 +108,7 @@ def extract_startlists_pages_from_search_url(
     while True and (max_pages == -1 or page <= max_pages):
         page_response = try_get(client=client, url=search_url)
         if not isinstance(page_response, httpx.Response):
-            print(f"Startlists listing stopped at page {page} (request failed)")
+            logger.warning(f"Startlists listing stopped at page {page} (request failed)")
             break
         html = page_response.text
         soup = BeautifulSoup(html, features="html.parser")

@@ -5,6 +5,7 @@ departement, and, for the completed seasons only, by requesting the known
 organization codes and every number of each known organizer.
 """
 
+import logging
 import httpx
 
 from bs4 import BeautifulSoup
@@ -15,6 +16,8 @@ from access_it.etl.extract.cache import (
 )
 from access_it.etl.extract.client import BASE_URL, try_get
 from access_it.common.html import get_text_safe, get_elements_from_results_page
+
+logger = logging.getLogger(__name__)
 
 
 def extract_results_from_organization_page(
@@ -37,7 +40,7 @@ def extract_results_from_organization_page(
     season_str = f"{season:4d}"
     org_ref = f"{season_str:4s}/{code:11s}"
     if results_sidecar_exists(season, code):
-        print(f"{org_ref} already exists")
+        logger.debug(f"{org_ref} already exists")
         return
 
     url = f"{results_base_url}/{season_str}/{code}"
@@ -45,7 +48,7 @@ def extract_results_from_organization_page(
 
     # Request failed for good: nothing is cached, the page is requested again at the next run
     if not isinstance(race_response, httpx.Response):
-        print(f"{org_ref} request failed, skipped")
+        logger.info(f"{org_ref} request failed, skipped")
         return
 
     # 404 error (HTTP status, or redirection to the error page)
@@ -56,7 +59,7 @@ def extract_results_from_organization_page(
     )
     if page_not_found:
         write_results_sidecar_and_html_files(season, code, race_response, force_404=True)
-        print(f"{org_ref} page not found")
+        logger.info(f"{org_ref} page not found")
         return
 
     # No errors
@@ -68,7 +71,7 @@ def extract_results_from_organization_page(
     race_code = general_info.get("race_code")
     # Unexpected page layout: not cached, so that the page is read again at the next run
     if race_code is None:
-        print(f"Warning: {org_ref} no race code found on the page, skipped: {name}")
+        logger.warning(f"{org_ref} no race code found on the page, skipped: {name}")
         return
     included = (
         discipline == "Route"
@@ -82,11 +85,11 @@ def extract_results_from_organization_page(
     # Races not kept:
     if not included:
         write_results_sidecar_and_html_files(season, code, race_response, kept=False)
-        print(f"{org_ref} excluded race: {name}")
+        logger.info(f"{org_ref} excluded race: {name}")
         return
     # Races kept:
     write_results_sidecar_and_html_files(season, code, race_response, kept=True)
-    print(f"{org_ref}: cached")
+    logger.info(f"{org_ref}: cached")
 
 
 def extract_organization_pages_from_search_url(
@@ -120,7 +123,7 @@ def extract_organization_pages_from_search_url(
         page_response = try_get(client=client, url=search_url)
         if not isinstance(page_response, httpx.Response):
             # The next search pages cannot be trusted: stop for this departement
-            print(f"Search of departement {dept!r} stopped at page {page} (request failed)")
+            logger.warning(f"Search of departement {dept!r} stopped at page {page} (request failed)")
             break
         html = page_response.text
         soup = BeautifulSoup(html, features="html.parser")

@@ -100,14 +100,15 @@ def test_jitter_increases_the_delay():
     assert clock.sleeps == [1.2]
 
 
-def test_rejection_doubles_the_delay_of_the_host(capsys):
+def test_rejection_doubles_the_delay_of_the_host(caplog):
     clock = FakeClock()
     throttle = make_throttle(clock)
     response = get(FakeClient(429, 200), FFC, pause=0, throttle=throttle)
     assert response.status_code == 200
     assert throttle.min_delay("competitions.ffc.fr") == 0.6
     assert throttle.min_delay("velo.ffc.fr") == 1.0
-    assert "delay between requests increased to 0.6 s" in capsys.readouterr().out
+    assert "delay between requests increased to 0.6 s" in caplog.text
+    assert caplog.records[-1].levelname == "WARNING"
 
 
 def test_delay_is_bounded_after_many_rejections():
@@ -153,11 +154,12 @@ def test_try_get_returns_the_response():
     assert failures.summary() == "All requests succeeded."
 
 
-def test_try_get_records_an_http_error_instead_of_raising(capsys):
+def test_try_get_records_an_http_error_instead_of_raising(caplog):
     failures = RequestFailures()
     response = try_get(FakeClient(403), FFC, throttle=make_throttle(FakeClock()), failures=failures)
     assert response is None
-    assert "request failed (HTTP 403)" in capsys.readouterr().out
+    assert "request failed (HTTP 403)" in caplog.text
+    assert caplog.records[-1].levelname == "WARNING"
     summary = failures.summary()
     assert "1 request(s) failed" in summary
     assert "competitions.ffc.fr: HTTP 403 x 1" in summary

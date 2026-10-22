@@ -65,11 +65,12 @@ def test_region_block_gives_the_committees():
     }]
 
 
-def test_region_block_with_missing_keys_is_skipped_with_a_warning(capsys):
+def test_region_block_with_missing_keys_is_skipped_with_a_warning(caplog):
     block = region_block(["CD LOIRE-ATLANTIQUE"])
     del block["committees"]
     assert get_region_bloc_data(block, DEPARTEMENTS) == ([], [])
-    assert "missing keys ['committees']" in capsys.readouterr().out
+    assert "missing keys ['committees']" in caplog.text
+    assert caplog.records[-1].levelname == "WARNING"
 
 
 def test_region_block_leaves_the_departements_unchanged():
@@ -78,7 +79,7 @@ def test_region_block_leaves_the_departements_unchanged():
     pd.testing.assert_frame_equal(departements, DEPARTEMENTS)
 
 
-def test_get_committees_warns_about_a_skipped_region(monkeypatch, capsys):
+def test_get_committees_warns_about_a_skipped_region(monkeypatch, caplog):
     monkeypatch.setattr(
         "access_it.etl.extract.clubs.get_departement_mapping", lambda client: DEPARTEMENTS
     )
@@ -91,4 +92,5 @@ def test_get_committees_warns_about_a_skipped_region(monkeypatch, capsys):
     reg, dep = get_committees(client)
     assert set(dep["departemental_committee_id"]) >= {"5244", "5249"}
     assert "52" in set(reg["regional_committee_id"])
-    assert "missing keys" in capsys.readouterr().out
+    assert "missing keys" in caplog.text
+    assert caplog.records[-1].levelname == "WARNING"
