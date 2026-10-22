@@ -9,6 +9,7 @@ import httpx
 
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
+from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.cache import (
     RESULTS_DIR, write_results_sidecar_and_html_files, results_sidecar_exists
 )
@@ -156,7 +157,7 @@ def completed_seasons(start_year: int, now: datetime | None = None) -> range:
 
 def extract_former_organization_pages_from_existing_ones(
         client: httpx.Client,
-        start_year: int = 2023
+        start_year: int = FIRST_SEASON
     ):
     """Request every cached organization code for every completed season.
 
@@ -181,7 +182,7 @@ def extract_former_organization_pages_from_existing_ones(
 
 def extract_former_organization_pages_using_bruteforce(
         client: httpx.Client,
-        start_year: int = 2023,
+        start_year: int = FIRST_SEASON,
         margin: int = 0
     ):
     """Request every number of each known organizer, for every completed season.

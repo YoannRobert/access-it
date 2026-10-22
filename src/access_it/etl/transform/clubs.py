@@ -10,6 +10,7 @@ import re
 
 from datetime import datetime
 from types import NoneType
+from access_it.common.seasons import FIRST_SEASON
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.cache import read_results_html_file
 from access_it.etl.extract.clubs import (
@@ -26,8 +27,8 @@ from access_it.etl.transform.parse import (
 
 
 def is_valid_season(season: int):
-    """Whether the season is between 2023 and the current year."""
-    return 2023 <= season <= datetime.now().year
+    """Whether the season is between FIRST_SEASON and the current year."""
+    return FIRST_SEASON <= season <= datetime.now().year
 
 
 def add_club(
@@ -61,7 +62,7 @@ def add_club(
         if `club_id` or `club_name` is None.
 
     Raises:
-        ValueError: If the season is outside 2023 to the current year, or
+        ValueError: If the season is outside FIRST_SEASON to the current year, or
             if the departemental committee of a new club is not found.
     """
     df = df_clubs.copy()

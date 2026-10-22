@@ -12,6 +12,7 @@ import re
 from datetime import datetime
 from functools import lru_cache
 from typing import Literal, Any
+from access_it.common.seasons import FIRST_SEASON
 from access_it.common.text import normalize_string_and_fold_case
 
 
@@ -293,7 +294,8 @@ def search_rider_category(
         rankings: Ranking table (race_id, rider_id, finish_rank).
         categories_from_startlists: Categories read on the startlists
             (rider_id, race_date, category).
-        after: First date taken into account ('YYYY-MM-DD'; default 2023-01-01).
+        after: First date taken into account ('YYYY-MM-DD'; default January 1st
+            of FIRST_SEASON).
 
     Returns:
         One row per observation: rider_id, race_date, rider_category (1 to 4).
@@ -426,7 +428,7 @@ def search_rider_category(
 
     df = pd.concat([categories_from_startlists, categories_from_results], ignore_index=True)
     if after is None:
-        after = pd.to_datetime("2023-01-01", format="%Y-%m-%d")
+        after = pd.Timestamp(year=FIRST_SEASON, month=1, day=1)
     else:
         try:
             after = pd.to_datetime(after, format="%Y-%m-%d")
@@ -553,7 +555,7 @@ def add_unknown_years_in_category_history(
         races: pd.DataFrame,
         rankings: pd.DataFrame,
         categories_from_startlists: pd.DataFrame,
-        after_year: int = 2023
+        after_year: int = FIRST_SEASON
     ) -> pd.DataFrame:
     """Add the periods of unknown category, for the years without observation.
 
@@ -579,12 +581,12 @@ def add_unknown_years_in_category_history(
         The completed history, rider_category as a nullable integer (Int8).
 
     Raises:
-        ValueError: If `after_year` is before 2023 or after the current year.
+        ValueError: If `after_year` is before FIRST_SEASON or after the current year.
     """
     this_year = datetime.now().year
-    if after_year < 2023 or after_year > this_year:
+    if after_year < FIRST_SEASON or after_year > this_year:
         raise ValueError(
-            "'after_year' must be greater than or equal to 2023"
+            f"'after_year' must be greater than or equal to {FIRST_SEASON}"
             f" and less than or equal to {this_year}"
         )
 
@@ -682,7 +684,7 @@ def add_unknown_years_in_category_history(
 def delete_rows_for_riders_having_duplicated_keys(
         category_history: pd.DataFrame,
         add_unknown_category_row: bool = True,
-        after_year: int = 2023
+        after_year: int = FIRST_SEASON
     ) -> pd.DataFrame:
     """Replace the category history of riders having duplicated keys by an unknown category.
 
