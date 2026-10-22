@@ -6,12 +6,15 @@ from the races he takes part in (results and startlists), then aggregated
 into a history of periods (one row per period, starting at start_date).
 """
 
+import logging
 import pandas as pd
 
 from datetime import datetime
 from typing import Literal, Any
 from access_it.common.access_categories import find_access_categories_from_name
 from access_it.common.seasons import FIRST_SEASON
+
+logger = logging.getLogger(__name__)
 
 
 def find_ranking_categories(organization_data: dict[str, Any]) -> dict[str, dict[int, bool]]:
@@ -560,21 +563,22 @@ def delete_rows_for_riders_having_duplicated_keys(
     Duplicated keys (two periods starting on the same day) come from two
     classifications on the same day with different categories, which only
     happens to women riders (a mixed race and a women's ranking of the same
-    organization). The riders concerned and their duplicated dates are printed,
+    organization). The riders concerned and their duplicated dates are logged,
     so that any unexpected case is noticed.
     """
     df = category_history.copy()
     duplicated_keys = df.duplicated(["rider_id", "start_date"], keep=False)
     riders_removed = df.loc[duplicated_keys, "rider_id"].drop_duplicates().to_list()
     if riders_removed:
-        print(
-            f"Info: category history replaced by an unknown category for {len(riders_removed)} "
+        lines = [
+            f"category history replaced by an unknown category for {len(riders_removed)} "
             f"rider(s) with duplicated keys (rider_id: duplicated start dates):"
-        )
+        ]
         dates_by_rider = df[duplicated_keys].groupby("rider_id")["start_date"]
         for rider_id, dates in dates_by_rider:
             dates = sorted(pd.to_datetime(dates).dt.strftime("%Y-%m-%d").unique())
-            print(f"  {rider_id}: {', '.join(dates)}")
+            lines.append(f"  {rider_id}: {', '.join(dates)}")
+        logger.info("\n".join(lines))
     df = df[~df["rider_id"].isin(riders_removed)]
     if not add_unknown_category_row:
         return df

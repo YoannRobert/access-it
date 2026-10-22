@@ -1,5 +1,6 @@
 """Unit tests of the computation of the affiliation periods."""
 
+import logging
 import pandas as pd
 import pytest
 
@@ -91,7 +92,8 @@ def test_same_day_results_with_two_clubs_keep_the_latest():
     )
 
 
-def test_compute_affiliation_periods_for_several_riders(capsys):
+def test_compute_affiliation_periods_for_several_riders(caplog):
+    caplog.set_level(logging.INFO)
     df = pd.DataFrame({
         "rider_id": ["r2", "r1", "r1", "r1", "r2"],
         "race_id": ["x1", "x2", "x3", "x4", "x5"],
@@ -106,7 +108,7 @@ def test_compute_affiliation_periods_for_several_riders(capsys):
         {"rider_id": "r2", "start_date": pd.Timestamp("2024-01-01"), "club_id": "A"},
         {"rider_id": "r2", "start_date": pd.Timestamp("2025-01-01"), "club_id": "B"},
     ]
-    assert "1 isolated club observation(s) of 1 rider(s) ignored" in capsys.readouterr().out
+    assert "1 isolated club observation(s) of 1 rider(s) ignored" in caplog.text
 
 
 # ---------------------------------------------------------------- AffiliationLookup
@@ -161,7 +163,8 @@ def test_homonyms_are_separated_by_the_club_at_the_race_date():
 
 # ---------------------------------------------------------------- create_affiliation_clubs_riders
 
-def test_results_without_identified_club_are_ignored_for_affiliations(capsys):
+def test_results_without_identified_club_are_ignored_for_affiliations(caplog):
+    caplog.set_level(logging.INFO)
     from access_it.etl.transform.riders import create_affiliation_clubs_riders
 
     rider_x_race = pd.DataFrame({
@@ -174,4 +177,4 @@ def test_results_without_identified_club_are_ignored_for_affiliations(capsys):
     assert result.to_dict(orient="records") == [
         {"rider_id": "id1", "start_date": pd.Timestamp("2025-01-01"), "club_id": "A"}
     ]
-    assert "1 result(s) without identified club ignored" in capsys.readouterr().out
+    assert "1 result(s) without identified club ignored" in caplog.text

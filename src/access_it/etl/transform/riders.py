@@ -1,5 +1,6 @@
 """Riders and affiliations: rider IDs, rider table, lookups of riders and affiliations."""
 
+import logging
 import hashlib
 import pandas as pd
 
@@ -10,6 +11,8 @@ from access_it.common.text import normalize_string_and_fold_case
 from access_it.common.uci import is_valid_uci_id
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 from access_it.etl.transform.clubs import ClubLookup, parse_club_text, identify_club
+
+logger = logging.getLogger(__name__)
 
 
 RED_LIST = "Liste Rouge"
@@ -81,16 +84,17 @@ def identify_club_of_riders(
 
 
 def report_unidentified_club_texts(unidentified_club_texts: Counter[str]) -> None:
-    """Print the number of result rows dropped because their club was not identified."""
+    """Log the number of result rows dropped because their club was not identified."""
     if not unidentified_club_texts:
         return
     n_rows = sum(unidentified_club_texts.values())
     n_texts = len(unidentified_club_texts)
-    print(f"Warning: {n_rows} result row(s) dropped, club not identified ({n_texts} club text(s)):")
+    lines = [f"{n_rows} result row(s) dropped, club not identified ({n_texts} club text(s)):"]
     for club_text, count in unidentified_club_texts.most_common(MAX_REPORTED_CLUB_TEXTS):
-        print(f"{count:8d}  {club_text!r}")
+        lines.append(f"{count:8d}  {club_text!r}")
     if n_texts > MAX_REPORTED_CLUB_TEXTS:
-        print(f"          ... and {n_texts - MAX_REPORTED_CLUB_TEXTS} other club text(s)")
+        lines.append(f"          ... and {n_texts - MAX_REPORTED_CLUB_TEXTS} other club text(s)")
+    logger.warning("\n".join(lines))
 
 
 def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
@@ -99,7 +103,7 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
     One rider is created per valid UCI ID, and per names for the red-list
     riders, the individual licensees and the riders without UCI ID (names
     already used by red-list or individual riders are not duplicated). Results
-    without names are skipped. A summary is printed.
+    without names are skipped. A summary is logged.
 
     Args:
         rider_x_race_data: Results of the riders.
@@ -107,28 +111,23 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
     Returns:
         One row per rider: rider_id, uci_id, last_name, first_name.
     """
-    def print_summary(n: int, i_list: list[int], label_list: list[str]):
-        """Print the number of results per type of rider, and whether all are covered."""
-        print('-' * 120)
-        print("Summary:")
+    def log_summary(n: int, i_list: list[int], label_list: list[str]):
+        """Log the number of results per type of rider, and whether all are covered."""
+        lines = ["Summary:"]
         i_cum = 0
         j = 0
         while j < 4:
             i = i_list[j]
             i_cum += i
             label = label_list[j]
-            print_summary_line(i, i_cum, n, label)
+            lines.append(summary_line(i, i_cum, n, label))
             j += 1
-        print("Status: ", end="")
-        if i_cum == n:
-            print("✅ Complete")
-        else:
-            print("❌ Incomplete")
-        print('-' * 120)
+        lines.append("Status: " + ("✅ Complete" if i_cum == n else "❌ Incomplete"))
+        logger.info("\n".join(lines))
 
 
-    def print_summary_line(i: int, i_tot: int, n: int, label: str):
-        """Print the number and share of results of one type of rider."""
+    def summary_line(i: int, i_tot: int, n: int, label: str) -> str:
+        """Number and share of results of one type of rider."""
         msg = f"{label:24s}:"
         msg += "   added"
         msg += f" {i:9d}"
@@ -139,7 +138,7 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
         msg += "   remaining"
         msg += f" {n - i_tot:9d}"
         msg += f" ({(n - i_tot) / n:7.2%})"
-        print(msg)
+        return msg
 
     df = rider_x_race_data.copy()
     total_rows = df.shape[0]
@@ -219,7 +218,7 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
             db_rows.append(row2)
 
     db = pd.concat([db, pd.DataFrame(db_rows)], axis=0)
-    print_summary(
+    log_summary(
         n=total_rows,
         i_list=[i_uci_id, i_red_list, i_individual_license, i_missing_uci_id],
         label_list=["Known UCI IDs", "Red-list riders", "Individual licensees", "Unknown UCI IDs"]
@@ -299,11 +298,11 @@ def assign_rider_ids(rider_x_race_data: pd.DataFrame, rider_db: pd.DataFrame) ->
     df["rider_id"] = rider_ids
     if dropped:
         n = sum(len(results) for results in dropped.values())
-        print(f"Warning: {n} result row(s) dropped, rider not identified:")
+        lines = [f"{n} result row(s) dropped, rider not identified:"]
         for reason, results in dropped.items():
-            print(f"  {reason}: {len(results)}")
-            for result in results[:MAX_REPORTED_RESULTS]:
-                print(f"    {result}")
+            lines.append(f"  {reason}: {len(results)}")
+            lines += [f"    {result}" for result in results[:MAX_REPORTED_RESULTS]]
+        logger.warning("\n".join(lines))
     return df[df["rider_id"].notna()].copy()
 
 
@@ -564,7 +563,7 @@ def compute_affiliation_periods(observations: pd.DataFrame) -> pd.DataFrame:
 
     `observations` has one row per result: rider_id, race_id, race_date, club_id.
     Return one row per period: rider_id, start_date, club_id (see
-    compute_rider_affiliation_periods), and print the number of isolated
+    compute_rider_affiliation_periods), and log the number of isolated
     observations ignored.
     """
     df = observations.sort_values(["rider_id", "race_date", "race_id"], kind="stable")
@@ -578,8 +577,8 @@ def compute_affiliation_periods(observations: pd.DataFrame) -> pd.DataFrame:
         n_ignored += n
         riders_with_ignored += n > 0
     if n_ignored:
-        print(
-            f"Info: {n_ignored} isolated club observation(s) of {riders_with_ignored} rider(s) "
+        logger.info(
+            f"{n_ignored} isolated club observation(s) of {riders_with_ignored} rider(s) "
             f"ignored for affiliations"
         )
     periods = pd.DataFrame(rows, columns=["rider_id", "start_date", "club_id"])
@@ -609,8 +608,8 @@ def create_affiliation_clubs_riders(
     # Results without identified club (e.g. ambiguous club name) give no observation
     unknown_club = df["club_id"].map(lambda club_id: not isinstance(club_id, str))
     if unknown_club.any():
-        print(f"Info: {unknown_club.sum()} result(s) without identified club "
-              f"ignored for affiliations")
+        logger.info(f"{unknown_club.sum()} result(s) without identified club "
+                    f"ignored for affiliations")
     df = df[~unknown_club].copy()
     return compute_affiliation_periods(df[["rider_id", "race_id", "race_date", "club_id"]])
 

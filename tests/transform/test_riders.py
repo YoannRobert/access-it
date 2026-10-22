@@ -1,6 +1,7 @@
 """Unit tests of the rider functions of the transform step."""
 
 import hashlib
+import logging
 
 import pandas as pd
 
@@ -24,15 +25,17 @@ def result_row(club: str | None) -> dict:
     return {"last_name": "X", "first_name": "Y", "uci_id": "", "finish_rank": 1, "club": club}
 
 
-def test_identified_clubs_are_kept_without_report(capsys):
+def test_identified_clubs_are_kept_without_report(caplog):
+    caplog.set_level(logging.INFO)
     rows = [result_row("4976038 AC SOTTEVILLAIS"), result_row("AC SOTTEVILLE")]
     data = identify_club_of_riders(rows, CLUBS)
     assert [row["club_id"] for row in data] == ["4976038", "4976038"]
     assert all("club" not in row for row in data)
-    assert capsys.readouterr().out == ""
+    assert caplog.records == []
 
 
-def test_unidentified_clubs_are_dropped_and_reported(capsys):
+def test_unidentified_clubs_are_dropped_and_reported(caplog):
+    caplog.set_level(logging.INFO)
     rows = [
         result_row("AC SOTTEVILLE"),
         result_row("UNKNOWN CLUB NAME"),
@@ -41,9 +44,10 @@ def test_unidentified_clubs_are_dropped_and_reported(capsys):
     ]
     data = identify_club_of_riders(rows, CLUBS)
     assert len(data) == 1
-    output = capsys.readouterr().out
-    assert "Warning: 3 result row(s) dropped, club not identified (2 club text(s)):" in output
-    lines = output.splitlines()
+    [record] = caplog.records
+    assert record.levelname == "WARNING"
+    lines = record.getMessage().splitlines()
+    assert lines[0] == "3 result row(s) dropped, club not identified (2 club text(s)):"
     assert lines[1].split() == ["2", "'UNKNOWN", "CLUB", "NAME'"]
     assert lines[2].split() == ["1", "'OTHER", "UNKNOWN", "CLUB'"]
 
@@ -103,11 +107,12 @@ def assigned(data: pd.DataFrame) -> pd.DataFrame:
     return assign_rider_ids(data, add_riders_to_database(data))
 
 
-def test_valid_uci_id_gives_its_rider_whatever_the_names(capsys):
+def test_valid_uci_id_gives_its_rider_whatever_the_names(caplog):
+    caplog.set_level(logging.INFO)
     data = results((VALID_UCI_ID, "DUPONT", "Jean", "A"), (VALID_UCI_ID, "", "", "A"))
     out = assigned(data)
     assert list(out["rider_id"]) == [define_rider_id(VALID_UCI_ID, "", "")] * 2
-    assert "dropped" not in capsys.readouterr().out
+    assert "dropped" not in caplog.text
 
 
 def test_red_list_rider_is_not_mixed_up_with_a_homonym_having_a_uci_id():
@@ -142,7 +147,8 @@ def test_individual_licensee_with_an_invalid_uci_id_is_kept():
     assert list(out["rider_id"]) == [define_rider_id("12345", "DUPONT", "Jean")]
 
 
-def test_results_without_rider_are_dropped_and_reported(capsys):
+def test_results_without_rider_are_dropped_and_reported(caplog):
+    caplog.set_level(logging.INFO)
     data = results(
         ("10012345600", "DUPONT", "Jean", "A"),  # wrong check digits
         ("", "", "Jean", "A"),
@@ -151,8 +157,9 @@ def test_results_without_rider_are_dropped_and_reported(capsys):
     )
     out = assigned(data)
     assert list(out["race_id"]) == ["r4"]
-    output = capsys.readouterr().out
-    assert "Warning: 3 result row(s) dropped, rider not identified:" in output
+    output = caplog.text
+    assert "3 result row(s) dropped, rider not identified:" in output
+    assert caplog.records[-1].levelname == "WARNING"
     assert "invalid UCI ID, to fix in UCI_ID_CORRECTIONS: 1" in output
     assert "race_id=r1, finish_rank=1, uci_id='10012345600'" in output
     assert "missing names: 2" in output

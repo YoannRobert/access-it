@@ -5,6 +5,7 @@ club, category, nationality, time...) are recognized by heuristics, then the
 riders are identified by their full name and their club at the race date.
 """
 
+import logging
 import pandas as pd
 
 from access_it.common.access_categories import (
@@ -19,6 +20,8 @@ from access_it.etl.transform.riders import (
     AffiliationLookup, RiderLookup, get_rider_id, get_rider_id_using_affiliations
 )
 
+logger = logging.getLogger(__name__)
+
 
 CLUB_LONG_REFERENCES = [
     "cyc", "velo", "club", "klub", "sport", "guidon", "vtt",
@@ -31,7 +34,7 @@ CLUB_SHORT_REFERENCES = [
 
 
 def get_startlists_data() -> list[dict]:
-    """Parse every cached startlist page; print the race dates corrected (see parse.py)."""
+    """Parse every cached startlist page; log the race dates corrected (see parse.py)."""
     startlists_data = []
     corrections = []
     for startlists_html_file in get_startlists_html_files():
@@ -45,8 +48,7 @@ def get_startlists_data() -> list[dict]:
                 f"(published {data['fallback_date']}): {data['title']!r}"
             )
     if corrections:
-        print(f"Info: {len(corrections)} startlist date(s) corrected:")
-        print("\n".join(corrections))
+        logger.info("\n".join([f"{len(corrections)} startlist date(s) corrected:"] + corrections))
     return startlists_data
 
 

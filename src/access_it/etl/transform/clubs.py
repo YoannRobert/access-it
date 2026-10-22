@@ -5,6 +5,7 @@ The club table read from the FFC API is completed with former clubs
 each result is then identified from its club text (club ID and/or name).
 """
 
+import logging
 import pandas as pd
 import re
 
@@ -24,6 +25,8 @@ from access_it.etl.extract.constants import (
 from access_it.etl.transform.parse import (
     parse_clubs_in_organisation_page, get_results_html_files
 )
+
+logger = logging.getLogger(__name__)
 
 
 def is_valid_season(season: int):
@@ -73,7 +76,7 @@ def add_club(
 
     if club_id in df["club_id"].values:
         if verbose:
-            print(f">>>>>>> Club {club_id} already exists in database")
+            logger.info(f">>>>>>> Club {club_id} already exists in database")
         changed = False
         mask_club = df["club_id"] == club_id
         dfi = df[mask_club].iloc[0]
@@ -107,10 +110,10 @@ def add_club(
             df.loc[mask_club, "max_year"] = db_max_year
             df.loc[mask_club, "alternative_names"] = ",".join(db_alt_names)
             if verbose:
-                print("Club updated:", df.loc[mask_club, :])
+                logger.info(f"Club updated: {df.loc[mask_club, :]}")
     elif is_valid_french_club_id(club_id):
         if verbose:
-            print(f">>>>>>> {club_id} is a valid French club ID")
+            logger.info(f">>>>>>> {club_id} is a valid French club ID")
         cd_id = get_departemental_committee_id(club_id, departemental_committees)
         df_club = pd.DataFrame(
             [
@@ -126,10 +129,10 @@ def add_club(
         )
         df = pd.concat([df, df_club], ignore_index=True)
         if verbose:
-            print("Club added:", df.tail(1))
+            logger.info(f"Club added: {df.tail(1)}")
     else:
         if verbose:
-            print(f">>>>>>> {club_id} NOT IN DATABASE AND NOT A VALID FRENCH CLUB ID")
+            logger.info(f">>>>>>> {club_id} NOT IN DATABASE AND NOT A VALID FRENCH CLUB ID")
     return df
 
 
@@ -154,7 +157,7 @@ def parse_club_text(text: str | None) -> tuple[str | None, str | None]:
     text = " ".join(text.split())
     m = RE_CLUB.match(text.strip())
     if m is None:
-        print(f"In parse_club_text: ValueError was raised, text={text}")
+        logger.error(f"In parse_club_text: ValueError was raised, text={text}")
         raise ValueError(f"Club not found in {text}")
     club_id, club_name = m.group(1), m.group(2).strip()
     return club_id, club_name
