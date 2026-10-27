@@ -1,8 +1,9 @@
 """Check the direction of the dependencies between the layers of the package.
 
-common <- extract <- transform <- load: a module may only import from its
-own layer or from the layers on its left, so that no circular import can
-appear between the steps of the ETL.
+common <- extract <- transform <- load <- analytics: a module may only import
+from its own layer or from the layers on its left, so that no circular import
+can appear between the steps of the ETL, and the ETL never depends on the
+analyses of its data.
 """
 
 import ast
@@ -12,7 +13,7 @@ from pathlib import Path
 import pytest
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1] / "src" / "access_it"
-LAYERS = ["common", "etl.extract", "etl.transform", "etl.load"]
+LAYERS = ["common", "etl.extract", "etl.transform", "etl.load", "analytics"]
 
 
 def layer_of(module: str) -> int | None:
