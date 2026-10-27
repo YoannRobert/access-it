@@ -135,6 +135,41 @@ def to_optional_int(value: Any) -> int | None:
     return None if pd.isna(value) else int(value)
 
 
+def remove_conflicting_observations(observations: pd.DataFrame) -> pd.DataFrame:
+    """Remove the observations of a rider on a day when their categories cannot all be true.
+
+    A rider ranked in two races of disjoint categories on the same day (e.g.
+    A1-A2 and A3-A4), or read on a startlist in a category of none of the
+    races he is ranked in that day, holds an error of the source. All the
+    observations of that rider and day are removed: his category on that day
+    is then filled from his other races. The conflicts are logged.
+
+    Args:
+        observations: Observations (rider_id, race_date, categories, race_hc,
+            race_lc), race_hc and race_lc being the highest and lowest category
+            of each observation (e.g. 1 and 2 for "A1,A2").
+
+    Returns:
+        The observations without the conflicting ones.
+    """
+    by_rider_and_day = observations.groupby(["rider_id", "race_date"])
+    # The ranges [race_hc, race_lc] have a common category if the highest
+    # lowest category is not above the lowest highest one
+    is_conflict = by_rider_and_day["race_hc"].transform("max") > by_rider_and_day["race_lc"].transform("min")
+    if is_conflict.any():
+        conflicts = observations[is_conflict]
+        lines = [
+            f"observations removed for {conflicts.groupby(['rider_id', 'race_date']).ngroups} "
+            f"rider(s) and day(s) with conflicting categories (rider_id, date: categories):"
+        ]
+        for (rider_id, race_date), categories in conflicts.groupby(["rider_id", "race_date"])["categories"]:
+            lines.append(
+                f"  {rider_id}, {pd.Timestamp(race_date).strftime('%Y-%m-%d')}: {' / '.join(categories)}"
+            )
+        logger.info("\n".join(lines))
+    return observations[~is_conflict]
+
+
 def search_rider_category(
         races: pd.DataFrame,
         rankings: pd.DataFrame,
@@ -144,8 +179,9 @@ def search_rider_category(
     """Infer the Access category of each rider at each race date.
 
     Observations are the results (the race categories, e.g. "A1,A2", and the
-    finish rank) and the startlists (a single category), from `after` on. The
-    races of a rider bound his category: his possible range [hc, lc] (highest
+    finish rank) and the startlists (a single category), from `after` on.
+    Observations of a rider on a day with conflicting categories are removed
+    first (see remove_conflicting_observations). The races of a rider bound his category: his possible range [hc, lc] (highest
     and lowest category, A1 being the highest) is narrowed race after race, and
     moved when he enters races of other categories (category change). A win in
     a race whose highest category is above his range moves him up at the next
@@ -307,6 +343,7 @@ def search_rider_category(
 
     df["race_hc"] = df["categories"].str.replace("A", "").str.split(",").str[0].astype(int)
     df["race_lc"] = df["categories"].str.replace("A", "").str.split(",").str[-1].astype(int)
+    df = remove_conflicting_observations(df)
     df["rider_hc"] = 100
     df["rider_lc"] = -100
     df["rider_category"] = None

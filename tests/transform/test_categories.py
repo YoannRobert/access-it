@@ -5,7 +5,8 @@ import pandas as pd
 
 from access_it.etl.transform.categories import (
     add_unknown_years_in_category_history, advance_start_dates_in_category_history,
-    delete_rows_for_riders_having_duplicated_keys
+    delete_rows_for_riders_having_duplicated_keys, remove_conflicting_observations,
+    search_rider_category
 )
 
 
@@ -120,3 +121,58 @@ def test_rider_back_after_a_year_without_race_keeps_his_category_until_a_change_
     assert completed(df, ["2025-05-01", "2027-03-01", "2027-06-07"], current_year=2027) == [
         ("2025-01-01", 3), ("2026-01-01", None), ("2027-01-01", 3), ("2027-06-07", 2)
     ]
+
+
+# ---------------------------------------------------------------- remove_conflicting_observations
+
+def observations(*rows: tuple[str, str, str]) -> pd.DataFrame:
+    """Observations from (rider, date, categories) tuples."""
+    df = pd.DataFrame(
+        [{"rider_id": r, "race_date": pd.Timestamp(d), "categories": c} for r, d, c in rows]
+    )
+    df["race_hc"] = df["categories"].str.replace("A", "").str.split(",").str[0].astype(int)
+    df["race_lc"] = df["categories"].str.replace("A", "").str.split(",").str[-1].astype(int)
+    return df
+
+
+def kept(df: pd.DataFrame) -> list[tuple]:
+    return [
+        (row.rider_id, str(row.race_date.date()), row.categories)
+        for row in remove_conflicting_observations(df).itertuples()
+    ]
+
+
+def test_rankings_of_disjoint_categories_on_the_same_day_are_removed(caplog):
+    caplog.set_level(logging.INFO)
+    df = observations(
+        ("r1", "2024-02-25", "A1,A2"), ("r1", "2024-03-03", "A1,A2"), ("r1", "2024-03-03", "A3,A4"),
+        ("r2", "2024-03-03", "A3,A4"),
+    )
+    assert kept(df) == [("r1", "2024-02-25", "A1,A2"), ("r2", "2024-03-03", "A3,A4")]
+    assert "for 1 rider(s) and day(s) with conflicting categories" in caplog.text
+    assert "  r1, 2024-03-03: A1,A2 / A3,A4" in caplog.text
+
+
+def test_startlist_category_outside_the_race_categories_is_removed():
+    df = observations(("r1", "2026-08-30", "A3"), ("r1", "2026-08-30", "A1,A2"))
+    assert kept(df) == []
+
+
+def test_compatible_observations_on_the_same_day_are_kept(caplog):
+    caplog.set_level(logging.INFO)
+    df = observations(("r1", "2026-08-30", "A2"), ("r1", "2026-08-30", "A1,A2"))
+    assert kept(df) == [("r1", "2026-08-30", "A2"), ("r1", "2026-08-30", "A1,A2")]
+    assert caplog.records == []
+
+
+def test_category_of_a_conflicting_day_is_filled_from_the_other_races():
+    races = pd.DataFrame({
+        "race_id": ["a", "b", "c", "d"],
+        "categories": ["A1,A2", "A1,A2", "A3,A4", "A1"],
+        "race_date": ["2024-02-25", "2024-03-03", "2024-03-03", "2024-04-07"],
+    })
+    rankings = pd.DataFrame({"race_id": ["a", "b", "c", "d"], "rider_id": "r1", "finish_rank": 30})
+    startlists = pd.DataFrame(columns=["rider_id", "race_date", "category"])
+    result = search_rider_category(races, rankings, startlists)
+    assert result["race_date"].dt.strftime("%Y-%m-%d").tolist() == ["2024-02-25", "2024-04-07"]
+    assert result["rider_category"].tolist() == [1, 1]
