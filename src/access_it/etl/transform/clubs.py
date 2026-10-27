@@ -389,7 +389,9 @@ def add_legacy_clubs(
         ("4927279", "AS BRETEUILCYCLISME", 2026),
         ("4927024", "CS BONNEVILLE", 2026),
         ("4927024", "CLUB SPORTIF BONNEVILLOIS", 2026),
-        ("4892411", "CSM CLAMART", 2024)
+        ("4892411", "CSM CLAMART", 2024),
+        ("4976078", "AC MONTIVILLIERS", 2025),
+        ("4976078", "AC MONTIVILLIERS", 2026)
     ]
     for club_id, club_name, season in legacy_clubs:
         df = add_club(
