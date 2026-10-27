@@ -399,21 +399,45 @@ def compute_category_history(category_at_given_times: pd.DataFrame) -> pd.DataFr
     )
 
 
-def advance_start_dates_in_category_history(category_history: pd.DataFrame) -> pd.DataFrame:
-    """Move the first period of each rider and year to January 1st of that year.
+def advance_start_dates_in_category_history(
+        category_history: pd.DataFrame,
+        category_at_given_times: pd.DataFrame
+    ) -> pd.DataFrame:
+    """Move to January 1st the periods starting at the first race of a rider in a year.
 
     A category is valid for the whole season: a period observed first in April
-    starts on January 1st, unless another period starts earlier the same year.
+    starts on January 1st when April is the first race of the rider that year.
+    A period starting later in the year (category change during the season,
+    after races in the former category) keeps its start date, so that the
+    former category still covers the beginning of the year. So does a second
+    period starting on the same day as the first one of the year (left to
+    delete_rows_for_riders_having_duplicated_keys, as before).
+
+    Args:
+        category_history: Category history (rider_id, start_date, rider_category).
+        category_at_given_times: Observations the history was computed from
+            (rider_id, race_date, rider_category).
+
+    Returns:
+        The category history, with the start dates moved.
     """
     df = category_history.copy()
     df["start_date"] = pd.to_datetime(df["start_date"])
     df = df.sort_values(["rider_id", "start_date"])
-    # Rows being sorted by date within each rider, the first row of each
-    # (rider, year) pair is moved to January 1st of that year
+    race_dates = pd.to_datetime(category_at_given_times["race_date"])
+    first_race_dates = race_dates.groupby(
+        [category_at_given_times["rider_id"], race_dates.dt.year]
+    ).min()
     years = df["start_date"].dt.year
+    # Rows being sorted by date within each rider, only the first row of each
+    # (rider, year) pair may move (a second period starting the same day keeps it)
     first_row_of_year = ~pd.DataFrame({"rider_id": df["rider_id"], "year": years}).duplicated()
-    df.loc[first_row_of_year, "start_date"] = pd.to_datetime(
-        years[first_row_of_year].astype(str) + "-01-01", format="%Y-%m-%d"
+    first_race_of_year = pd.Series(
+        list(zip(df["rider_id"], years)), index=df.index
+    ).map(first_race_dates)
+    moved = first_row_of_year & (df["start_date"] == first_race_of_year)
+    df.loc[moved, "start_date"] = pd.to_datetime(
+        years[moved].astype(str) + "-01-01", format="%Y-%m-%d"
     )
     return df
 
@@ -433,7 +457,9 @@ def add_unknown_years_in_category_history(
     - A year without any race of the rider starts an unknown category period
       on January 1st (once, until his next race).
     - A rider racing again after such a year gets back his last known category
-      on January 1st of the year of his return, if no period starts that year.
+      on January 1st of the year of his return, if no period starts that year,
+      or if he raced that year before the first period (category change during
+      the season).
 
     The current year is not complete: a rider without race yet this year keeps
     his last period, and gets an unknown category from January 1st of this
@@ -481,6 +507,14 @@ def add_unknown_years_in_category_history(
 
     category_history_tmp: list[dict] = []
 
+    # First known race date of each rider and year
+    first_known_date_by_rider_and_year = (
+        known_dates
+        .assign(race_date=pd.to_datetime(known_dates["race_date"], format="%Y-%m-%d"))
+        .groupby(["rider_id", "year"])["race_date"].min()
+        .to_dict()
+    )
+
     # Years with known race dates, per rider (computed once instead of once per rider)
     years_in_known_dates_by_rider = {
         rider_id: set(years.dropna())
@@ -513,9 +547,26 @@ def add_unknown_years_in_category_history(
                 last_known_category_this_year = categories_this_year.iloc[0]
             else:
                 last_known_category_this_year = None
+            category_before_this_year = last_known_category
             if last_known_category_this_year is not None:
                 last_known_category = last_known_category_this_year
             if year in years_in_category_history:
+                first_start_date = df_rider.loc[df_rider["year"] == year, "start_date"].min()
+                first_known_date = first_known_date_by_rider_and_year.get((rider_id, year))
+                if (
+                    missing_category_line_already_added
+                    and first_known_date is not None
+                    and first_known_date < first_start_date
+                ):
+                    # Return after a year without race, with races in the former
+                    # category before a category change during the season
+                    category_history_tmp.append(
+                        {
+                            "rider_id": rider_id,
+                            "start_date": pd.to_datetime(arg=f"{year}-01-01", format="%Y-%m-%d"),
+                            "rider_category": category_before_this_year,
+                        }
+                    )
                 category_history_tmp.extend(
                     df_rider[df_rider["year"] == year]
                     .loc[:, ["rider_id", "start_date", "rider_category"]]
@@ -627,7 +678,10 @@ def create_category_table(
         categories_from_startlists=categories_from_startlists,
     )
     category_history = compute_category_history(category_at_given_times)
-    category_history = advance_start_dates_in_category_history(category_history)
+    category_history = advance_start_dates_in_category_history(
+        category_history=category_history,
+        category_at_given_times=category_at_given_times
+    )
     category_history = add_unknown_years_in_category_history(
         category_history=category_history,
         races=races,
