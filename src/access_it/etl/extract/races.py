@@ -3,16 +3,22 @@
 Result pages are found by the search engine of the FFC website, by
 departement, and, for the completed seasons only, by requesting the known
 organization codes and every number of each known organizer.
+
+The result pages of the other regions are found by the search engine only,
+for every departement together and from NATIONAL_FIRST_SEASON on, and are
+cached apart (NATIONAL_RESULTS_DIR).
 """
 
 import logging
 import httpx
 
 from bs4 import BeautifulSoup
+from collections.abc import Iterator
 from datetime import datetime, timezone
-from access_it.common.seasons import FIRST_SEASON
+from pathlib import Path
+from access_it.common.seasons import FIRST_SEASON, NATIONAL_FIRST_SEASON
 from access_it.etl.extract.cache import (
-    RESULTS_DIR, write_results_sidecar_and_html_files, results_sidecar_exists
+    NATIONAL_RESULTS_DIR, RESULTS_DIR, write_results_sidecar_and_html_files, results_sidecar_exists
 )
 from access_it.etl.extract.client import BASE_URL, try_get
 from access_it.common.html import get_text_safe, get_elements_from_results_page
@@ -23,7 +29,8 @@ logger = logging.getLogger(__name__)
 def extract_results_from_organization_page(
         client: httpx.Client,
         season: int,
-        code: str
+        code: str,
+        results_dir: Path | None = None
     ):
     """Request and cache a result page, unless it is already cached.
 
@@ -35,11 +42,12 @@ def extract_results_from_organization_page(
         client: HTTP client.
         season: Season of the page.
         code: Organization code of the page (e.g. 'C4400001001').
+        results_dir: Cache directory of the result pages (default: RESULTS_DIR).
     """
     results_base_url = f"{BASE_URL}/resultats/resultat"
     season_str = f"{season:4d}"
     org_ref = f"{season_str:4s}/{code:11s}"
-    if results_sidecar_exists(season, code):
+    if results_sidecar_exists(season, code, results_dir):
         logger.debug(f"{org_ref} already exists")
         return
 
@@ -58,7 +66,9 @@ def extract_results_from_organization_page(
         or (dst_url.find("error") != -1 and dst_url.find("404") != -1)
     )
     if page_not_found:
-        write_results_sidecar_and_html_files(season, code, race_response, force_404=True)
+        write_results_sidecar_and_html_files(
+            season, code, race_response, force_404=True, results_dir=results_dir
+        )
         logger.info(f"{org_ref} page not found")
         return
 
@@ -84,20 +94,24 @@ def extract_results_from_organization_page(
     )
     # Races not kept:
     if not included:
-        write_results_sidecar_and_html_files(season, code, race_response, kept=False)
+        write_results_sidecar_and_html_files(
+            season, code, race_response, kept=False, results_dir=results_dir
+        )
         logger.info(f"{org_ref} excluded race: {name}")
         return
     # Races kept:
-    write_results_sidecar_and_html_files(season, code, race_response, kept=True)
+    write_results_sidecar_and_html_files(
+        season, code, race_response, kept=True, results_dir=results_dir
+    )
     logger.info(f"{org_ref}: cached")
 
 
-def extract_organization_pages_from_search_url(
+def iter_organizations_from_search_url(
         client: httpx.Client,
         dept: int | None = None,
         max_pages: int = -1
-    ):
-    """Extract the result pages listed by the search engine of the FFC website.
+    ) -> Iterator[tuple[int, str]]:
+    """Yield the (season, organization code) of the result pages listed by the search engine.
 
     The search pages of the departement are read until an empty page; the
     search stops at the first search page whose request fails.
@@ -142,8 +156,58 @@ def extract_organization_pages_from_search_url(
                 season = int(season)
             except ValueError:
                 raise ValueError(f"'season' value ({season}) not convertible to int")
-            extract_results_from_organization_page(client=client, season=season, code=code)
+            yield season, code
         page += 1
+
+
+def extract_organization_pages_from_search_url(
+        client: httpx.Client,
+        dept: int | None = None,
+        max_pages: int = -1
+    ):
+    """Extract the result pages listed by the search engine of the FFC website.
+
+    The search pages of the departement are read until an empty page; the
+    search stops at the first search page whose request fails.
+
+    Args:
+        client: HTTP client.
+        dept: Departement number, or None for every departement.
+        max_pages: Maximum number of search pages (-1: no limit).
+
+    Raises:
+        ValueError: If `dept` is neither an int nor None.
+    """
+    for season, code in iter_organizations_from_search_url(client, dept=dept, max_pages=max_pages):
+        extract_results_from_organization_page(client=client, season=season, code=code)
+
+
+def extract_national_organization_pages(
+        client: httpx.Client,
+        first_season: int = NATIONAL_FIRST_SEASON,
+        max_pages: int = -1
+    ):
+    """Extract the result pages of the other regions, listed by the search engine.
+
+    The search engine is read for every departement together. A page is
+    skipped if its season is before `first_season`, or if it is already in the
+    cache of Bretagne and Pays de la Loire (RESULTS_DIR); the other pages are
+    cached in NATIONAL_RESULTS_DIR, kept or not by their race code as the
+    pages of RESULTS_DIR. Run it after the searches by departement, so that
+    the pages of Bretagne and Pays de la Loire are in RESULTS_DIR first. No
+    page is requested by its number (no brute force).
+
+    Args:
+        client: HTTP client.
+        first_season: First season of the pages.
+        max_pages: Maximum number of search pages (-1: no limit).
+    """
+    for season, code in iter_organizations_from_search_url(client, dept=None, max_pages=max_pages):
+        if season < first_season or results_sidecar_exists(season, code):
+            continue
+        extract_results_from_organization_page(
+            client=client, season=season, code=code, results_dir=NATIONAL_RESULTS_DIR
+        )
 
 
 def completed_seasons(start_year: int, now: datetime | None = None) -> range:

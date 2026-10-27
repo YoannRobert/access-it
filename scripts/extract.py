@@ -19,6 +19,7 @@ from access_it.etl.extract.client import FAILURES, make_client
 from access_it.etl.extract.departements import get_departement_mapping
 from access_it.etl.extract.races import (
     extract_organization_pages_from_search_url,
+    extract_national_organization_pages,
     extract_former_organization_pages_from_existing_ones,
     extract_former_organization_pages_using_bruteforce
 )
@@ -27,7 +28,7 @@ from access_it.etl.extract.startlists import extract_startlists_pages_from_searc
 
 
 def extract():
-    """Run the extract step (departements of Pays de la Loire and Bretagne)."""
+    """Run the extract step (departements of Pays de la Loire and Bretagne, then the other regions)."""
     create_cache_dir()
 
     with make_client() as client:
@@ -40,6 +41,9 @@ def extract():
             extract_organization_pages_from_search_url(client=client, dept=dept)
         extract_former_organization_pages_from_existing_ones(client=client)
         extract_former_organization_pages_using_bruteforce(client=client)
+
+        # Extract results of the other regions (committee of the individual licensees)
+        extract_national_organization_pages(client=client)
 
         # Extract startlists
         extract_startlists_pages_from_search_url(client=client)

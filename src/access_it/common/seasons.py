@@ -6,6 +6,11 @@ ACCESS_CATEGORIES_FIRST_SEASON = 2023
 
 FIRST_SEASON = 2023  # first season covered; never before ACCESS_CATEGORIES_FIRST_SEASON
 
+# First season of the result pages of the other regions (outside Bretagne and
+# Pays de la Loire), only read to find the committee of the individual
+# licensees: before 2026, the result pages give the committee in their club ID.
+NATIONAL_FIRST_SEASON = 2026
+
 
 def check_first_season(first_season: int) -> None:
     """Check that the first season is not before the creation of the Access categories.

@@ -113,3 +113,53 @@ def test_page_without_race_code_is_not_cached(tmp_path, monkeypatch, caplog):
     assert not cache.results_sidecar_exists(2026, "C4400001001")
     assert "no race code found on the page" in caplog.text
     assert caplog.records[-1].levelname == "WARNING"
+
+
+# ---------------------------------------------------------------- national result pages
+
+class NationalSearchClient:
+    """Search page 1 lists three races (2025, 2026 already cached, 2026 new); page 2 is empty."""
+
+    def get(self, url: str) -> httpx.Response:
+        request = httpx.Request("GET", url)
+        if "page=1" in url:
+            html = (
+                "<div id='resultats'>"
+                "<a class='resultat' saison='2025' numero='C4950101001'></a>"
+                "<a class='resultat' saison='2026' numero='C4400001001'></a>"
+                "<a class='resultat' saison='2026' numero='C4950101002'></a></div>"
+            )
+            return httpx.Response(200, text=html, request=request)
+        return httpx.Response(200, text="<div id='resultats'></div>", request=request)
+
+
+def test_national_search_skips_former_seasons_and_pages_of_the_main_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(cache, "RESULTS_DIR", tmp_path / "results")
+    (tmp_path / "results" / "2026").mkdir(parents=True)
+    (tmp_path / "results" / "2026" / "C4400001001.meta.json").write_text("{}")
+    monkeypatch.setattr(races, "NATIONAL_RESULTS_DIR", tmp_path / "results_national")
+    pages = []
+    monkeypatch.setattr(
+        races, "extract_results_from_organization_page",
+        lambda client, season, code, results_dir: pages.append((season, code, results_dir)),
+    )
+    monkeypatch.setattr(
+        races, "try_get",
+        lambda client, url: try_get(client, url, throttle=NO_WAIT, failures=RequestFailures()),
+    )
+    races.extract_national_organization_pages(NationalSearchClient(), first_season=2026)
+    assert pages == [(2026, "C4950101002", tmp_path / "results_national")]
+
+
+def test_national_result_page_is_cached_apart(tmp_path, monkeypatch):
+    monkeypatch.setattr(cache, "RESULTS_DIR", tmp_path / "results")
+    national_dir = tmp_path / "results_national"
+    url = "https://competitions.ffc.fr/resultats/resultat/2026/C4950101002"
+    html = "<h1 class='titre'>Course</h1><div class='discipline'>Route</div>"
+    response = httpx.Response(200, text=html, request=httpx.Request("GET", url))
+    monkeypatch.setattr(races, "try_get", lambda client, url: response)
+    monkeypatch.setattr(races, "get_elements_from_results_page", lambda bs: {"race_code": "1.27.1"})
+    races.extract_results_from_organization_page(None, 2026, "C4950101002", results_dir=national_dir)
+    assert cache.results_sidecar_exists(2026, "C4950101002", national_dir)
+    assert cache.read_results_sidecar_data(2026, "C4950101002", national_dir)["kept"] is True
+    assert not cache.results_sidecar_exists(2026, "C4950101002")

@@ -46,7 +46,9 @@ flowchart LR
 
 1. **Extract** (`scripts/extract.py`) : télécharge les pages et les met en cache. Une page
    déjà en cache n'est jamais redemandée. Les requêtes sont espacées d'un délai minimal par
-   site, et une page en échec est réessayée à l'exécution suivante.
+   site, et une page en échec est réessayée à l'exécution suivante. Les pages de résultats
+   des autres régions (depuis la saison 2026) sont aussi téléchargées, dans un dossier à
+   part : elles servent uniquement à trouver le comité des licenciés individuels.
 2. **Transform** (`scripts/transform.py`) : analyse les pages en cache, identifie les clubs
    et les coureurs, corrige les erreurs connues des sources, calcule les affiliations et
    l'historique des catégories, puis écrit un fichier Parquet par table.
