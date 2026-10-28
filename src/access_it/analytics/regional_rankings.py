@@ -5,10 +5,9 @@ its departements, over a calendar year. Only the Pays de la Loire challenge is
 configured. Its rules:
 
 - a rider counts if, on the race date, his club belongs to the region (for an
-  individual licensee, the pseudo-club of his committee), or if he holds an
-  individual licence of unknown committee (INDIVIDUAL_CLUB_ID) and the race is
-  held in the region; other riders (other regions, foreign riders) are removed
-  and the riders behind them move up;
+  individual licensee, the pseudo-club of his committee); other riders (other
+  regions, foreign riders, individual licensees of unknown committee) are
+  removed and the riders behind them move up;
 - the place in the challenge is the place among the riders who count, all
   categories of the race together (no reranking by category); tied riders
   share the place and the next place is skipped (1, 2, 2, 4);
@@ -27,7 +26,6 @@ compute_regional_rankings (one call computes the four categories).
 import pandas as pd
 
 from access_it.etl.extract.clubs import individual_club_id_mask
-from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 
 PAYS_DE_LA_LOIRE = "PAYS DE LA LOIRE"
 
@@ -132,7 +130,7 @@ def compute_challenge_points(
 
     results = rankings[["race_id", "rider_id", "finish_rank"]].merge(region_races, on="race_id")
 
-    # Riders of the region on the race date, and individual licensees of unknown committee
+    # Riders of the region on the race date
     results = _add_value_on_race_date(results, affiliations, "club_id")
     region_clubs = clubs.loc[
         clubs["departemental_committee_id"].isin(
@@ -143,11 +141,7 @@ def compute_challenge_points(
         ),
         "club_id"
     ]
-    is_counted = (
-        results["club_id"].isin(region_clubs)
-        | (results["club_id"] == INDIVIDUAL_CLUB_ID)
-    )
-    results = results[is_counted].copy()
+    results = results[results["club_id"].isin(region_clubs)].copy()
 
     # Place in the challenge: tied riders share it, the next one is skipped
     results["place"] = (

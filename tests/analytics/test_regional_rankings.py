@@ -103,19 +103,19 @@ def test_rider_of_another_region_is_removed_and_next_riders_move_up():
     assert points_of(tables) == {"a": 30, "c": 26}
 
 
-def test_foreign_rider_is_removed_and_individual_licence_counts():
+def test_foreign_rider_and_individual_licensee_of_unknown_committee_are_removed():
     tables = single_race(
         ranks={"a": 1, "b": 2, "c": 3},
         clubs={"a": FOR, "b": IND, "c": PDL},
         categories={"a": 3, "b": 3, "c": 3},
     )
-    assert points_of(tables) == {"b": 30, "c": 26}
+    assert points_of(tables) == {"c": 30}
 
 
 def test_race_held_outside_the_region_is_ignored():
     tables = single_race(
         ranks={"a": 1, "b": 2},
-        clubs={"a": PDL, "b": IND},
+        clubs={"a": PDL, "b": IND_PDL},
         categories={"a": 3, "b": 3},
         departement_code="56",
     )
@@ -237,7 +237,7 @@ def test_club_shown_is_the_first_scoring_club_unless_individual():
         results=[("r1", "a", 1), ("r2", "a", 1), ("r3", "a", 1),
                  ("r1", "b", 2), ("r2", "b", 2), ("r3", "b", 2)],
         clubs={
-            "a": [("2026-01-01", IND), ("2026-04-01", PDL_2), ("2026-06-01", PDL)],
+            "a": [("2026-01-01", IND_PDL), ("2026-04-01", PDL_2), ("2026-06-01", PDL)],
             "b": [("2026-01-01", BZH), ("2026-04-01", PDL)],
         },
         categories={"a": [("2026-01-01", 3)], "b": [("2026-01-01", 3)]},
