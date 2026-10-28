@@ -22,11 +22,16 @@ DEPARTEMENTAL_COMMITTEES = pd.DataFrame({
     "departement_code": ["44", "56", "98", "99"],
 })
 CLUBS = pd.DataFrame({
-    "club_id": ["5244001", "5244002", "5385001", INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID],
-    "name": ["Club Nantes", "Club Heric", "Club Vannes", "Individuel", "Etranger"],
-    "departemental_committee_id": ["5244", "5244", "5385", "9898", "9999"],
+    "club_id": [
+        "5244001", "5244002", "5385001", INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID, "5244800", "5385800"
+    ],
+    "name": [
+        "Club Nantes", "Club Heric", "Club Vannes", "Individuel", "Etranger",
+        "Individuel 44", "Individuel 56"
+    ],
+    "departemental_committee_id": ["5244", "5244", "5385", "9898", "9999", "5244", "5385"],
 })
-PDL, PDL_2, BZH, IND, FOR = CLUBS["club_id"]
+PDL, PDL_2, BZH, IND, FOR, IND_PDL, IND_BZH = CLUBS["club_id"]
 
 
 def make_tables(races: list[tuple], results: list[tuple], clubs: dict, categories: dict) -> dict:
@@ -263,3 +268,23 @@ def test_unknown_or_unconfigured_region_raises():
 def test_unknown_category_raises():
     with pytest.raises(ValueError, match="Unknown category"):
         get_category_ranking(pd.DataFrame(columns=COLUMNS), "A5")
+
+
+def test_individual_licensee_counts_in_the_region_of_his_committee():
+    tables = single_race(
+        ranks={"a": 1, "b": 2, "c": 3},
+        clubs={"a": IND_BZH, "b": IND_PDL, "c": PDL},
+        categories={"a": 3, "b": 3, "c": 3},
+    )
+    assert points_of(tables) == {"b": 30, "c": 26}
+
+
+def test_club_shown_skips_the_pseudo_club_of_a_committee():
+    tables = make_tables(
+        races=[("r1", "2026-03-01", "44"), ("r2", "2026-05-01", "44")],
+        results=[("r1", "a", 1), ("r2", "a", 1)],
+        clubs={"a": [("2026-01-01", IND_PDL), ("2026-04-01", PDL_2)]},
+        categories={"a": [("2026-01-01", 3)]},
+    )
+    ranking = compute_regional_rankings(**tables, season=SEASON)
+    assert ranking["club"].tolist() == ["Club Heric"]

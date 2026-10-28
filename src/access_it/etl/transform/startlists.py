@@ -13,7 +13,8 @@ from access_it.common.access_categories import (
     has_access_subcategories, get_higher_access_subcategory
 )
 from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
-from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID, FOREIGN_CLUB_ID
+from access_it.etl.extract.clubs import individual_club_id_mask
+from access_it.etl.extract.constants import FOREIGN_CLUB_ID
 from access_it.etl.transform.clubs import ClubLookup, identify_clubs
 from access_it.etl.transform.parse import get_startlists_html_files, parse_startlists_from_organization_page
 from access_it.etl.transform.riders import (
@@ -541,7 +542,7 @@ def identify_riders_categories_on_startlist(
         kept_clubs = df0["regional_committee_id"].isin([br_id, pdl_id])
         df0 = df0[kept_clubs].drop(columns=["regional_committee_id"])
         df0 = df0[
-            (df0[club_id_col] != INDIVIDUAL_CLUB_ID)
+            ~individual_club_id_mask(df0[club_id_col])
             & (df0[club_id_col] != FOREIGN_CLUB_ID)
         ]
         cols = df0.columns.to_list()

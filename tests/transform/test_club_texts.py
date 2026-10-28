@@ -3,7 +3,9 @@
 import pandas as pd
 import pytest
 
-from access_it.etl.transform.clubs import ClubLookup, identify_club, parse_club_text
+from access_it.etl.extract.clubs import individual_club_id_mask, is_individual_club_id
+from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
+from access_it.etl.transform.clubs import ClubLookup, add_club, identify_club, parse_club_text
 
 
 @pytest.mark.parametrize(
@@ -62,3 +64,51 @@ def test_name_becomes_ambiguous_when_another_club_gets_it_as_alternative_name():
     clubs.loc[0, "alternative_names"] = "VC NANTAIS"
     lookup.sync(clubs, "4436087")
     assert identify_club(None, "VC NANTAIS", lookup) == (False, None, None)
+
+
+# ---------------------------------------------------------------- individual licensees of a committee
+
+COMMITTEES = pd.DataFrame({
+    "departemental_committee_id": ["5244", "6097"],
+    "name": ["LOIRE-ATLANTIQUE", "GUADELOUPE"],
+    "regional_committee_id": ["52", "60"],
+    "departement_code": ["44", "971"],
+})
+
+
+def test_individual_license_id_gives_the_pseudo_club_of_its_committee():
+    assert identify_club("5244800", "", ClubLookup(CLUBS)) == (True, "5244800", "")
+    assert identify_club(None, "Individuel", ClubLookup(CLUBS)) == (
+        False, INDIVIDUAL_CLUB_ID, "Individuel"
+    )
+
+
+def test_pseudo_club_of_a_committee_is_named_after_its_departement():
+    clubs = add_club(CLUBS, "5244800", "COMITE DEPARTEMENTAL", 2025, COMMITTEES)
+    clubs = add_club(clubs, "5244800", "", 2026, COMMITTEES)
+    clubs = add_club(clubs, "6098800", "", 2026, COMMITTEES)
+    row = clubs[clubs["club_id"] == "5244800"].iloc[0]
+    assert (row["name"], row["departemental_committee_id"]) == ("Individuel 44", "5244")
+    assert (row["min_year"], row["max_year"], row["alternative_names"]) == (2025, 2026, "")
+    assert clubs.loc[clubs["club_id"] == "6098800", "name"].iloc[0] == "Individuel 971"
+    assert identify_club("5244800", "", ClubLookup(clubs)) == (True, "5244800", "Individuel 44")
+
+
+@pytest.mark.parametrize(
+    "club_id, expected",
+    [
+        ("5244800", True), (INDIVIDUAL_CLUB_ID, True), ("5244001", False),
+        (None, False), (float("nan"), False),
+    ],
+)
+def test_is_individual_club_id(club_id, expected):
+    assert is_individual_club_id(club_id) is expected
+
+
+@pytest.mark.parametrize("dtype", ["object", "str", "string[pyarrow]", "large_string[pyarrow]"])
+def test_individual_club_id_mask_is_a_plain_boolean_series(dtype):
+    club_ids = pd.Series(["5244800", "5244001", None], index=[3, 5, 7], dtype=dtype)
+    mask = individual_club_id_mask(club_ids)
+    assert mask.dtype == bool
+    assert mask.tolist() == [True, False, False]
+    assert (~mask & (club_ids != "x").fillna(True).astype(bool)).tolist() == [False, True, True]

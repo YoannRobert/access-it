@@ -9,7 +9,7 @@ from typing import Literal
 
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.common.uci import is_valid_uci_id
-from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
+from access_it.etl.extract.clubs import is_individual_club_id
 from access_it.etl.transform.clubs import ClubLookup, parse_club_text, identify_club
 
 logger = logging.getLogger(__name__)
@@ -175,7 +175,7 @@ def add_riders_to_database(rider_x_race_data: pd.DataFrame) -> pd.DataFrame:
         uci_id = uci_id if isinstance(uci_id, str) else ""
         club_id = club_id if isinstance(club_id, str) else ""
         isin_red_list = (row.uci_id == RED_LIST)
-        isin_individual_license = (club_id == INDIVIDUAL_CLUB_ID)
+        isin_individual_license = is_individual_club_id(club_id)
         names = (last_name, first_name)
 
         if is_valid_uci_id(uci_id):
@@ -277,7 +277,7 @@ def assign_rider_ids(rider_x_race_data: pd.DataFrame, rider_db: pd.DataFrame) ->
             rider_id = None
         elif uci_id == RED_LIST:
             rider_id = red_list_by_names.get(names)
-        elif uci_id == "" or row.club_id == INDIVIDUAL_CLUB_ID:
+        elif uci_id == "" or is_individual_club_id(row.club_id):
             rider_id = other_by_names.get(names) or red_list_by_names.get(names)
         else:
             rider_id = None

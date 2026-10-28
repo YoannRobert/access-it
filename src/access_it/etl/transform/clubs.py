@@ -15,7 +15,7 @@ from access_it.common.seasons import FIRST_SEASON
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.cache import read_results_html_file
 from access_it.etl.extract.clubs import (
-    get_departemental_committee_id,
+    get_departemental_committee_id, get_individual_license_club_name,
     is_valid_french_club_id, is_individual_license,
     is_individual_club, is_foreign_license, is_foreign_club
 )
@@ -47,8 +47,11 @@ def add_club(
     An existing club gets the name read as an alternative name (when it
     differs from its name and alternative names, ignoring case and accents),
     and its year range is extended to the season. An unknown club is added
-    only if its ID is a valid French club ID; otherwise the table is
-    returned unchanged.
+    only if its ID is a valid French club ID, or the ID of the individual
+    licensees of a committee (ending with 800); otherwise the table is
+    returned unchanged. The pseudo-club of the individual licensees of a
+    committee is always named "Individuel <departement code>", whatever the
+    name read (no alternative name).
 
     Args:
         df_clubs: Club table (club_id, name, departemental_committee_id,
@@ -73,6 +76,8 @@ def add_club(
         return df
     if not is_valid_season(season):
         raise ValueError(f"Invalid season: {season}")
+    if is_individual_license(club_id):
+        club_name = get_individual_license_club_name(club_id, departemental_committees)
 
     if club_id in df["club_id"].values:
         if verbose:
@@ -111,7 +116,7 @@ def add_club(
             df.loc[mask_club, "alternative_names"] = ",".join(db_alt_names)
             if verbose:
                 logger.info(f"Club updated: {df.loc[mask_club, :]}")
-    elif is_valid_french_club_id(club_id):
+    elif is_valid_french_club_id(club_id) or is_individual_license(club_id):
         if verbose:
             logger.info(f">>>>>>> {club_id} is a valid French club ID")
         cd_id = get_departemental_committee_id(club_id, departemental_committees)
@@ -275,6 +280,9 @@ def identify_club(
     ) -> tuple[bool, str | None, str | None]:
     """Identify a club from its ID and/or name.
 
+    The ID of an individual license (ending with 800) gives the pseudo-club of
+    the individual licensees of its committee; the name "Individuel" without
+    this ID gives the pseudo-club of unknown committee (INDIVIDUAL_CLUB_ID).
     Without a valid club ID, an empty name or an ambiguous name (shared by
     several clubs) gives an unknown club (False, None, None): the club of the
     rider may then be completed from his other results (fill_missing_club_ids).
@@ -287,7 +295,10 @@ def identify_club(
         if position is not None:
             club_name = clubs.names[position]
             add_this_club = True
-        elif is_individual_license(club_id) or is_individual_club(club_name):
+        elif is_individual_license(club_id):
+            # Pseudo-club of the individual licensees of the committee (named by add_club)
+            add_this_club = True
+        elif is_individual_club(club_name):
             club_id = INDIVIDUAL_CLUB_ID
             club_name = INDIVIDUAL_NAME
         elif is_foreign_license(club_id) or is_foreign_club(club_name):

@@ -4,10 +4,11 @@ A regional committee awards points to its riders in the Access races held in
 its departements, over a calendar year. Only the Pays de la Loire challenge is
 configured. Its rules:
 
-- a rider counts if, on the race date, his club belongs to the region, or if
-  he holds an individual licence (club "Individuel") and the race is held in
-  the region; other riders (other regions, foreign riders) are removed and
-  the riders behind them move up;
+- a rider counts if, on the race date, his club belongs to the region (for an
+  individual licensee, the pseudo-club of his committee), or if he holds an
+  individual licence of unknown committee (INDIVIDUAL_CLUB_ID) and the race is
+  held in the region; other riders (other regions, foreign riders) are removed
+  and the riders behind them move up;
 - the place in the challenge is the place among the riders who count, all
   categories of the race together (no reranking by category); tied riders
   share the place and the next place is skipped (1, 2, 2, 4);
@@ -25,6 +26,7 @@ compute_regional_rankings (one call computes the four categories).
 
 import pandas as pd
 
+from access_it.etl.extract.clubs import individual_club_id_mask
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 
 PAYS_DE_LA_LOIRE = "PAYS DE LA LOIRE"
@@ -130,7 +132,7 @@ def compute_challenge_points(
 
     results = rankings[["race_id", "rider_id", "finish_rank"]].merge(region_races, on="race_id")
 
-    # Riders of the region on the race date, and riders with an individual licence
+    # Riders of the region on the race date, and individual licensees of unknown committee
     results = _add_value_on_race_date(results, affiliations, "club_id")
     region_clubs = clubs.loc[
         clubs["departemental_committee_id"].isin(
@@ -165,11 +167,11 @@ def compute_challenge_points(
 
 
 def _select_club(clubs_by_date: pd.Series) -> str:
-    """Club shown in the ranking: the first one of the year, unless it is "Individuel".
+    """Club shown in the ranking: the first one of the year, unless it is an individual licence.
 
     In that case, the first club that follows is shown, if any.
     """
-    regular_clubs = clubs_by_date[clubs_by_date != INDIVIDUAL_CLUB_ID]
+    regular_clubs = clubs_by_date[~individual_club_id_mask(clubs_by_date)]
     return regular_clubs.iloc[0] if not regular_clubs.empty else clubs_by_date.iloc[0]
 
 

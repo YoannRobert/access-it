@@ -341,6 +341,54 @@ def is_individual_license(club_id: str | None) -> bool:
     return club_id.endswith("800")
 
 
+def is_individual_club_id(club_id: str | None) -> bool:
+    """Whether the club ID is that of an individual licensee.
+
+    Either the pseudo-club of a committee (FFC ID ending with 800), or the
+    pseudo-club of the individual licensees of unknown committee
+    (INDIVIDUAL_CLUB_ID).
+    """
+    if not isinstance(club_id, str):
+        return False
+    return club_id == INDIVIDUAL_CLUB_ID or is_individual_license(club_id)
+
+
+def individual_club_id_mask(club_ids: pd.Series) -> pd.Series:
+    """Whether each club ID is that of an individual licensee (see is_individual_club_id).
+
+    The mask is a plain boolean series (NumPy dtype) with the index of
+    `club_ids`, whatever the dtype of the IDs (e.g. Arrow strings, which give
+    an Arrow or string result with Series.map in some pandas versions).
+    """
+    return pd.Series(
+        [is_individual_club_id(club_id) for club_id in club_ids], index=club_ids.index, dtype=bool
+    )
+
+
+def get_individual_license_club_name(
+        club_id: str,
+        departemental_committees: pd.DataFrame | list[dict]
+    ) -> str:
+    """Name of the pseudo-club of the individual licensees of a committee.
+
+    The name is "Individuel" followed by the departement code of the
+    committee (e.g. "Individuel 44" for 5244800).
+
+    Args:
+        club_id: FFC ID of an individual license (ending with 800).
+        departemental_committees: Departemental committees.
+
+    Raises:
+        ValueError: If the club ID is invalid or its committee unknown.
+    """
+    df = pd.DataFrame(departemental_committees)
+    committee_id = get_departemental_committee_id(club_id, df)
+    departement_code = df.loc[
+        df["departemental_committee_id"] == committee_id, "departement_code"
+    ].iloc[0]
+    return f"{INDIVIDUAL_NAME} {departement_code}"
+
+
 def is_individual_club(club_name: str | None) -> bool:
     """Whether the club name is that of individual licenses ('Individuel')."""
     if club_name is None:
