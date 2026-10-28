@@ -5,11 +5,13 @@ followed by 800) until 2025, but mostly "Individuel" alone since 2026, which
 gives the pseudo-club of unknown committee (INDIVIDUAL_CLUB_ID). For each
 rider and season with such results, the committee is found, in this order:
 
-1. observed: the committee of an individual license ID of the rider in the
+1. imposed: the committee of the departement given by a manual correction
+   (INDIVIDUAL_COMMITTEE_CORRECTIONS), checked outside the result pages;
+2. observed: the committee of an individual license ID of the rider in the
    season, in any region (the most frequent one, then the most recent one);
-2. observed: the same in the nearest season with such an ID (the previous
+3. observed: the same in the nearest season with such an ID (the previous
    season before the next one);
-3. deduced: the region where the rider raced most in the season, then, in this
+4. deduced: the region where the rider raced most in the season, then, in this
    region, the committee where he raced most; ties are broken by all his
    seasons, then by his most recent race of the season.
 
@@ -38,6 +40,23 @@ logger = logging.getLogger(__name__)
 
 INDIVIDUAL_LICENSE_SUFFIX = "800"
 
+# Committees of individual licensees checked outside the result pages, imposed
+# before any other rule: (rider ID, season, departement code)
+INDIVIDUAL_COMMITTEE_CORRECTIONS: list[tuple[str, int, str]] = [
+    ("02b45996a8def6b3", 2026, "35"),
+    ("c489c11e08c63539", 2026, "16"),
+    ("9d4acc5b43c37a62", 2026, "72"),
+    ("852440febc154132", 2026, "72"),
+    ("c219da496a6e2757", 2026, "35"),
+    ("20fb49c3990289f9", 2026, "56"),
+    ("bb63a6cad4c9a73a", 2026, "69"),
+    ("486f8cdd905750d6", 2026, "14"),
+    ("c6b517427910f533", 2026, "22"),
+    ("22e58a62c102fd2a", 2026, "50"),
+    ("1ba892d77239c15f", 2026, "14"),
+]
+
+IMPOSED_BY_A_CORRECTION = "imposed by a correction"
 OBSERVED_IN_SEASON = "observed in the season"
 OBSERVED_IN_NEAREST_SEASON = "observed in the nearest season"
 DEDUCED_FROM_RACES = "deduced from the places of the races"
@@ -219,7 +238,8 @@ def _by_place(season_rows: pd.DataFrame, all_rows: pd.DataFrame, column: str):
 def resolve_individual_committees(
         observations: pd.DataFrame,
         pending: set[tuple[str, int]],
-        region_by_committee: dict[str, str]
+        region_by_committee: dict[str, str],
+        imposed: dict[tuple[str, int], str] | None = None
     ) -> dict[tuple[str, int], tuple[str, str]]:
     """Find the committee of each (rider_id, season) of `pending` (see the module docstring).
 
@@ -227,13 +247,18 @@ def resolve_individual_committees(
         observations: Results of the individual licensees (see collect_individual_observations).
         pending: (rider_id, season) pairs whose committee is to be found.
         region_by_committee: Regional committee ID of each departemental committee.
+        imposed: Committee imposed by a correction for some (rider_id, season) pairs.
 
     Returns:
         (committee ID, step) of each pair found; pairs without any result are missing.
     """
     by_rider = {rider_id: rows for rider_id, rows in observations.groupby("rider_id")}
     found: dict[tuple[str, int], tuple[str, str]] = {}
+    imposed = imposed or {}
     for rider_id, season in sorted(pending):
+        if (rider_id, season) in imposed:
+            found[(rider_id, season)] = (imposed[(rider_id, season)], IMPOSED_BY_A_CORRECTION)
+            continue
         rows = by_rider.get(rider_id)
         if rows is None:
             continue
@@ -263,6 +288,35 @@ def resolve_individual_committees(
         )
         found[(rider_id, season)] = (committee, DEDUCED_FROM_RACES)
     return found
+
+
+def imposed_committees(
+        pending: set[tuple[str, int]],
+        departemental_committees: pd.DataFrame
+    ) -> dict[tuple[str, int], str]:
+    """Committees imposed by INDIVIDUAL_COMMITTEE_CORRECTIONS, for the pairs of `pending`.
+
+    A correction whose departement has no committee, or which matches no
+    (rider, season) of unknown committee, is logged (warning) and ignored.
+    """
+    committee_by_departement_code = dict(zip(
+        departemental_committees["departement_code"],
+        departemental_committees["departemental_committee_id"]
+    ))
+    imposed: dict[tuple[str, int], str] = {}
+    unused = []
+    for rider_id, season, departement_code in INDIVIDUAL_COMMITTEE_CORRECTIONS:
+        committee = committee_by_departement_code.get(departement_code)
+        if committee is None or (rider_id, season) not in pending:
+            unused.append(f"  {rider_id}, {season}, {departement_code}")
+            continue
+        imposed[(rider_id, season)] = committee
+    if unused:
+        logger.warning(
+            f"{len(unused)} committee correction(s) ignored (unknown departement, or no result "
+            f"of unknown committee for the rider and season):\n" + "\n".join(unused)
+        )
+    return imposed
 
 
 def assign_individual_committees(
@@ -299,7 +353,8 @@ def assign_individual_committees(
         departemental_committees["departemental_committee_id"],
         departemental_committees["regional_committee_id"]
     ))
-    found = resolve_individual_committees(observations, pending, region_by_committee)
+    imposed = imposed_committees(pending, departemental_committees)
+    found = resolve_individual_committees(observations, pending, region_by_committee, imposed)
 
     new_club_ids = []
     for rider_id, season, club_id, is_unknown in zip(
@@ -319,7 +374,10 @@ def assign_individual_committees(
     lines = [
         f"committee of {len(pending)} individual licensee(s) x season(s) of unknown committee:"
     ]
-    for step in (OBSERVED_IN_SEASON, OBSERVED_IN_NEAREST_SEASON, DEDUCED_FROM_RACES):
+    for step in (
+            IMPOSED_BY_A_CORRECTION, OBSERVED_IN_SEASON, OBSERVED_IN_NEAREST_SEASON,
+            DEDUCED_FROM_RACES
+    ):
         lines.append(f"  {step}: {steps[step]}")
     lines.append(f"  not found (left in {INDIVIDUAL_CLUB_ID}): {len(pending) - len(found)}")
     logger.info("\n".join(lines))

@@ -1,11 +1,16 @@
 """Unit tests of the committee of the individual licensees of unknown committee."""
 
+import logging
+import re
+
 import pandas as pd
 
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
+from access_it.etl.transform import individuals
 from access_it.etl.transform.individuals import (
-    DEDUCED_FROM_RACES, OBSERVED_IN_NEAREST_SEASON, OBSERVED_IN_SEASON,
-    assign_individual_committees, resolve_individual_committees
+    DEDUCED_FROM_RACES, IMPOSED_BY_A_CORRECTION, INDIVIDUAL_COMMITTEE_CORRECTIONS,
+    OBSERVED_IN_NEAREST_SEASON, OBSERVED_IN_SEASON, assign_individual_committees,
+    imposed_committees, resolve_individual_committees
 )
 
 REGION_BY_COMMITTEE = {"5244": "52", "5285": "52", "4356": "43", "4950": "49"}
@@ -142,3 +147,32 @@ def test_results_of_unknown_committee_get_the_pseudo_club_of_the_committee_found
         ["4950800", "5285800"], ["name", "departemental_committee_id"]
     ]
     assert added.values.tolist() == [["Individuel 50", "4950"], ["Individuel 85", "5285"]]
+
+
+# ---------------------------------------------------------------- committee corrections
+
+def test_committee_corrections_are_well_formed_and_unique():
+    keys = [(rider_id, season) for rider_id, season, _ in INDIVIDUAL_COMMITTEE_CORRECTIONS]
+    assert len(keys) == len(set(keys))
+    for rider_id, season, departement_code in INDIVIDUAL_COMMITTEE_CORRECTIONS:
+        assert re.fullmatch(r"[0-9a-f]{16}", rider_id)
+        assert isinstance(season, int)
+        assert re.fullmatch(r"\d[\dAB]\d?", departement_code)
+
+
+def test_imposed_committee_comes_before_the_observed_one():
+    found = resolve_individual_committees(
+        observations((2026, "2026-05-01", "5244", "5285")),
+        {("r1", 2026)}, REGION_BY_COMMITTEE, imposed={("r1", 2026): "4356"}
+    )
+    assert found == {("r1", 2026): ("4356", IMPOSED_BY_A_CORRECTION)}
+
+
+def test_unusable_committee_corrections_are_ignored_with_a_warning(monkeypatch, caplog):
+    caplog.set_level(logging.WARNING)
+    monkeypatch.setattr(individuals, "INDIVIDUAL_COMMITTEE_CORRECTIONS", [
+        ("r1", 2026, "50"), ("r2", 2026, "99"), ("r3", 2025, "44"),
+    ])
+    imposed = imposed_committees({("r1", 2026), ("r2", 2026)}, COMMITTEES)
+    assert imposed == {("r1", 2026): "4950"}
+    assert "2 committee correction(s) ignored" in caplog.text
