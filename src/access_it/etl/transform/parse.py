@@ -15,9 +15,9 @@ from access_it.common.html import TRANSLATIONS, get_elements_from_results_page, 
 from access_it.etl.extract.cache import RESULTS_DIR, STARTLISTS_DIR
 
 
-def get_results_html_files() -> list[Path]:
-    """HTML files of the kept result pages of the cache, sorted."""
-    return sorted(RESULTS_DIR.rglob("*.html"))
+def get_results_html_files(results_dir: Path | None = None) -> list[Path]:
+    """HTML files of the kept result pages of the cache, sorted (RESULTS_DIR by default)."""
+    return sorted((results_dir or RESULTS_DIR).rglob("*.html"))
 
 
 def parse_clubs_in_organisation_page(html: str) -> list[str]:
@@ -43,7 +43,8 @@ def parse_results_from_organization_page(html: str) -> dict[str, Any]:
     """Parse a result page: general information and rankings.
 
     Women's rankings (name starting with "femme" or "dame") are left out when
-    the page holds several rankings.
+    the page holds several rankings. Rows without a numeric rank (e.g. "DNS",
+    "DNF") are left out: these riders are not ranked.
 
     Args:
         html: HTML of the result page.
@@ -85,9 +86,11 @@ def parse_results_from_organization_page(html: str) -> dict[str, Any]:
             continue
         try:
             cols = ["RANG", "NOM", "PRENOM", "UCIID", "CLUB"]
+            # Rows without a numeric rank (e.g. 'DNS', 'DNF': rider not ranked) are left out
             ranking_data = [
                 {TRANSLATIONS[k]: int(row[k]) if k == "RANG" else row[k] for k in cols}
                 for row in ranking["resultats"]
+                if str(row["RANG"]).strip().isdigit()
             ]
             data["rankings"][ranking_id] = {"name": ranking_name, "data": ranking_data}
         except KeyError:

@@ -1,9 +1,12 @@
-"""Unit tests of the parsing of the startlist pages."""
+"""Unit tests of the parsing of the result and startlist pages."""
+
+import json
 
 import pytest
 
 from access_it.etl.transform.parse import (
-    correct_startlist_date, parse_startlists_from_organization_page
+    correct_startlist_date, parse_results_from_organization_page,
+    parse_startlists_from_organization_page
 )
 
 
@@ -67,3 +70,16 @@ def test_title_without_day_uses_the_publication_date():
     page = startlist_page("Adainville mai 2026", "26/05/2026")
     data = parse_startlists_from_organization_page(page)
     assert data["date"] == "2026-05-26"
+
+
+def test_rows_without_numeric_rank_are_left_out():
+    rows = [
+        {"RANG": 1, "NOM": "A", "PRENOM": "a", "UCIID": "", "CLUB": "X"},
+        {"RANG": "2", "NOM": "B", "PRENOM": "b", "UCIID": "", "CLUB": "X"},
+        {"RANG": "DNS", "NOM": "C", "PRENOM": "c", "UCIID": "", "CLUB": "X"},
+        {"RANG": "DNF", "NOM": "D", "PRENOM": "d", "UCIID": "", "CLUB": "X"},
+    ]
+    resultats = json.dumps({"grilles": [{"uid": "g1", "resultats": rows}]})
+    html = f"<a grille='g1'>Access</a><script>var resultatsJson = {resultats};</script>"
+    data = parse_results_from_organization_page(html)
+    assert [row["finish_rank"] for row in data["rankings"]["g1"]["data"]] == [1, 2]

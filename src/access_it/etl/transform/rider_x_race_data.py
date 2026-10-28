@@ -32,6 +32,14 @@ INDIVIDUAL_LABEL_CORRECTIONS: list[tuple] = [
     ("7c605505e10d81a6", 49)
 ]
 
+# Results whose club is wrong on the result pages (e.g. a rider still shown as
+# an individual licensee after joining a club): (race ID, finish rank, correct
+# club text, read as the club texts of the result pages)
+CLUB_CORRECTIONS: list[tuple] = [
+    ("87864c14f8dd5055", 35, "4335104 - VCS LOUVIGNEEN"),
+    ("1c7e41df8bdd9475", 12, "4335104 - VCS LOUVIGNEEN"),
+]
+
 # Results of foreign riders whose club is missing on the result pages:
 # (race ID, finish rank)
 FOREIGN_LABEL_CORRECTIONS: list[tuple] = [
@@ -256,6 +264,23 @@ def add_missing_individual_labels(data: list[dict]) -> list[dict]:
     return apply_corrections_for_missing_club_labels(
         data, INDIVIDUAL_LABEL_CORRECTIONS, INDIVIDUAL_NAME
     )
+
+
+def correct_wrong_clubs(data: list[dict]) -> list[dict]:
+    """Replace the club of the results whose club is wrong on the result pages.
+
+    Unlike the label corrections, which only fill a missing club, the club is
+    replaced whatever its value. To add a correction, append (race ID, finish
+    rank, correct club text) to CLUB_CORRECTIONS.
+    """
+    correct_club_by_result = {
+        (race_id, finish_rank): club for race_id, finish_rank, club in CLUB_CORRECTIONS
+    }
+    for d in data:
+        club = correct_club_by_result.get((d["race_id"], d["finish_rank"]))
+        if club is not None:
+            d["club"] = club
+    return data
 
 
 def add_missing_foreign_labels(data: list[dict]) -> list[dict]:

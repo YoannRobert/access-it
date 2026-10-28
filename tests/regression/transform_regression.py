@@ -40,7 +40,7 @@ FROZEN_INPUTS_DIR = REGRESSION_DIR / "inputs"
 BASELINE_DIR = REGRESSION_DIR / "baseline"
 
 # Raw cache directories read by the transform step
-RAW_DIRS = ["results", "startlists"]
+RAW_DIRS = ["results", "results_national", "startlists"]
 
 # Parquet files produced by the extract step and read by the transform step.
 # Note: clubs.parquet is both read and overwritten by the transform step.

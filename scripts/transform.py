@@ -13,7 +13,8 @@ from access_it.common.log import setup_logging
 from access_it.etl.extract.cache import (
     RACES_PARQUET_FILE, RIDERS_PARQUET_FILE, RIDER_CATEGORIES_PARQUET_FILE,
     CLUBS_PARQUET_FILE, AFFILIATIONS_PARQUET_FILE, RANKINGS_PARQUET_FILE,
-    DEPARTEMENTS_PARQUET_FILE, DEPCOM_PARQUET_FILE, REGCOM_PARQUET_FILE
+    DEPARTEMENTS_PARQUET_FILE, DEPCOM_PARQUET_FILE, REGCOM_PARQUET_FILE,
+    NATIONAL_RESULTS_DIR
 )
 from access_it.etl.transform.clubs import add_legacy_clubs
 from access_it.etl.transform.riders import (
@@ -22,13 +23,14 @@ from access_it.etl.transform.riders import (
 )
 from access_it.etl.transform.rider_x_race_data import (
     fill_missing_club_and_uci_ids, fill_missing_uci_ids_deep_mode,
-    add_missing_individual_labels, add_missing_foreign_labels,
+    add_missing_individual_labels, add_missing_foreign_labels, correct_wrong_clubs,
     correct_wrong_uci_ids, create_ranking_table, correct_swapped_names
 )
 from access_it.etl.transform.clubs import add_clubs_found_in_race_html_files
 from access_it.etl.transform.races import get_results_data, create_race_table
 from access_it.etl.transform.startlists import identify_riders_categories_on_startlists
 from access_it.etl.transform.categories import create_category_table
+from access_it.etl.transform.individuals import assign_individual_committees
 
 
 def transform():
@@ -62,6 +64,7 @@ def transform():
     rider_x_race_data = correct_swapped_names(rider_x_race_data)
     rider_x_race_data = add_missing_individual_labels(rider_x_race_data)
     rider_x_race_data = add_missing_foreign_labels(rider_x_race_data)
+    rider_x_race_data = correct_wrong_clubs(rider_x_race_data)
     # ---- identifying the club of the riders
     rider_x_race_data = identify_club_of_riders(rider_x_race_data, clubs)
     # ---- filling missing data
@@ -72,6 +75,18 @@ def transform():
     # Creating rider database
     rider_db = add_riders_to_database(rider_x_race_data=rider_x_race_data)
     rider_x_race_data = assign_rider_ids(rider_x_race_data, rider_db)
+
+    # Finding the committee of the individual licensees of unknown committee
+    # (the result pages of the other regions are only read here)
+    national_races_data = get_results_data(results_dir=NATIONAL_RESULTS_DIR)
+    rider_x_race_data, clubs = assign_individual_committees(
+        rider_x_race_data=rider_x_race_data,
+        races=races,
+        national_races_data=national_races_data,
+        clubs=clubs,
+        departements=departements,
+        departemental_committees=departemental_committees
+    )
 
     # Creating ranking database
     rankings = create_ranking_table(rider_x_race_data)
