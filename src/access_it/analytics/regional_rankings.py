@@ -25,7 +25,10 @@ compute_regional_rankings (one call computes the four categories).
 
 import pandas as pd
 
-from access_it.etl.extract.clubs import individual_club_id_mask
+from access_it.analytics.ranking_tools import (
+    CATEGORIES, add_category_on_race_date, add_value_on_race_date, compute_places,
+    get_regional_committee_id, rank_scoring_riders, scale_points, select_category, to_datetime
+)
 
 PAYS_DE_LA_LOIRE = "PAYS DE LA LOIRE"
 
@@ -34,14 +37,12 @@ POINTS_SCALES = {
     PAYS_DE_LA_LOIRE: (30, 26, 24, 22, 20) + tuple(range(15, 0, -1)),
 }
 
-CATEGORIES = ("A1", "A2", "A3", "A4")
-
 COLUMNS = ["category", "rank", "points", "last_name", "first_name", "club", "nb_scoring_races"]
 
-
-def _to_datetime(s: pd.Series) -> pd.Series:
-    """Dates as datetime64[ns], whatever their input type (string, date, timestamp)."""
-    return pd.to_datetime(s).astype("datetime64[ns]")
+__all__ = [
+    "CATEGORIES", "COLUMNS", "PAYS_DE_LA_LOIRE", "POINTS_SCALES", "compute_challenge_points",
+    "compute_regional_rankings", "get_category_ranking"
+]
 
 
 def _get_region_id(regional_committees: pd.DataFrame, region: str) -> str:
@@ -50,38 +51,10 @@ def _get_region_id(regional_committees: pd.DataFrame, region: str) -> str:
     Raises:
         ValueError: If the region is unknown or has no configured points scale.
     """
-    is_region = regional_committees["name"] == region
-    if not is_region.any():
-        raise ValueError(f"Unknown region: {region!r}")
+    region_id = get_regional_committee_id(regional_committees, region)
     if region not in POINTS_SCALES:
         raise ValueError(f"No regional ranking configured for the region {region!r}")
-    return regional_committees.loc[is_region, "regional_committee_id"].iloc[0]
-
-
-def _add_value_on_race_date(
-        results: pd.DataFrame,
-        history: pd.DataFrame,
-        column: str
-    ) -> pd.DataFrame:
-    """Add to each result the value of `column` of the period of `history` covering the race date.
-
-    History periods (rider_id, start_date, column) start at start_date and
-    end the day before the next start_date of the same rider. The value is
-    missing if the race is before the first period of the rider.
-    """
-    history = (
-        history[["rider_id", "start_date", column]]
-        .assign(start_date=lambda df: _to_datetime(df["start_date"]))
-        .sort_values("start_date")
-    )
-    return pd.merge_asof(
-        results.sort_values("race_date"),
-        history,
-        left_on="race_date",
-        right_on="start_date",
-        by="rider_id",
-        direction="backward"
-    ).drop(columns="start_date")
+    return region_id
 
 
 def compute_challenge_points(
@@ -117,7 +90,6 @@ def compute_challenge_points(
         ValueError: If the region is unknown or has no configured points scale.
     """
     region_id = _get_region_id(regional_committees, region)
-    scale = POINTS_SCALES[region]
 
     # Races of the season held in the departements of the region
     region_departements = departemental_committees.loc[
@@ -126,12 +98,12 @@ def compute_challenge_points(
     region_races = races.loc[
         (races["season"] == season) & races["departement_code"].isin(region_departements),
         ["race_id", "race_date"]
-    ].assign(race_date=lambda df: _to_datetime(df["race_date"]))
+    ].assign(race_date=lambda df: to_datetime(df["race_date"]))
 
     results = rankings[["race_id", "rider_id", "finish_rank"]].merge(region_races, on="race_id")
 
     # Riders of the region on the race date
-    results = _add_value_on_race_date(results, affiliations, "club_id")
+    results = add_value_on_race_date(results, affiliations, "club_id")
     region_clubs = clubs.loc[
         clubs["departemental_committee_id"].isin(
             departemental_committees.loc[
@@ -143,30 +115,13 @@ def compute_challenge_points(
     ]
     results = results[results["club_id"].isin(region_clubs)].copy()
 
-    # Place in the challenge: tied riders share it, the next one is skipped
-    results["place"] = (
-        results.groupby("race_id")["finish_rank"].rank(method="min").astype(int)
-    )
-
-    # Category on the race date; unknown category: place kept, no points
-    results = _add_value_on_race_date(results, rider_categories, "rider_category")
-    results["category"] = results["rider_category"].map(
-        lambda c: None if pd.isna(c) else f"A{int(c)}"
-    )
-    points = results["place"].map(lambda p: scale[p - 1] if p <= len(scale) else 0)
-    results["points"] = points.where(results["category"].notna(), 0)
+    # Place in the challenge; category on the race date; unknown category: place kept, no points
+    results["place"] = compute_places(results)
+    results = add_category_on_race_date(results, rider_categories)
+    results["points"] = scale_points(results, POINTS_SCALES[region])
 
     columns = ["race_id", "race_date", "rider_id", "club_id", "place", "category", "points"]
     return results[columns].sort_values(["race_date", "race_id", "place"]).reset_index(drop=True)
-
-
-def _select_club(clubs_by_date: pd.Series) -> str:
-    """Club shown in the ranking: the first one of the year, unless it is an individual licence.
-
-    In that case, the first club that follows is shown, if any.
-    """
-    regular_clubs = clubs_by_date[~individual_club_id_mask(clubs_by_date)]
-    return regular_clubs.iloc[0] if not regular_clubs.empty else clubs_by_date.iloc[0]
 
 
 def compute_regional_rankings(
@@ -218,33 +173,8 @@ def compute_regional_rankings(
     scoring = points[points["points"] > 0]
     if scoring.empty:
         return pd.DataFrame(columns=COLUMNS)
-
-    keys = ["category", "rider_id"]
-    max_place = len(POINTS_SCALES[region])
-    place_columns = [f"nb_places_{p}" for p in range(1, max_place + 1)]
-    place_counts = (
-        pd.crosstab([scoring["category"], scoring["rider_id"]], scoring["place"])
-        .reindex(columns=range(1, max_place + 1), fill_value=0)
-        .set_axis(place_columns, axis=1)
-    )
-    totals = scoring.groupby(keys).agg(
-        points=("points", "sum"),
-        nb_scoring_races=("race_id", "nunique"),
-        club_id=("club_id", _select_club)  # scoring is sorted by date
-    )
-    ranking = (
-        totals
-        .join(place_counts)
-        .reset_index()
-        .merge(riders[["rider_id", "last_name", "first_name"]], on="rider_id", how="left")
-        .merge(clubs[["club_id", "name"]].rename(columns={"name": "club"}), on="club_id", how="left")
-        .sort_values(
-            ["category", "points", *place_columns, "last_name", "first_name"],
-            ascending=[True, False, *[False] * max_place, True, True]
-        )
-    )
-    ranking["rank"] = ranking.groupby("category").cumcount() + 1
-    return ranking[COLUMNS].reset_index(drop=True)
+    ranking = rank_scoring_riders(scoring, riders, clubs, max_place=len(POINTS_SCALES[region]))
+    return ranking[COLUMNS]
 
 
 def get_category_ranking(regional_rankings: pd.DataFrame, category: str) -> pd.DataFrame:
@@ -260,10 +190,4 @@ def get_category_ranking(regional_rankings: pd.DataFrame, category: str) -> pd.D
     Raises:
         ValueError: If the category is not one of "A1" to "A4".
     """
-    if category not in CATEGORIES:
-        raise ValueError(f"Unknown category: {category!r} (expected one of {CATEGORIES})")
-    return (
-        regional_rankings[regional_rankings["category"] == category]
-        .drop(columns="category")
-        .reset_index(drop=True)
-    )
+    return select_category(regional_rankings, category)
