@@ -129,6 +129,7 @@ Toutes les commandes se lancent depuis la racine du dépôt.
 | `python scripts/transform.py` | construction des tables (fichiers Parquet) |
 | `python scripts/load.py` | contrôles, puis écriture dans la base |
 | `python scripts/export_database_to_s3_bucket.py` | snapshot de la base sur S3 (10 conservés) |
+| `python scripts/restore_database_from_s3_bucket.py` | restauration de la base depuis un snapshot S3 (`--list`, `--key`, `--yes`) |
 | `python scripts/check_startlist_matches.py` | contrôle des identifications de secours des listes d'engagés (lecture seule) |
 | `python scripts/prune_stale_rows.py` | simulation du nettoyage des coureurs obsolètes ; `--apply` pour supprimer |
 | `python -m access_it.etl.load.schema {create,drop,reset}` | création, suppression ou réinitialisation des tables |
