@@ -126,35 +126,44 @@ def _compute_access_categories_from_name(name: str, verbose: bool = False) -> di
     return categories
 
 
-# Words of a women-only ranking or startlist, in normalized names
+# Women's words, in normalized names
 WOMEN_PATTERN = re.compile(r"\b(femmes?|dames?|feminin(?:e|es|s)?|filles?|cadettes?|juniores?)\b")
 
 
 def is_women_only_name(name: str) -> bool:
     """Whether a ranking or startlist name designates women only.
 
-    The name is normalized (case, accents, any character other than a letter
-    or a figure replaced by a space). The text after "sauf" (riders excluded)
-    and the place names "Notre-Dame" are ignored, then a women's word is
-    searched anywhere in the name.
+    The name is normalized (case, accents, "+", "," and "&" read as "et", any
+    other character than a letter or a figure replaced by a space). The text
+    after "sauf" (riders excluded) and the place names "Notre-Dame" are
+    ignored. A women's word next to "et" belongs to an enumeration of several
+    groups of riders (mixed race) and does not count.
 
     Args:
         name: Ranking name or startlist name.
 
     Returns:
-        True if a women's word is found.
+        True if a women's word is found outside an enumeration.
 
     Examples:
         >>> is_women_only_name("C4356009100 : BIGNAN - ACCESS Dames")
         True
+        >>> is_women_only_name("ACCESS 3.4 ET FEMMES")
+        False
         >>> is_women_only_name("POMMERIEUX - ACCESS 3/4 SAUF FEMMES")
         False
     """
-    n = re.sub(r"[^a-z0-9]", " ", normalize_string_and_fold_case(name))
-    n = " ".join(n.split())
+    n = re.sub(r"[+,&]", " et ", normalize_string_and_fold_case(name))
+    n = " ".join(re.sub(r"[^a-z0-9]", " ", n).split())
     n = re.split(r"\bsauf\b", n, maxsplit=1)[0]
-    n = re.sub(r"\bnotre dame\b", "", n)
-    return WOMEN_PATTERN.search(n) is not None
+    words = re.sub(r"\bnotre dame\b", " ", n).split()
+    for i, word in enumerate(words):
+        if WOMEN_PATTERN.fullmatch(word) is None:
+            continue
+        neighbors = words[max(i - 1, 0): i] + words[i + 1: i + 2]
+        if "et" not in neighbors:
+            return True
+    return False
 
 
 def count_nb_access_subcategories_from_name(name: str) -> int:

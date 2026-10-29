@@ -105,7 +105,9 @@ def test_women_ranking_alone_on_its_page_is_left_out():
     assert data["rankings"] == {}
 
 
-def test_rankings_excluding_women_are_kept():
-    page = results_page(["ACCESS 3/4 SAUF FEMMES", "NOTRE DAME DE MONTS (A1-A2)"])
+def test_rankings_excluding_women_or_mixed_are_kept():
+    page = results_page(
+        ["ACCESS 3/4 SAUF FEMMES", "NOTRE DAME DE MONTS (A1-A2)", "ACCESS 1-2 ET FEMMES"]
+    )
     data = parse_results_from_organization_page(page)
-    assert list(data["rankings"]) == ["g0", "g1"]
+    assert list(data["rankings"]) == ["g0", "g1", "g2"]

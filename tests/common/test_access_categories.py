@@ -89,6 +89,18 @@ def test_verbose_logs_each_normalization_step(caplog):
         ("NOTRE DAME DE MONTS (A1-A2)", False),
         ("Notre-Dame-de-Riez - Access 3-4", False),
         ("NOTRE DAME DE MONTS - Dames", True),
+        # Enumeration of several groups of riders (mixed race): not women only
+        ("ACCESS 3.4 ET FEMMES", False),
+        ("A3-A4 ET FEMMES 93 ENGAGES", False),
+        ("OPEN 3 , FEMMES ET ACCESS 1.2", False),
+        ("U17 G-F +FEMMES 68 ENGAGES", False),
+        ("LES 193 ENGAGES OPEN-ACCESS-ET FEMMES", False),
+        ("ACCESS 4 ET FEMMES OPEN", False),
+        ("Access 3-4 H + Femmes 17 ans et +", False),
+        ("Access 1-2 & Dames", False),
+        # "et" not next to the women's word
+        ("ACCESS FEMMES", True),
+        ("U19 FEMMES", True),
         # No women's word
         ("Classement général individuel (épreuve de 1 jour)", False),
         ("ACCESS 1-2-3-4 H/F", False),
