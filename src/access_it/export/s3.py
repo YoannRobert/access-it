@@ -125,6 +125,48 @@ def delete_old_snapshots(
     return keys_to_delete
 
 
+def snapshot_key_from_name(name: str) -> str:
+    """Snapshot key from a key or a file name, e.g. 'snapshot_20260926T124100Z.zip'.
+
+    Raises:
+        ValueError: If the name does not match the snapshot pattern.
+    """
+    key = name if name.startswith(f"{SNAPSHOT_PREFIX}/") else f"{SNAPSHOT_PREFIX}/{name}"
+    if parse_snapshot_timestamp(key) is None:
+        raise ValueError(
+            f"Invalid snapshot name '{name}' (expected e.g. '{Path(build_snapshot_key()).name}')"
+        )
+    return key
+
+
+def download_snapshot(
+        bucket: str,
+        key: str,
+        dest_dir: Path,
+        client: S3Client | None = None
+    ) -> Path:
+    """Download a snapshot into `dest_dir` and return the local file path.
+
+    Args:
+        bucket: Name of the bucket.
+        key: Snapshot key, or file name (see snapshot_key_from_name).
+        dest_dir: Local directory, created if missing.
+        client: S3 client (created from the settings if None).
+
+    Raises:
+        ValueError: If the name does not match the snapshot pattern.
+        FileNotFoundError: If the bucket holds no snapshot with this key.
+    """
+    client = client or get_s3_client()
+    key = snapshot_key_from_name(key)
+    if key not in list_snapshot_keys(bucket, client=client):
+        raise FileNotFoundError(f"Snapshot not found: s3://{bucket}/{key}")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    local_path = dest_dir / Path(key).name
+    client.download_file(Bucket=bucket, Key=key, Filename=str(local_path))
+    return local_path
+
+
 def download_latest_snapshot(
         bucket: str,
         dest_dir: Path,
@@ -139,9 +181,4 @@ def download_latest_snapshot(
     keys = list_snapshot_keys(bucket, client=client)
     if not keys:
         raise FileNotFoundError(f"No snapshot found in s3://{bucket}/{SNAPSHOT_PREFIX}/")
-
-    latest_key = keys[0]
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    local_path = dest_dir / Path(latest_key).name
-    client.download_file(Bucket=bucket, Key=latest_key, Filename=str(local_path))
-    return local_path
+    return download_snapshot(bucket, keys[0], dest_dir, client=client)
