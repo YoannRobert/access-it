@@ -83,3 +83,29 @@ def test_rows_without_numeric_rank_are_left_out():
     html = f"<a grille='g1'>Access</a><script>var resultatsJson = {resultats};</script>"
     data = parse_results_from_organization_page(html)
     assert [row["finish_rank"] for row in data["rankings"]["g1"]["data"]] == [1, 2]
+
+
+def results_page(names: list[str]) -> str:
+    """Minimal result page: one ranking per name, with one ranked rider each."""
+    row = {"RANG": 1, "NOM": "A", "PRENOM": "a", "UCIID": "", "CLUB": "X"}
+    grids = [{"uid": f"g{i}", "resultats": [row]} for i in range(len(names))]
+    links = "".join(f"<a grille='g{i}'>{name}</a>" for i, name in enumerate(names))
+    resultats = json.dumps({"grilles": grids})
+    return f"{links}<script>var resultatsJson = {resultats};</script>"
+
+
+def test_women_rankings_are_left_out_wherever_the_word_is():
+    page = results_page(["Access 1-2", "Access 3-4", "C4356009100 : BIGNAN - ACCESS DAMES"])
+    data = parse_results_from_organization_page(page)
+    assert list(data["rankings"]) == ["g0", "g1"]
+
+
+def test_women_ranking_alone_on_its_page_is_left_out():
+    data = parse_results_from_organization_page(results_page(["Dames"]))
+    assert data["rankings"] == {}
+
+
+def test_rankings_excluding_women_are_kept():
+    page = results_page(["ACCESS 3/4 SAUF FEMMES", "NOTRE DAME DE MONTS (A1-A2)"])
+    data = parse_results_from_organization_page(page)
+    assert list(data["rankings"]) == ["g0", "g1"]

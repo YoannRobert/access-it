@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 from pathlib import Path
 from typing import Any
+from access_it.common.access_categories import is_women_only_name
 from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
 from access_it.common.date import convert_date, MONTH_CONVERT
 from access_it.common.html import TRANSLATIONS, get_elements_from_results_page, get_text_safe
@@ -42,8 +43,8 @@ def parse_clubs_in_organisation_page(html: str) -> list[str]:
 def parse_results_from_organization_page(html: str) -> dict[str, Any]:
     """Parse a result page: general information and rankings.
 
-    Women's rankings (name starting with "femme" or "dame") are left out when
-    the page holds several rankings. Rows without a numeric rank (e.g. "DNS",
+    Women's rankings (see is_women_only_name) are left out, even when alone
+    on the page. Rows without a numeric rank (e.g. "DNS",
     "DNF") are left out: these riders are not ranked.
 
     Args:
@@ -78,11 +79,7 @@ def parse_results_from_organization_page(html: str) -> dict[str, Any]:
         if not isinstance(ranking_name, Tag):
             continue
         ranking_name = ranking_name.get_text(strip=True)
-        normalized_ranking_name = normalize_string_and_fold_case(ranking_name).strip()
-        if (
-            len(rankings) > 1
-            and any([normalized_ranking_name.startswith(n) for n in ["femme", "dame"]])
-        ):
+        if is_women_only_name(ranking_name):
             continue
         try:
             cols = ["RANG", "NOM", "PRENOM", "UCIID", "CLUB"]

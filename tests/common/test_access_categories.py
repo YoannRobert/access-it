@@ -6,7 +6,7 @@ import pytest
 
 from access_it.common.access_categories import (
     count_nb_access_subcategories_from_name, find_access_categories_from_name,
-    get_higher_access_subcategory, has_access_subcategories
+    get_higher_access_subcategory, has_access_subcategories, is_women_only_name
 )
 
 
@@ -67,3 +67,34 @@ def test_verbose_logs_each_normalization_step(caplog):
     messages = [record.getMessage() for record in caplog.records]
     assert messages[0] == "name=Access 1-2"
     assert messages[-1] == "n=a1a2"
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        # Women's words, anywhere in the name (names of real rankings)
+        ("C4356009100 : BIGNAN - ACCESS Dames", True),
+        ("feminines", True),
+        ("FEMMES", True),
+        ("Femmes sur épreuve Access 1-2-3-4", True),
+        ("Femmes 17 ans et +", True),
+        ("Access 3-4 Féminine", True),
+        ("Cadettes", True),
+        ("Juniores", True),
+        ("Filles U17", True),
+        # Text after "sauf" is ignored (riders excluded)
+        ("POMMERIEUX - ACCESS 3/4 SAUF FEMMES", False),
+        ("ACCESS 1-2 sauf dames", False),
+        # Place names "Notre-Dame" are ignored
+        ("NOTRE DAME DE MONTS (A1-A2)", False),
+        ("Notre-Dame-de-Riez - Access 3-4", False),
+        ("NOTRE DAME DE MONTS - Dames", True),
+        # No women's word
+        ("Classement général individuel (épreuve de 1 jour)", False),
+        ("ACCESS 1-2-3-4 H/F", False),
+        ("Access 3-4", False),
+        ("F", False),
+    ],
+)
+def test_is_women_only_name(name, expected):
+    assert is_women_only_name(name) is expected

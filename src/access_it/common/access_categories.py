@@ -126,6 +126,37 @@ def _compute_access_categories_from_name(name: str, verbose: bool = False) -> di
     return categories
 
 
+# Words of a women-only ranking or startlist, in normalized names
+WOMEN_PATTERN = re.compile(r"\b(femmes?|dames?|feminin(?:e|es|s)?|filles?|cadettes?|juniores?)\b")
+
+
+def is_women_only_name(name: str) -> bool:
+    """Whether a ranking or startlist name designates women only.
+
+    The name is normalized (case, accents, any character other than a letter
+    or a figure replaced by a space). The text after "sauf" (riders excluded)
+    and the place names "Notre-Dame" are ignored, then a women's word is
+    searched anywhere in the name.
+
+    Args:
+        name: Ranking name or startlist name.
+
+    Returns:
+        True if a women's word is found.
+
+    Examples:
+        >>> is_women_only_name("C4356009100 : BIGNAN - ACCESS Dames")
+        True
+        >>> is_women_only_name("POMMERIEUX - ACCESS 3/4 SAUF FEMMES")
+        False
+    """
+    n = re.sub(r"[^a-z0-9]", " ", normalize_string_and_fold_case(name))
+    n = " ".join(n.split())
+    n = re.split(r"\bsauf\b", n, maxsplit=1)[0]
+    n = re.sub(r"\bnotre dame\b", "", n)
+    return WOMEN_PATTERN.search(n) is not None
+
+
 def count_nb_access_subcategories_from_name(name: str) -> int:
     """Number of Access categories found in the name."""
     return sum(

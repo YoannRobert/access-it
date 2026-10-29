@@ -10,7 +10,7 @@ import pandas as pd
 
 from access_it.common.access_categories import (
     count_nb_access_subcategories_from_name,
-    has_access_subcategories, get_higher_access_subcategory
+    has_access_subcategories, get_higher_access_subcategory, is_women_only_name
 )
 from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
 from access_it.etl.extract.clubs import individual_club_id_mask
@@ -281,7 +281,6 @@ def identify_riders_categories_on_startlist(
     on_date = pd.to_datetime(race_date, format="%Y-%m-%d", errors="coerce")
     on_date = None if pd.isna(on_date) else on_date
     young_labels = ["u7", "u9", "u11", "u13", "u15", "u17", "ecole"]
-    women_labels = ["dames", "femmes"]
     possible_headers = [
         "rg", "rg.", "rang", "dos", "dos.", "dossard",
         "nom", "prénom",
@@ -300,7 +299,7 @@ def identify_riders_categories_on_startlist(
     for table_name, table_data in data["startlists"].items():
         n_table_name = normalize_string_and_fold_case(table_name)
         is_young_startlist = any([ref in n_table_name for ref in young_labels])
-        is_women_startlist = any([n_table_name.startswith(ref) for ref in women_labels])
+        is_women_startlist = is_women_only_name(table_name)
         if is_young_startlist or is_women_startlist:
             continue
 
