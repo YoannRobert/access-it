@@ -1,6 +1,7 @@
 """Race table: one race per Access ranking of the result pages."""
 
 import hashlib
+import logging
 import pandas as pd
 
 from pathlib import Path
@@ -12,6 +13,14 @@ from access_it.etl.transform.categories import (
 from access_it.etl.transform.parse import (
     get_results_html_files, parse_results_from_organization_page
 )
+
+logger = logging.getLogger(__name__)
+
+# Women-only organizations published with the race code of a men's or mixed
+# race, so kept by the extract step: (season, organization code)
+WOMEN_ONLY_ORGANIZATIONS: set[tuple[int, str]] = {
+    (2023, "C5249282053"),  # SEICHES SUR LE LOIR: women's departemental championship coded 1.27
+}
 
 
 def split_results_from_organization_into_races(organization_data: dict) -> list[dict]:
@@ -59,6 +68,8 @@ def create_race_id(season: int, organisation_code: str, ranking_id: str) -> str:
 def get_results_data(results_dir: Path | None = None) -> list[dict]:
     """Parse every cached result page and split it into races (rankings included).
 
+    The pages of WOMEN_ONLY_ORGANIZATIONS are skipped.
+
     Args:
         results_dir: Cache directory of the result pages (default: RESULTS_DIR).
     """
@@ -66,6 +77,9 @@ def get_results_data(results_dir: Path | None = None) -> list[dict]:
     for race_html_file in get_results_html_files(results_dir):
         season = int(race_html_file.parent.stem)
         code = race_html_file.stem
+        if (season, code) in WOMEN_ONLY_ORGANIZATIONS:
+            logger.info(f"{season} {code}: women-only organization, skipped")
+            continue
         html = read_results_html_file(season, code, results_dir)
         data = parse_results_from_organization_page(html)
         data_split = split_results_from_organization_into_races(data)
