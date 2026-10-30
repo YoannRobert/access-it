@@ -5,12 +5,13 @@ import pytest
 
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.promotion_points import compute_promotion_points
-from access_it.analytics.regional_rankings import PAYS_DE_LA_LOIRE, compute_challenge_points
+from access_it.analytics.regional_rankings import compute_challenge_points
 from access_it.analytics.rider_profile import (
     RESULT_COLUMNS, SEASON_POINTS_COLUMNS, SEASON_STATS_COLUMNS, RiderProfile,
     compute_rider_profile, compute_season_points, compute_season_stats, get_rider_categories,
     get_rider_clubs, get_rider_results
 )
+from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
 
 SEASON = FIRST_SEASON + 1
@@ -18,7 +19,7 @@ REFERENCE_DATE = f"{SEASON}-10-01"
 
 REGIONAL_COMMITTEES = pd.DataFrame({
     "regional_committee_id": ["52", "53"],
-    "name": [PAYS_DE_LA_LOIRE, "BRETAGNE"],
+    "name": [PAYS_DE_LA_LOIRE, BRETAGNE],
 })
 DEPARTEMENTAL_COMMITTEES = pd.DataFrame({
     "departemental_committee_id": ["5244", "5385"],

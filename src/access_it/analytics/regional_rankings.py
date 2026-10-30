@@ -30,8 +30,7 @@ from access_it.analytics.ranking_tools import (
     get_region_club_ids, get_regional_committee_id, rank_scoring_riders, scale_points,
     select_category, to_datetime
 )
-
-PAYS_DE_LA_LOIRE = "PAYS DE LA LOIRE"
+from access_it.common.regions import PAYS_DE_LA_LOIRE
 
 # Points of the places 1 to 20: 30, 26, 24, 22, 20, then 15 down to 1
 POINTS_SCALES = {
@@ -41,7 +40,7 @@ POINTS_SCALES = {
 COLUMNS = ["category", "rank", "points", "last_name", "first_name", "club", "nb_scoring_races"]
 
 __all__ = [
-    "CATEGORIES", "COLUMNS", "PAYS_DE_LA_LOIRE", "POINTS_SCALES", "compute_challenge_points",
+    "CATEGORIES", "COLUMNS", "POINTS_SCALES", "compute_challenge_points",
     "compute_regional_rankings", "get_category_ranking"
 ]
 

@@ -33,7 +33,7 @@ from access_it.analytics.ranking_tools import (
     get_regional_committee_id, to_datetime
 )
 from access_it.analytics.recent_form import compute_recent_form
-from access_it.analytics.regional_rankings import PAYS_DE_LA_LOIRE
+from access_it.common.regions import PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
 
 TOP_THRESHOLDS = (3, 5, 10, 20)

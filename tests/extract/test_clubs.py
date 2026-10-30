@@ -4,6 +4,7 @@ import httpx
 import pandas as pd
 import pytest
 
+from access_it.common.regions import PAYS_DE_LA_LOIRE
 from access_it.etl.extract import client as client_module
 from access_it.etl.extract.client import RequestThrottle, get_required
 from access_it.etl.extract.clubs import get_committees, get_region_bloc_data
@@ -39,7 +40,7 @@ class JsonClient:
 
 def region_block(committees: list[str]) -> dict:
     return {
-        "region": "PAYS DE LA LOIRE",
+        "region": PAYS_DE_LA_LOIRE,
         "extra_data": {"id_api": "52"},
         "committees": [{"post_title": name} for name in committees],
     }
@@ -58,7 +59,7 @@ def test_get_required_stops_the_extract_on_an_error_response(status_code):
 
 def test_region_block_gives_the_committees():
     reg, dep = get_region_bloc_data(region_block(["CD LOIRE-ATLANTIQUE"]), DEPARTEMENTS)
-    assert reg == [{"regional_committee_id": "52", "name": "PAYS DE LA LOIRE"}]
+    assert reg == [{"regional_committee_id": "52", "name": PAYS_DE_LA_LOIRE}]
     assert dep == [{
         "departemental_committee_id": "5244", "name": "CD LOIRE-ATLANTIQUE",
         "regional_committee_id": "52", "departement_code": "44",

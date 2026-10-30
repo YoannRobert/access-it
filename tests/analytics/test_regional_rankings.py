@@ -4,16 +4,17 @@ import pandas as pd
 import pytest
 
 from access_it.analytics.regional_rankings import (
-    COLUMNS, PAYS_DE_LA_LOIRE, POINTS_SCALES, compute_challenge_points,
-    compute_regional_rankings, get_category_ranking
+    COLUMNS, POINTS_SCALES, compute_challenge_points, compute_regional_rankings,
+    get_category_ranking
 )
+from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID, INDIVIDUAL_CLUB_ID
 
 SEASON = 2026
 
 REGIONAL_COMMITTEES = pd.DataFrame({
     "regional_committee_id": ["52", "53", "98", "99"],
-    "name": [PAYS_DE_LA_LOIRE, "BRETAGNE", "INDIVIDUEL", "ETRANGER"],
+    "name": [PAYS_DE_LA_LOIRE, BRETAGNE, "INDIVIDUEL", "ETRANGER"],
 })
 DEPARTEMENTAL_COMMITTEES = pd.DataFrame({
     "departemental_committee_id": ["5244", "5385", "9898", "9999"],
@@ -262,7 +263,7 @@ def test_unknown_or_unconfigured_region_raises():
     with pytest.raises(ValueError, match="Unknown region"):
         compute_regional_rankings(**tables, season=SEASON, region="Pays de la Loire")
     with pytest.raises(ValueError, match="No regional ranking configured"):
-        compute_regional_rankings(**tables, season=SEASON, region="BRETAGNE")
+        compute_regional_rankings(**tables, season=SEASON, region=BRETAGNE)
 
 
 def test_unknown_category_raises():

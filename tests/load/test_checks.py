@@ -5,6 +5,7 @@ import pytest
 
 from sqlalchemy import create_engine, insert
 
+from access_it.common.regions import PAYS_DE_LA_LOIRE
 from access_it.etl.load import load
 from access_it.etl.load.checks import (
     DataValidationError, check_foreign_keys, check_missing_rows, check_primary_key,
@@ -47,7 +48,7 @@ def valid_frames() -> dict[str, pd.DataFrame]:
     date = pd.Timestamp("2025-04-12")
     rows = {
         "departements": {"departement_code": "44", "departement_name": "Loire-Atlantique"},
-        "regional_committees": {"regional_committee_id": "52", "name": "PAYS DE LA LOIRE"},
+        "regional_committees": {"regional_committee_id": "52", "name": PAYS_DE_LA_LOIRE},
         "departemental_committees": {
             "departemental_committee_id": "5244", "name": "CD 44",
             "regional_committee_id": "52", "departement_code": "44",

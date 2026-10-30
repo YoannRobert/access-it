@@ -7,14 +7,14 @@ from access_it.analytics.promotion_points import (
     COLUMNS, PROMOTION_SCALE, compute_promotion_points, compute_promotion_rankings,
     get_promotion_ranking
 )
+from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID, INDIVIDUAL_CLUB_ID
 
 SEASON = 2026
-PDL_NAME = "PAYS DE LA LOIRE"
 
 REGIONAL_COMMITTEES = pd.DataFrame({
     "regional_committee_id": ["52", "53", "98", "99"],
-    "name": [PDL_NAME, "BRETAGNE", "INDIVIDUEL", "ETRANGER"],
+    "name": [PAYS_DE_LA_LOIRE, BRETAGNE, "INDIVIDUEL", "ETRANGER"],
 })
 DEPARTEMENTAL_COMMITTEES = pd.DataFrame({
     "departemental_committee_id": ["5244", "5385", "9898", "9999"],
@@ -140,7 +140,7 @@ def test_columns_and_first_region_of_the_season():
     )
     ranking = get_promotion_ranking(rankings_of(tables), "A2")
     assert ranking.columns.tolist() == [c for c in COLUMNS if c != "category"]
-    assert ranking.iloc[0].tolist() == [1, 12, "NAME_a", "First_a", "Club Vannes", 2, 2, "BRETAGNE"]
+    assert ranking.iloc[0].tolist() == [1, 12, "NAME_a", "First_a", "Club Vannes", 2, 2, BRETAGNE]
 
 
 def test_region_filter_keeps_the_national_total_and_ranks_again():
@@ -165,11 +165,11 @@ def test_region_filter_keeps_the_national_total_and_ranks_again():
     assert national[["last_name", "rank", "points"]].values.tolist() == [
         ["NAME_c", 1, 9], ["NAME_b", 2, 8], ["NAME_a", 3, 6], ["NAME_d", 4, 5]
     ]
-    pdl = get_promotion_ranking(rankings, "A1", PDL_NAME, REGIONAL_COMMITTEES)
+    pdl = get_promotion_ranking(rankings, "A1", PAYS_DE_LA_LOIRE, REGIONAL_COMMITTEES)
     assert pdl[["last_name", "rank", "points", "region"]].values.tolist() == [
-        ["NAME_c", 1, 9, PDL_NAME], ["NAME_b", 2, 8, "BRETAGNE"]
+        ["NAME_c", 1, 9, PAYS_DE_LA_LOIRE], ["NAME_b", 2, 8, BRETAGNE]
     ]
-    bzh = get_promotion_ranking(rankings, "A1", "BRETAGNE", REGIONAL_COMMITTEES)
+    bzh = get_promotion_ranking(rankings, "A1", BRETAGNE, REGIONAL_COMMITTEES)
     assert bzh["last_name"].tolist() == ["NAME_b", "NAME_a"]
     assert bzh["rank"].tolist() == [1, 2]
     assert pd.isna(national.set_index("last_name").loc["NAME_d", "region"])

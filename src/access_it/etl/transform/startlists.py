@@ -12,6 +12,7 @@ from access_it.common.access_categories import (
     count_nb_access_subcategories_from_name,
     has_access_subcategories, get_higher_access_subcategory, is_women_only_name
 )
+from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
 from access_it.etl.extract.clubs import individual_club_id_mask
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID
@@ -522,8 +523,8 @@ def identify_riders_categories_on_startlist(
         df0 = df0.drop(columns=[club_col])
 
         # Remove clubs outside Bretagne and Pays de la Loire, individual and foreign riders
-        br = regional_committees["name"] == "BRETAGNE"
-        pdl = regional_committees["name"] == "PAYS DE LA LOIRE"
+        br = regional_committees["name"] == BRETAGNE
+        pdl = regional_committees["name"] == PAYS_DE_LA_LOIRE
         br_id = regional_committees.loc[br, "regional_committee_id"].iloc[0]
         pdl_id = regional_committees.loc[pdl, "regional_committee_id"].iloc[0]
         df0 = (
