@@ -27,7 +27,8 @@ import pandas as pd
 
 from access_it.analytics.ranking_tools import (
     CATEGORIES, add_category_on_race_date, add_value_on_race_date, compute_places,
-    get_regional_committee_id, rank_scoring_riders, scale_points, select_category, to_datetime
+    get_region_club_ids, get_regional_committee_id, rank_scoring_riders, scale_points,
+    select_category, to_datetime
 )
 
 PAYS_DE_LA_LOIRE = "PAYS DE LA LOIRE"
@@ -104,15 +105,7 @@ def compute_challenge_points(
 
     # Riders of the region on the race date
     results = add_value_on_race_date(results, affiliations, "club_id")
-    region_clubs = clubs.loc[
-        clubs["departemental_committee_id"].isin(
-            departemental_committees.loc[
-                departemental_committees["regional_committee_id"] == region_id,
-                "departemental_committee_id"
-            ]
-        ),
-        "club_id"
-    ]
+    region_clubs = get_region_club_ids(clubs, departemental_committees, region_id)
     results = results[results["club_id"].isin(region_clubs)].copy()
 
     # Place in the challenge; category on the race date; unknown category: place kept, no points

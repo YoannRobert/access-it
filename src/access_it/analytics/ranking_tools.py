@@ -2,8 +2,9 @@
 
 Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: default reference date,
-category and club of a rider on the race date, places in a race, points of a
-scale, ranking of the riders with its tie-breaks, and filter on a category.
+clubs of a region, category and club of a rider on the race date, places in a
+race, points of a scale, ranking of the riders with its tie-breaks, and filter
+on a category.
 """
 
 import pandas as pd
@@ -41,6 +42,27 @@ def get_regional_committee_id(regional_committees: pd.DataFrame, region: str) ->
     if not is_region.any():
         raise ValueError(f"Unknown region: {region!r}")
     return regional_committees.loc[is_region, "regional_committee_id"].iloc[0]
+
+
+def get_region_club_ids(
+        clubs: pd.DataFrame,
+        departemental_committees: pd.DataFrame,
+        region_id: str
+    ) -> pd.Series:
+    """IDs of the clubs of a region: those of the departemental committees of the region.
+
+    The pseudo-clubs of the individual licensees of these committees are included.
+
+    Args:
+        clubs: Club table.
+        departemental_committees: Departemental committee table.
+        region_id: ID of the regional committee (see get_regional_committee_id).
+    """
+    region_committee_ids = departemental_committees.loc[
+        departemental_committees["regional_committee_id"] == region_id,
+        "departemental_committee_id"
+    ]
+    return clubs.loc[clubs["departemental_committee_id"].isin(region_committee_ids), "club_id"]
 
 
 def add_value_on_race_date(

@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 
 from access_it.analytics.ranking_tools import (
-    compute_places, get_reference_date, rank_scoring_riders, scale_points, select_category,
-    select_club
+    compute_places, get_reference_date, get_region_club_ids, rank_scoring_riders, scale_points,
+    select_category, select_club
 )
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 
@@ -57,3 +57,16 @@ def test_reference_date_is_the_day_after_the_last_race():
 def test_reference_date_of_an_empty_race_table_raises():
     with pytest.raises(ValueError):
         get_reference_date(pd.DataFrame({"race_date": []}))
+
+
+def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
+    departemental_committees = pd.DataFrame({
+        "departemental_committee_id": ["5244", "5285", "5385"],
+        "regional_committee_id": ["52", "52", "53"],
+    })
+    clubs = pd.DataFrame({
+        "club_id": ["5244001", "5285001", "5244800", "5385001", "5385800"],
+        "departemental_committee_id": ["5244", "5285", "5244", "5385", "5385"],
+    })
+    club_ids = get_region_club_ids(clubs, departemental_committees, "52")
+    assert club_ids.tolist() == ["5244001", "5285001", "5244800"]
