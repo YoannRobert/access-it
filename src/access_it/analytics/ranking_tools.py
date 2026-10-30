@@ -1,9 +1,9 @@
-"""Building blocks shared by the rankings of the analytics package.
+"""Building blocks shared by the modules of the analytics package.
 
-Used by the regional challenge (regional_rankings) and by the promotion points
-(promotion_points): category and club of a rider on the race date, places in
-a race, points of a scale, ranking of the riders with its tie-breaks, and
-filter on a category.
+Used by the regional challenge (regional_rankings), the promotion points
+(promotion_points) and the other analytics modules: default reference date,
+category and club of a rider on the race date, places in a race, points of a
+scale, ranking of the riders with its tie-breaks, and filter on a category.
 """
 
 import pandas as pd
@@ -16,6 +16,19 @@ CATEGORIES = ("A1", "A2", "A3", "A4")
 def to_datetime(s: pd.Series) -> pd.Series:
     """Dates as datetime64[ns], whatever their input type (string, date, timestamp)."""
     return pd.to_datetime(s).astype("datetime64[ns]")
+
+
+def get_reference_date(races: pd.DataFrame) -> pd.Timestamp:
+    """Default reference date of the analytics: the day after the last race of the table.
+
+    Every race of the table, the last one included, is strictly before it.
+
+    Raises:
+        ValueError: If the race table is empty.
+    """
+    if races.empty:
+        raise ValueError("No race to find the reference date from")
+    return to_datetime(races["race_date"]).max().normalize() + pd.Timedelta(days=1)
 
 
 def get_regional_committee_id(regional_committees: pd.DataFrame, region: str) -> str:

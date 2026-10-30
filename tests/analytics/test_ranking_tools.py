@@ -4,7 +4,8 @@ import pandas as pd
 import pytest
 
 from access_it.analytics.ranking_tools import (
-    compute_places, rank_scoring_riders, scale_points, select_category, select_club
+    compute_places, get_reference_date, rank_scoring_riders, scale_points, select_category,
+    select_club
 )
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 
@@ -46,3 +47,13 @@ def test_riders_ranked_by_points_then_places_then_names():
 def test_unknown_category_raises():
     with pytest.raises(ValueError, match="Unknown category"):
         select_category(pd.DataFrame(columns=["category"]), "A5")
+
+
+def test_reference_date_is_the_day_after_the_last_race():
+    races = pd.DataFrame({"race_date": ["2026-10-25", "2026-10-26", "2026-03-01"]})
+    assert get_reference_date(races) == pd.Timestamp("2026-10-27")
+
+
+def test_reference_date_of_an_empty_race_table_raises():
+    with pytest.raises(ValueError):
+        get_reference_date(pd.DataFrame({"race_date": []}))
