@@ -3,8 +3,8 @@
 Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: default reference date,
 races and clubs of a region, category and club of a rider on the race date,
-places in a race, points of a scale, ranking of the riders with its
-tie-breaks, and filter on a category.
+places in a race, wins and tops of the riders by season, points of a scale,
+ranking of the riders with its tie-breaks, and filter on a category.
 """
 
 import pandas as pd
@@ -13,6 +13,11 @@ from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.etl.extract.clubs import individual_club_id_mask
 
 CATEGORIES = ("A1", "A2", "A3", "A4")
+
+TOP_THRESHOLDS = (3, 5, 10, 20)
+SEASON_STATS_COLUMNS = [
+    "rider_id", "season", "nb_races", "nb_wins", *[f"nb_top_{n}" for n in TOP_THRESHOLDS]
+]
 
 
 def to_datetime(s: pd.Series) -> pd.Series:
@@ -158,6 +163,32 @@ def compute_places(results: pd.DataFrame) -> pd.Series:
     skipped (1, 2, 2, 4).
     """
     return results.groupby("race_id")["finish_rank"].rank(method="min").astype(int)
+
+
+def count_wins_and_tops(rider_results: pd.DataFrame) -> pd.DataFrame:
+    """Number of races, wins and tops of each rider and season.
+
+    Args:
+        rider_results: Results with rider_id, season and finish_rank, such as
+            the output of get_rider_results of rider_profile (one or several riders).
+
+    Returns:
+        One row per rider and season with a race: the SEASON_STATS_COLUMNS
+        (inclusive tops); sorted by rider and from the oldest season.
+    """
+    stats = rider_results.assign(
+        is_win=rider_results["finish_rank"] <= 1,
+        **{f"is_top_{n}": rider_results["finish_rank"] <= n for n in TOP_THRESHOLDS}
+    ).groupby(["rider_id", "season"]).agg(
+        nb_races=("race_id", "size"),
+        nb_wins=("is_win", "sum"),
+        **{f"nb_top_{n}": (f"is_top_{n}", "sum") for n in TOP_THRESHOLDS}
+    ).astype(int).reset_index()
+    return (
+        stats[SEASON_STATS_COLUMNS]
+        .sort_values(["rider_id", "season"])
+        .reset_index(drop=True)
+    )
 
 
 def scale_points(results: pd.DataFrame, scale: tuple[int, ...]) -> pd.Series:

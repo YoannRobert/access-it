@@ -18,8 +18,8 @@ Rules:
   otherwise his challenge points are empty and the challenge column is
   "not applicable".
 
-The functions select the riders by rider_id only; compute_season_stats and
-compute_season_points also work on the results of several riders. The
+The functions select the riders by rider_id only; compute_season_points also
+works on the results of several riders. The
 computation is free of any Streamlit dependency.
 """
 
@@ -29,20 +29,15 @@ import pandas as pd
 
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, add_category_and_club_on_race_date, add_value_on_race_date, get_region_club_ids,
-    get_regional_committee_id, to_datetime
+    CATEGORIES, add_category_and_club_on_race_date, add_value_on_race_date, count_wins_and_tops,
+    get_region_club_ids, get_regional_committee_id, to_datetime
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.common.regions import PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
 
-TOP_THRESHOLDS = (3, 5, 10, 20)
-
 RESULT_COLUMNS = [
     "rider_id", "race_date", "season", "race_id", "title", "finish_rank", "category", "club"
-]
-SEASON_STATS_COLUMNS = [
-    "rider_id", "season", "nb_races", "nb_wins", *[f"nb_top_{n}" for n in TOP_THRESHOLDS]
 ]
 SEASON_POINTS_COLUMNS = [
     "rider_id", "season",
@@ -60,7 +55,7 @@ class RiderProfile:
         results: Output of get_rider_results.
         categories: Output of get_rider_categories.
         clubs: Output of get_rider_clubs.
-        season_stats: Output of compute_season_stats.
+        season_stats: Output of count_wins_and_tops (ranking_tools).
         season_points: Output of compute_season_points.
         recent_form: Output of compute_recent_form (one row).
     """
@@ -209,32 +204,6 @@ def get_rider_clubs(
     return periods[["rider_id", "start_date", "end_date", "club"]]
 
 
-def compute_season_stats(rider_results: pd.DataFrame) -> pd.DataFrame:
-    """Number of races, wins and tops of each rider and season.
-
-    Args:
-        rider_results: Results with rider_id, season and finish_rank, such as
-            the output of get_rider_results (one or several riders).
-
-    Returns:
-        One row per rider and season with a race: the SEASON_STATS_COLUMNS
-        (inclusive tops); sorted by rider and from the oldest season.
-    """
-    stats = rider_results.assign(
-        is_win=rider_results["finish_rank"] <= 1,
-        **{f"is_top_{n}": rider_results["finish_rank"] <= n for n in TOP_THRESHOLDS}
-    ).groupby(["rider_id", "season"]).agg(
-        nb_races=("race_id", "size"),
-        nb_wins=("is_win", "sum"),
-        **{f"nb_top_{n}": (f"is_top_{n}", "sum") for n in TOP_THRESHOLDS}
-    ).astype(int).reset_index()
-    return (
-        stats[SEASON_STATS_COLUMNS]
-        .sort_values(["rider_id", "season"])
-        .reset_index(drop=True)
-    )
-
-
 def _sum_points_by_category(
         points: pd.DataFrame,
         rider_results: pd.DataFrame,
@@ -372,7 +341,7 @@ def compute_rider_profile(
         results=results,
         categories=get_rider_categories(rider_categories, rider_id, reference_date),
         clubs=get_rider_clubs(clubs, affiliations, rider_id, reference_date),
-        season_stats=compute_season_stats(results),
+        season_stats=count_wins_and_tops(results),
         season_points=compute_season_points(
             results, promotion_points, challenge_points, clubs, departemental_committees,
             regional_committees, affiliations, region

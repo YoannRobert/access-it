@@ -5,9 +5,9 @@ import pytest
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    add_category_and_club_on_race_date, compute_places, get_reference_date, get_region_club_ids,
-    get_region_races, rank_scoring_riders, scale_points, select_category, select_club,
-    to_datetime
+    SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, compute_places,
+    count_wins_and_tops, get_reference_date, get_region_club_ids, get_region_races,
+    rank_scoring_riders, scale_points, select_category, select_club, to_datetime
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -16,6 +16,23 @@ from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 def test_places_skip_the_next_place_after_tied_riders():
     results = pd.DataFrame({"race_id": ["r1"] * 4 + ["r2"], "finish_rank": [1, 3, 3, 7, 4]})
     assert compute_places(results).tolist() == [1, 2, 2, 4, 1]
+
+
+def test_wins_and_tops_count_inclusive_tops_and_ties():
+    season = FIRST_SEASON + 1
+    results = pd.DataFrame({
+        "rider_id": ["a"] * 5 + ["b"],
+        "season": [season] * 4 + [FIRST_SEASON, season],
+        "race_id": ["r1", "r2", "r3", "r4", "r0", "r1"],
+        "finish_rank": [1, 1, 5, 21, 20, 3],
+    })
+    stats = count_wins_and_tops(results)
+    assert stats.columns.tolist() == SEASON_STATS_COLUMNS
+    assert stats.drop(columns="rider_id").values.tolist() == [
+        [FIRST_SEASON, 1, 0, 0, 0, 0, 1],
+        [season, 4, 2, 2, 3, 3, 3],
+        [season, 1, 0, 1, 1, 1, 1],
+    ]
 
 
 def test_points_of_the_scale_and_none_for_an_unknown_category():

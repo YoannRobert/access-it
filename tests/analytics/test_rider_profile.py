@@ -7,9 +7,8 @@ from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN
 from access_it.analytics.promotion_points import compute_promotion_points
 from access_it.analytics.regional_rankings import compute_challenge_points
 from access_it.analytics.rider_profile import (
-    RESULT_COLUMNS, SEASON_POINTS_COLUMNS, SEASON_STATS_COLUMNS, RiderProfile,
-    compute_rider_profile, compute_season_points, compute_season_stats, get_rider_categories,
-    get_rider_clubs, get_rider_results
+    RESULT_COLUMNS, SEASON_POINTS_COLUMNS, RiderProfile, compute_rider_profile,
+    compute_season_points, get_rider_categories, get_rider_clubs, get_rider_results
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
@@ -161,22 +160,6 @@ def test_club_periods_with_an_unknown_club():
     })
     periods = get_rider_clubs(CLUBS, affiliations, "a", REFERENCE_DATE)
     assert periods["club"].tolist() == ["Club Nantes", UNKNOWN_CLUB]
-
-
-def test_season_stats_count_inclusive_tops_and_ties():
-    results = pd.DataFrame({
-        "rider_id": ["a"] * 5 + ["b"],
-        "season": [SEASON] * 4 + [FIRST_SEASON, SEASON],
-        "race_id": ["r1", "r2", "r3", "r4", "r0", "r1"],
-        "finish_rank": [1, 1, 5, 21, 20, 3],
-    })
-    stats = compute_season_stats(results)
-    assert stats.columns.tolist() == SEASON_STATS_COLUMNS
-    assert stats.drop(columns="rider_id").values.tolist() == [
-        [FIRST_SEASON, 1, 0, 0, 0, 0, 1],
-        [SEASON, 4, 2, 2, 3, 3, 3],
-        [SEASON, 1, 0, 1, 1, 1, 1],
-    ]
 
 
 def test_season_points_by_category_held():
