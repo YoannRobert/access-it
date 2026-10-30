@@ -27,17 +27,14 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, add_category_on_race_date, add_value_on_race_date, get_region_club_ids,
+    CATEGORIES, add_category_and_club_on_race_date, add_value_on_race_date, get_region_club_ids,
     get_regional_committee_id, to_datetime
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.analytics.regional_rankings import PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
-
-UNKNOWN_CATEGORY = "unknown category"
-UNKNOWN_CLUB = "unknown club"
-NOT_APPLICABLE = "not applicable"
 
 TOP_THRESHOLDS = (3, 5, 10, 20)
 
@@ -118,16 +115,11 @@ def get_rider_results(
     results = results[
         results["season"].between(FIRST_SEASON, day.year) & (results["race_date"] < day)
     ]
-    results = add_category_on_race_date(
-        results, rider_categories[rider_categories["rider_id"] == rider_id]
-    )
-    results = add_value_on_race_date(
-        results, affiliations[affiliations["rider_id"] == rider_id], "club_id"
-    )
-    # astype(object): a column of unknown categories only keeps the integer dtype of the history
-    results["category"] = results["category"].astype(object).fillna(UNKNOWN_CATEGORY).astype(str)
-    results["club"] = (
-        results["club_id"].map(clubs.set_index("club_id")["name"]).fillna(UNKNOWN_CLUB)
+    results = add_category_and_club_on_race_date(
+        results,
+        clubs,
+        affiliations[affiliations["rider_id"] == rider_id],
+        rider_categories[rider_categories["rider_id"] == rider_id]
     )
     return (
         results[RESULT_COLUMNS]

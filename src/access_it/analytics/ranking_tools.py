@@ -9,6 +9,7 @@ on a category.
 
 import pandas as pd
 
+from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.etl.extract.clubs import individual_club_id_mask
 
 CATEGORIES = ("A1", "A2", "A3", "A4")
@@ -101,6 +102,27 @@ def add_category_on_race_date(
         lambda c: None if pd.isna(c) else f"A{int(c)}"
     )
     return results.drop(columns="rider_category")
+
+
+def add_category_and_club_on_race_date(
+        results: pd.DataFrame,
+        clubs: pd.DataFrame,
+        affiliations: pd.DataFrame,
+        rider_categories: pd.DataFrame
+    ) -> pd.DataFrame:
+    """Add the category and the club name of the rider on the race date, as labels.
+
+    The category is "A1" to "A4", or UNKNOWN_CATEGORY; the club is the name
+    of the club, or UNKNOWN_CLUB. The results are sorted by race date.
+    """
+    results = add_category_on_race_date(results, rider_categories)
+    results = add_value_on_race_date(results, affiliations, "club_id")
+    # astype(object): a column of unknown categories only keeps the integer dtype of the history
+    results["category"] = results["category"].astype(object).fillna(UNKNOWN_CATEGORY).astype(str)
+    results["club"] = (
+        results["club_id"].map(clubs.set_index("club_id")["name"]).fillna(UNKNOWN_CLUB)
+    )
+    return results.drop(columns="club_id")
 
 
 def compute_places(results: pd.DataFrame) -> pd.Series:

@@ -3,12 +3,13 @@
 import pandas as pd
 import pytest
 
+from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.promotion_points import compute_promotion_points
 from access_it.analytics.regional_rankings import PAYS_DE_LA_LOIRE, compute_challenge_points
 from access_it.analytics.rider_profile import (
-    NOT_APPLICABLE, RESULT_COLUMNS, SEASON_POINTS_COLUMNS, SEASON_STATS_COLUMNS, UNKNOWN_CATEGORY,
-    UNKNOWN_CLUB, RiderProfile, compute_rider_profile, compute_season_points,
-    compute_season_stats, get_rider_categories, get_rider_clubs, get_rider_results
+    RESULT_COLUMNS, SEASON_POINTS_COLUMNS, SEASON_STATS_COLUMNS, RiderProfile,
+    compute_rider_profile, compute_season_points, compute_season_stats, get_rider_categories,
+    get_rider_clubs, get_rider_results
 )
 from access_it.common.seasons import FIRST_SEASON
 

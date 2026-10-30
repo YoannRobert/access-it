@@ -3,10 +3,12 @@
 import pandas as pd
 import pytest
 
+from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    compute_places, get_reference_date, get_region_club_ids, rank_scoring_riders, scale_points,
-    select_category, select_club
+    add_category_and_club_on_race_date, compute_places, get_reference_date, get_region_club_ids,
+    rank_scoring_riders, scale_points, select_category, select_club, to_datetime
 )
+from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 
 
@@ -70,3 +72,29 @@ def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
     })
     club_ids = get_region_club_ids(clubs, departemental_committees, "52")
     assert club_ids.tolist() == ["5244001", "5285001", "5244800"]
+
+
+def test_category_and_club_on_the_race_date_with_labels_when_unknown():
+    results = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3"],
+        "rider_id": ["a", "a", "b"],
+        "race_date": to_datetime(pd.Series(
+            [f"{FIRST_SEASON}-03-01", f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-06-01"]
+        )),
+    })
+    clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
+    affiliations = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [f"{FIRST_SEASON}-05-01"], "club_id": ["5244001"]}
+    )
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a", "a", "b"],
+        "start_date": [f"{FIRST_SEASON}-01-01", f"{FIRST_SEASON}-05-01", f"{FIRST_SEASON}-01-01"],
+        "rider_category": pd.array([3, 2, None], dtype="Int64"),
+    })
+    labelled = add_category_and_club_on_race_date(
+        results, clubs, affiliations, rider_categories
+    ).sort_values("race_id")
+    assert "club_id" not in labelled.columns
+    assert labelled[["category", "club"]].values.tolist() == [
+        ["A3", UNKNOWN_CLUB], ["A2", "Club Nantes"], [UNKNOWN_CATEGORY, UNKNOWN_CLUB]
+    ]
