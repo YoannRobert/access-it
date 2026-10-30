@@ -2,9 +2,9 @@
 
 Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: default reference date,
-clubs of a region, category and club of a rider on the race date, places in a
-race, points of a scale, ranking of the riders with its tie-breaks, and filter
-on a category.
+races and clubs of a region, category and club of a rider on the race date,
+places in a race, points of a scale, ranking of the riders with its
+tie-breaks, and filter on a category.
 """
 
 import pandas as pd
@@ -43,6 +43,31 @@ def get_regional_committee_id(regional_committees: pd.DataFrame, region: str) ->
     if not is_region.any():
         raise ValueError(f"Unknown region: {region!r}")
     return regional_committees.loc[is_region, "regional_committee_id"].iloc[0]
+
+
+def get_region_races(
+        races: pd.DataFrame,
+        departemental_committees: pd.DataFrame,
+        region_id: str,
+        season: int
+    ) -> pd.DataFrame:
+    """Races of a season held in a region: those of the departements of its committees.
+
+    Args:
+        races: Race table.
+        departemental_committees: Departemental committee table.
+        region_id: ID of the regional committee (see get_regional_committee_id).
+        season: Calendar year of the races.
+
+    Returns:
+        The rows of the race table, with all its columns.
+    """
+    region_departements = departemental_committees.loc[
+        departemental_committees["regional_committee_id"] == region_id, "departement_code"
+    ]
+    return races[
+        (races["season"] == season) & races["departement_code"].isin(region_departements)
+    ].reset_index(drop=True)
 
 
 def get_region_club_ids(

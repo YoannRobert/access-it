@@ -6,7 +6,8 @@ import pytest
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     add_category_and_club_on_race_date, compute_places, get_reference_date, get_region_club_ids,
-    rank_scoring_riders, scale_points, select_category, select_club, to_datetime
+    get_region_races, rank_scoring_riders, scale_points, select_category, select_club,
+    to_datetime
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -72,6 +73,21 @@ def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
     })
     club_ids = get_region_club_ids(clubs, departemental_committees, "52")
     assert club_ids.tolist() == ["5244001", "5285001", "5244800"]
+
+
+def test_races_of_a_region_are_those_of_the_season_in_its_departements():
+    departemental_committees = pd.DataFrame({
+        "regional_committee_id": ["52", "52", "53"],
+        "departement_code": ["44", "85", "56"],
+    })
+    races = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3", "r4"],
+        "season": [FIRST_SEASON, FIRST_SEASON, FIRST_SEASON, FIRST_SEASON + 1],
+        "departement_code": ["44", "56", "85", "44"],
+    })
+    region_races = get_region_races(races, departemental_committees, "52", FIRST_SEASON)
+    assert region_races.columns.tolist() == races.columns.tolist()
+    assert region_races["race_id"].tolist() == ["r1", "r3"]
 
 
 def test_category_and_club_on_the_race_date_with_labels_when_unknown():

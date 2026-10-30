@@ -27,8 +27,8 @@ import pandas as pd
 
 from access_it.analytics.ranking_tools import (
     CATEGORIES, add_category_on_race_date, add_value_on_race_date, compute_places,
-    get_region_club_ids, get_regional_committee_id, rank_scoring_riders, scale_points,
-    select_category, to_datetime
+    get_region_club_ids, get_region_races, get_regional_committee_id, rank_scoring_riders,
+    scale_points, select_category, to_datetime
 )
 from access_it.common.regions import PAYS_DE_LA_LOIRE
 
@@ -92,11 +92,7 @@ def compute_challenge_points(
     region_id = _get_region_id(regional_committees, region)
 
     # Races of the season held in the departements of the region
-    region_departements = departemental_committees.loc[
-        departemental_committees["regional_committee_id"] == region_id, "departement_code"
-    ]
-    region_races = races.loc[
-        (races["season"] == season) & races["departement_code"].isin(region_departements),
+    region_races = get_region_races(races, departemental_committees, region_id, season)[
         ["race_id", "race_date"]
     ].assign(race_date=lambda df: to_datetime(df["race_date"]))
 
