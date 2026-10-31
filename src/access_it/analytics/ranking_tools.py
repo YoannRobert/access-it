@@ -3,11 +3,11 @@
 Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: default reference date,
 races and clubs of a region, category and club of a rider on the race date,
-places in a race, wins and tops of the riders (or other groups), points of a scale,
-ranking of the riders with its tie-breaks, shared rank of tied rows, filter
-on a category, labels of a category and of a club, checks of the requested
-categories and of the categories of the races, and filter of the results on
-the categories.
+results of a rider, places in a race, wins and tops of the riders (or other
+groups), points of a scale, ranking of the riders with its tie-breaks, shared
+rank of tied rows, filter on a category, labels of a category and of a club,
+checks of the requested categories and of the categories of the races, and
+filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -16,6 +16,7 @@ from typing import Literal
 import pandas as pd
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
+from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.clubs import individual_club_id_mask
 
 CATEGORIES = ("A1", "A2", "A3", "A4")
@@ -29,11 +30,19 @@ TOP_THRESHOLDS = (3, 5, 10, 20)
 SEASON_STATS_COLUMNS = [
     "rider_id", "season", "nb_races", "nb_wins", *[f"nb_top_{n}" for n in TOP_THRESHOLDS]
 ]
+RIDER_RESULT_COLUMNS = [
+    "rider_id", "race_date", "season", "race_id", "title", "finish_rank", "category", "club"
+]
 
 
 def to_datetime(s: pd.Series) -> pd.Series:
     """Dates as datetime64[ns], whatever their input type (string, date, timestamp)."""
     return pd.to_datetime(s).astype("datetime64[ns]")
+
+
+def to_day(reference_date: str | pd.Timestamp) -> pd.Timestamp:
+    """Reference date as a timestamp at midnight."""
+    return to_datetime(pd.Series([reference_date])).dt.normalize().iloc[0]
 
 
 def get_reference_date(races: pd.DataFrame) -> pd.Timestamp:
@@ -180,6 +189,59 @@ def add_category_and_club_on_race_date(
     return results.drop(columns="club_id")
 
 
+def get_rider_results(
+        races: pd.DataFrame,
+        rankings: pd.DataFrame,
+        clubs: pd.DataFrame,
+        affiliations: pd.DataFrame,
+        rider_categories: pd.DataFrame,
+        rider_id: str,
+        reference_date: str | pd.Timestamp
+    ) -> pd.DataFrame:
+    """Results of a rider, from the most recent to the oldest.
+
+    Only the seasons from FIRST_SEASON to the year of the reference date are
+    kept, and only the races strictly before the reference date. Two races of
+    the same day are ordered by finish rank (best place first), then by
+    race_id, as in compute_recent_form.
+
+    Args:
+        races: Race table.
+        rankings: Ranking table.
+        clubs: Club table.
+        affiliations: Affiliation table (club history of the riders).
+        rider_categories: Category history of the riders.
+        rider_id: Rider to show.
+        reference_date: Day of the analysis, as "YYYY-MM-DD" or a date; its
+            races and the later ones are excluded.
+
+    Returns:
+        One row per race of the rider: the RIDER_RESULT_COLUMNS, with the
+        category ("A1" to "A4") and the club name of the rider on the race
+        date (UNKNOWN_CATEGORY or UNKNOWN_CLUB if unknown).
+    """
+    day = to_day(reference_date)
+    results = (
+        rankings.loc[rankings["rider_id"] == rider_id, ["race_id", "rider_id", "finish_rank"]]
+        .merge(races[["race_id", "race_date", "season", "title"]], on="race_id")
+        .assign(race_date=lambda df: to_datetime(df["race_date"]))
+    )
+    results = results[
+        results["season"].between(FIRST_SEASON, day.year) & (results["race_date"] < day)
+    ]
+    results = add_category_and_club_on_race_date(
+        results,
+        clubs,
+        affiliations[affiliations["rider_id"] == rider_id],
+        rider_categories[rider_categories["rider_id"] == rider_id]
+    )
+    return (
+        results[RIDER_RESULT_COLUMNS]
+        .sort_values(["race_date", "finish_rank", "race_id"], ascending=[False, True, False])
+        .reset_index(drop=True)
+    )
+
+
 def check_category(category: str) -> None:
     """Check that the category is one of "A1" to "A4".
 
@@ -292,8 +354,8 @@ def count_wins_and_tops(
 
     Args:
         results: One result per row, with race_id, finish_rank and the
-            columns of `by`, such as the output of get_rider_results of
-            rider_profile (one or several riders).
+            columns of `by`, such as the output of get_rider_results (one
+            or several riders).
         by: Columns defining the groups.
 
     Returns:

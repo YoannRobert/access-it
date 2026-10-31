@@ -5,11 +5,11 @@ import pytest
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, add_shared_rank, check_categories,
-    check_category, check_race_categories, compute_places, count_wins_and_tops,
-    filter_results_by_categories, format_category, format_club, get_reference_date,
-    get_region_club_ids, get_region_races, rank_scoring_riders, scale_points, select_category,
-    select_club, to_datetime
+    RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
+    add_shared_rank, check_categories, check_category, check_race_categories, compute_places,
+    count_wins_and_tops, filter_results_by_categories, format_category, format_club,
+    get_reference_date, get_region_club_ids, get_region_races, get_rider_results,
+    rank_scoring_riders, scale_points, select_category, select_club, to_datetime
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -241,3 +241,114 @@ def test_rows_tied_on_every_criterion_share_the_rank():
     assert ranked.columns.tolist() == ["nb_wins", "nb_top_3", "name", "rank"]
     assert ranked.index.tolist() == [7, 3, 9, 1, 5]
     assert ranked["rank"].tolist() == [1, 2, 2, 4, 5]
+
+
+def test_results_from_the_most_recent_with_category_and_club_on_the_race_date():
+    season = FIRST_SEASON + 1
+    races = pd.DataFrame({
+        "race_id": ["r1", "r2"],
+        "race_date": [f"{season}-03-01", f"{season}-06-01"],
+        "season": [season, season],
+        "title": ["r1 title", "r2 title"],
+    })
+    rankings = pd.DataFrame(
+        {"race_id": ["r1", "r2"], "rider_id": ["a", "a"], "finish_rank": [4, 1]}
+    )
+    clubs = pd.DataFrame(
+        {"club_id": ["5244001", "5385001"], "name": ["Club Nantes", "Club Vannes"]}
+    )
+    affiliations = pd.DataFrame({
+        "rider_id": ["a", "a"],
+        "start_date": [f"{season}-01-01", f"{season}-05-01"],
+        "club_id": ["5244001", "5385001"],
+    })
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a", "a"],
+        "start_date": [f"{season}-01-01", f"{season}-05-01"],
+        "rider_category": pd.array([3, 2], dtype="Int64"),
+    })
+    results = get_rider_results(
+        races, rankings, clubs, affiliations, rider_categories, "a", f"{season}-10-01"
+    )
+    assert results.columns.tolist() == RIDER_RESULT_COLUMNS
+    assert results["category"].dtype == "str"
+    assert results[["race_id", "finish_rank", "category", "club"]].values.tolist() == [
+        ["r2", 1, "A2", "Club Vannes"], ["r1", 4, "A3", "Club Nantes"]
+    ]
+
+
+def test_results_keep_the_seasons_covered_before_the_reference_date():
+    season = FIRST_SEASON + 1
+    reference_date = f"{season}-10-01"
+    races = pd.DataFrame({
+        "race_id": ["r0", "r1", "r2"],
+        "race_date": [f"{FIRST_SEASON - 1}-06-01", f"{season}-09-30", reference_date],
+        "season": [FIRST_SEASON - 1, season, season],
+        "title": ["r0 title", "r1 title", "r2 title"],
+    })
+    rankings = pd.DataFrame(
+        {"race_id": ["r0", "r1", "r2"], "rider_id": ["a"] * 3, "finish_rank": [1, 1, 1]}
+    )
+    clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
+    affiliations = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [f"{FIRST_SEASON - 1}-01-01"], "club_id": ["5244001"]}
+    )
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a"],
+        "start_date": [f"{FIRST_SEASON - 1}-01-01"],
+        "rider_category": pd.array([1], dtype="Int64"),
+    })
+    results = get_rider_results(
+        races, rankings, clubs, affiliations, rider_categories, "a", reference_date
+    )
+    assert results["race_id"].tolist() == ["r1"]
+
+
+def test_results_of_the_same_day_keep_the_best_place_first():
+    season = FIRST_SEASON + 1
+    races = pd.DataFrame({
+        "race_id": ["r1", "r2"],
+        "race_date": [f"{season}-06-01", f"{season}-06-01"],
+        "season": [season, season],
+        "title": ["r1 title", "r2 title"],
+    })
+    rankings = pd.DataFrame(
+        {"race_id": ["r1", "r2"], "rider_id": ["a", "a"], "finish_rank": [5, 2]}
+    )
+    clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
+    affiliations = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [f"{season}-01-01"], "club_id": ["5244001"]}
+    )
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a"],
+        "start_date": [f"{season}-01-01"],
+        "rider_category": pd.array([3], dtype="Int64"),
+    })
+    results = get_rider_results(
+        races, rankings, clubs, affiliations, rider_categories, "a", f"{season}-10-01"
+    )
+    assert results["race_id"].tolist() == ["r2", "r1"]
+
+
+def test_results_with_unknown_category_and_club():
+    season = FIRST_SEASON + 1
+    races = pd.DataFrame({
+        "race_id": ["r1"],
+        "race_date": [f"{season}-03-01"],
+        "season": [season],
+        "title": ["r1 title"],
+    })
+    rankings = pd.DataFrame({"race_id": ["r1"], "rider_id": ["a"], "finish_rank": [1]})
+    clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
+    affiliations = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [f"{season}-06-01"], "club_id": ["5244001"]}
+    )
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a"],
+        "start_date": [f"{season}-01-01"],
+        "rider_category": pd.array([None], dtype="Int64"),
+    })
+    results = get_rider_results(
+        races, rankings, clubs, affiliations, rider_categories, "a", f"{season}-10-01"
+    )
+    assert results[["category", "club"]].values.tolist() == [[UNKNOWN_CATEGORY, UNKNOWN_CLUB]]

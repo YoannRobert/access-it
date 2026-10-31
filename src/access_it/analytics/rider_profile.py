@@ -29,16 +29,13 @@ import pandas as pd
 
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, add_category_and_club_on_race_date, add_value_on_race_date, count_wins_and_tops,
-    format_category, format_club, get_region_club_ids, get_regional_committee_id, to_datetime
+    CATEGORIES, add_value_on_race_date, count_wins_and_tops, format_category, format_club,
+    get_region_club_ids, get_regional_committee_id, get_rider_results, to_datetime, to_day
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.common.regions import PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
 
-RESULT_COLUMNS = [
-    "rider_id", "race_date", "season", "race_id", "title", "finish_rank", "category", "club"
-]
 SEASON_POINTS_COLUMNS = [
     "rider_id", "season",
     *[f"promotion_points_{c.lower()}" for c in CATEGORIES],
@@ -52,7 +49,7 @@ class RiderProfile:
     """Profile of a rider (see the functions of the module for the columns).
 
     Attributes:
-        results: Output of get_rider_results.
+        results: Output of get_rider_results (ranking_tools).
         categories: Output of get_rider_categories.
         clubs: Output of get_rider_clubs.
         season_stats: Output of count_wins_and_tops (ranking_tools).
@@ -65,62 +62,6 @@ class RiderProfile:
     season_stats: pd.DataFrame
     season_points: pd.DataFrame
     recent_form: pd.DataFrame
-
-
-def _to_day(reference_date: str | pd.Timestamp) -> pd.Timestamp:
-    """Reference date as a timestamp at midnight."""
-    return to_datetime(pd.Series([reference_date])).dt.normalize().iloc[0]
-
-
-def get_rider_results(
-        races: pd.DataFrame,
-        rankings: pd.DataFrame,
-        clubs: pd.DataFrame,
-        affiliations: pd.DataFrame,
-        rider_categories: pd.DataFrame,
-        rider_id: str,
-        reference_date: str | pd.Timestamp
-    ) -> pd.DataFrame:
-    """Results of a rider, from the most recent to the oldest.
-
-    Two races of the same day are ordered by finish rank (best place first),
-    then by race_id, as in compute_recent_form.
-
-    Args:
-        races: Race table.
-        rankings: Ranking table.
-        clubs: Club table.
-        affiliations: Affiliation table (club history of the riders).
-        rider_categories: Category history of the riders.
-        rider_id: Rider to show.
-        reference_date: Day of the profile, as "YYYY-MM-DD" or a date; its
-            races and the later ones are excluded.
-
-    Returns:
-        One row per race of the rider: the RESULT_COLUMNS, with the category
-        ("A1" to "A4") and the club name of the rider on the race date
-        (UNKNOWN_CATEGORY or UNKNOWN_CLUB if unknown).
-    """
-    day = _to_day(reference_date)
-    results = (
-        rankings.loc[rankings["rider_id"] == rider_id, ["race_id", "rider_id", "finish_rank"]]
-        .merge(races[["race_id", "race_date", "season", "title"]], on="race_id")
-        .assign(race_date=lambda df: to_datetime(df["race_date"]))
-    )
-    results = results[
-        results["season"].between(FIRST_SEASON, day.year) & (results["race_date"] < day)
-    ]
-    results = add_category_and_club_on_race_date(
-        results,
-        clubs,
-        affiliations[affiliations["rider_id"] == rider_id],
-        rider_categories[rider_categories["rider_id"] == rider_id]
-    )
-    return (
-        results[RESULT_COLUMNS]
-        .sort_values(["race_date", "finish_rank", "race_id"], ascending=[False, True, False])
-        .reset_index(drop=True)
-    )
 
 
 def _get_periods(
@@ -137,7 +78,7 @@ def _get_periods(
     reference date are kept, and their start_date is moved to the first day
     of FIRST_SEASON if earlier.
     """
-    day = _to_day(reference_date)
+    day = to_day(reference_date)
     first_day = pd.Timestamp(year=FIRST_SEASON, month=1, day=1)
     periods = (
         history.loc[history["rider_id"] == rider_id, ["rider_id", "start_date", column]]
@@ -244,7 +185,8 @@ def compute_season_points(
     """Promotion and challenge points of each rider and season, by category.
 
     Args:
-        rider_results: Output of get_rider_results (one or several riders).
+        rider_results: Output of get_rider_results of ranking_tools (one or several
+            riders).
         promotion_points: Outputs of compute_promotion_points of the seasons,
             concatenated.
         challenge_points: Outputs of compute_challenge_points of the seasons

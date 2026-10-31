@@ -6,9 +6,10 @@ import pytest
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.promotion_points import compute_promotion_points
 from access_it.analytics.regional_rankings import compute_challenge_points
+from access_it.analytics.ranking_tools import get_rider_results
 from access_it.analytics.rider_profile import (
-    RESULT_COLUMNS, SEASON_POINTS_COLUMNS, RiderProfile, compute_rider_profile,
-    compute_season_points, get_rider_categories, get_rider_clubs, get_rider_results
+    SEASON_POINTS_COLUMNS, RiderProfile, compute_rider_profile, compute_season_points,
+    get_rider_categories, get_rider_clubs
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
@@ -79,56 +80,6 @@ def season_points_of(tables: dict, promotion: list[tuple], challenge: list[tuple
         results, points_of(promotion), points_of(challenge), CLUBS, DEPARTEMENTAL_COMMITTEES,
         REGIONAL_COMMITTEES, tables["affiliations"]
     ).set_index(["rider_id", "season"])
-
-
-def test_results_from_the_most_recent_with_category_and_club_on_the_race_date():
-    tables = make_tables(
-        races=[("r1", f"{SEASON}-03-01", "44"), ("r2", f"{SEASON}-06-01", "56")],
-        results=[("r1", "a", 4), ("r2", "a", 1)],
-        clubs={"a": [(f"{SEASON}-01-01", PDL), (f"{SEASON}-05-01", BZH)]},
-        categories={"a": [(f"{SEASON}-01-01", 3), (f"{SEASON}-05-01", 2)]},
-    )
-    results = results_of(tables)
-    assert results.columns.tolist() == RESULT_COLUMNS
-    assert results["category"].dtype == "str"
-    assert results[["race_id", "finish_rank", "category", "club"]].values.tolist() == [
-        ["r2", 1, "A2", "Club Vannes"], ["r1", 4, "A3", "Club Nantes"]
-    ]
-
-
-def test_results_keep_the_seasons_covered_before_the_reference_date():
-    tables = make_tables(
-        races=[
-            ("r0", f"{FIRST_SEASON - 1}-06-01", "44"), ("r1", f"{SEASON}-09-30", "44"),
-            ("r2", REFERENCE_DATE, "44")
-        ],
-        results=[("r0", "a", 1), ("r1", "a", 1), ("r2", "a", 1)],
-        clubs={"a": [(f"{FIRST_SEASON - 1}-01-01", PDL)]},
-        categories={"a": [(f"{FIRST_SEASON - 1}-01-01", 1)]},
-    )
-    assert results_of(tables)["race_id"].tolist() == ["r1"]
-
-
-def test_results_of_the_same_day_keep_the_best_place_first():
-    tables = make_tables(
-        races=[("r1", f"{SEASON}-06-01", "44"), ("r2", f"{SEASON}-06-01", "44")],
-        results=[("r1", "a", 5), ("r2", "a", 2)],
-        clubs={"a": [(f"{SEASON}-01-01", PDL)]},
-        categories={"a": [(f"{SEASON}-01-01", 3)]},
-    )
-    assert results_of(tables)["race_id"].tolist() == ["r2", "r1"]
-
-
-def test_results_with_unknown_category_and_club():
-    tables = make_tables(
-        races=[("r1", f"{SEASON}-03-01", "44")],
-        results=[("r1", "a", 1)],
-        clubs={"a": [(f"{SEASON}-06-01", PDL)]},
-        categories={"a": [(f"{SEASON}-01-01", None)]},
-    )
-    assert results_of(tables)[["category", "club"]].values.tolist() == [
-        [UNKNOWN_CATEGORY, UNKNOWN_CLUB]
-    ]
 
 
 def test_category_periods_from_the_first_season_to_the_reference_date():
