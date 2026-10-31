@@ -3,7 +3,7 @@
 Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: default reference date,
 races and clubs of a region, category and club of a rider on the race date,
-places in a race, wins and tops of the riders by season, points of a scale,
+places in a race, wins and tops of the riders (or other groups), points of a scale,
 ranking of the riders with its tie-breaks, shared rank of tied rows, filter
 on a category, checks of the requested categories and of the categories of
 the races, and filter of the results on the categories.
@@ -255,28 +255,41 @@ def compute_places(results: pd.DataFrame) -> pd.Series:
     return results.groupby("race_id")["finish_rank"].rank(method="min").astype(int)
 
 
-def count_wins_and_tops(rider_results: pd.DataFrame) -> pd.DataFrame:
-    """Number of races, wins and tops of each rider and season.
+def count_wins_and_tops(
+        results: pd.DataFrame,
+        by: Sequence[str] = ("rider_id", "season")
+    ) -> pd.DataFrame:
+    """Number of results, wins and tops of each group of results.
+
+    By default, the groups are the riders and seasons (rider_profile,
+    season_stats). With by=("club_id",) and the club of each rider on the race
+    date, the groups are the clubs (club_rankings).
 
     Args:
-        rider_results: Results with rider_id, season and finish_rank, such as
-            the output of get_rider_results of rider_profile (one or several riders).
+        results: One result per row, with race_id, finish_rank and the
+            columns of `by`, such as the output of get_rider_results of
+            rider_profile (one or several riders).
+        by: Columns defining the groups.
 
     Returns:
-        One row per rider and season with a race: the SEASON_STATS_COLUMNS
-        (inclusive tops); sorted by rider and from the oldest season.
+        One row per group with a result: the columns of `by`, then nb_races
+        (number of results of the group), nb_wins and nb_top_3 to nb_top_20
+        (inclusive tops); sorted by the columns of `by`. With the default
+        `by`, the columns are the SEASON_STATS_COLUMNS.
     """
-    stats = rider_results.assign(
-        is_win=rider_results["finish_rank"] <= 1,
-        **{f"is_top_{n}": rider_results["finish_rank"] <= n for n in TOP_THRESHOLDS}
-    ).groupby(["rider_id", "season"]).agg(
+    keys = list(by)
+    count_columns = ["nb_races", "nb_wins", *[f"nb_top_{n}" for n in TOP_THRESHOLDS]]
+    stats = results.assign(
+        is_win=results["finish_rank"] <= 1,
+        **{f"is_top_{n}": results["finish_rank"] <= n for n in TOP_THRESHOLDS}
+    ).groupby(keys).agg(
         nb_races=("race_id", "size"),
         nb_wins=("is_win", "sum"),
         **{f"nb_top_{n}": (f"is_top_{n}", "sum") for n in TOP_THRESHOLDS}
     ).astype(int).reset_index()
     return (
-        stats[SEASON_STATS_COLUMNS]
-        .sort_values(["rider_id", "season"])
+        stats[[*keys, *count_columns]]
+        .sort_values(keys)
         .reset_index(drop=True)
     )
 

@@ -36,6 +36,20 @@ def test_wins_and_tops_count_inclusive_tops_and_ties():
     ]
 
 
+def test_wins_and_tops_by_club():
+    results = pd.DataFrame({
+        "club_id": ["5244001", "5285001", "5244001", "5244001"],
+        "race_id": ["r1", "r1", "r2", "r3"],
+        "finish_rank": [1, 2, 4, 25],
+    })
+    stats = count_wins_and_tops(results, by=("club_id",))
+    assert stats.columns.tolist() == ["club_id", *SEASON_STATS_COLUMNS[2:]]
+    assert stats.values.tolist() == [
+        ["5244001", 3, 1, 1, 2, 2, 2],
+        ["5285001", 1, 0, 1, 1, 1, 1],
+    ]
+
+
 def test_points_of_the_scale_and_none_for_an_unknown_category():
     results = pd.DataFrame({"place": [1, 2, 3, 2], "category": ["A1", "A1", "A1", None]})
     assert scale_points(results, (6, 4)).tolist() == [6, 4, 0, 0]
