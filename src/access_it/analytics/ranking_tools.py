@@ -5,8 +5,8 @@ Used by the regional challenge (regional_rankings), the promotion points
 races and clubs of a region, category and club of a rider on the race date,
 places in a race, wins and tops of the riders (or other groups), points of a scale,
 ranking of the riders with its tie-breaks, shared rank of tied rows, filter
-on a category, checks of the requested categories and of the categories of
-the races, and filter of the results on the categories.
+on a category, label of a category, checks of the requested categories and of
+the categories of the races, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -132,15 +132,18 @@ def add_value_on_race_date(
     ).drop(columns="start_date")
 
 
+def format_category(rider_category: object) -> str | None:
+    """Label of a category of the history: "A1" to "A4", or None if unknown."""
+    return None if pd.isna(rider_category) else f"A{int(rider_category)}"
+
+
 def add_category_on_race_date(
         results: pd.DataFrame,
         rider_categories: pd.DataFrame
     ) -> pd.DataFrame:
     """Add the category of the rider on the race date ("A1" to "A4", missing if unknown)."""
     results = add_value_on_race_date(results, rider_categories, "rider_category")
-    results["category"] = results["rider_category"].map(
-        lambda c: None if pd.isna(c) else f"A{int(c)}"
-    )
+    results["category"] = results["rider_category"].map(format_category)
     return results.drop(columns="rider_category")
 
 
@@ -163,6 +166,16 @@ def add_category_and_club_on_race_date(
         results["club_id"].map(clubs.set_index("club_id")["name"]).fillna(UNKNOWN_CLUB)
     )
     return results.drop(columns="club_id")
+
+
+def check_category(category: str) -> None:
+    """Check that the category is one of "A1" to "A4".
+
+    Raises:
+        ValueError: If the category is not one of CATEGORIES.
+    """
+    if category not in CATEGORIES:
+        raise ValueError(f"Unknown category: {category!r} (expected one of {CATEGORIES})")
 
 
 def check_categories(categories: Sequence[str]) -> tuple[str, ...]:
@@ -393,8 +406,7 @@ def select_category(rankings: pd.DataFrame, category: str) -> pd.DataFrame:
     Raises:
         ValueError: If the category is not one of "A1" to "A4".
     """
-    if category not in CATEGORIES:
-        raise ValueError(f"Unknown category: {category!r} (expected one of {CATEGORIES})")
+    check_category(category)
     return (
         rankings[rankings["category"] == category]
         .drop(columns="category")

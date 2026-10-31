@@ -6,9 +6,10 @@ import pytest
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, add_shared_rank, check_categories,
-    check_race_categories, compute_places, count_wins_and_tops, filter_results_by_categories,
-    get_reference_date, get_region_club_ids, get_region_races, rank_scoring_riders,
-    scale_points, select_category, select_club, to_datetime
+    check_category, check_race_categories, compute_places, count_wins_and_tops,
+    filter_results_by_categories, format_category, get_reference_date, get_region_club_ids,
+    get_region_races, rank_scoring_riders, scale_points, select_category, select_club,
+    to_datetime
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -82,6 +83,19 @@ def test_riders_ranked_by_points_then_places_then_names():
 def test_unknown_category_raises():
     with pytest.raises(ValueError, match="Unknown category"):
         select_category(pd.DataFrame(columns=["category"]), "A5")
+
+
+def test_check_category_accepts_a1_to_a4_and_raises_otherwise():
+    for category in ("A1", "A2", "A3", "A4"):
+        check_category(category)
+    with pytest.raises(ValueError, match="Unknown category: 'A5'"):
+        check_category("A5")
+
+
+def test_category_labels_of_the_history():
+    assert [format_category(c) for c in pd.array([1, 4], dtype="Int8")] == ["A1", "A4"]
+    assert format_category(pd.NA) is None
+    assert format_category(None) is None
 
 
 def test_reference_date_is_the_day_after_the_last_race():

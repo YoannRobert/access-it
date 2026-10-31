@@ -30,7 +30,7 @@ import pandas as pd
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     CATEGORIES, add_category_and_club_on_race_date, add_value_on_race_date, count_wins_and_tops,
-    get_region_club_ids, get_regional_committee_id, to_datetime
+    format_category, get_region_club_ids, get_regional_committee_id, to_datetime
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.common.regions import PAYS_DE_LA_LOIRE
@@ -173,9 +173,11 @@ def get_rider_categories(
         to "A4", or UNKNOWN_CATEGORY).
     """
     periods = _get_periods(rider_categories, "rider_category", rider_id, reference_date)
-    periods["category"] = periods["rider_category"].map(
-        lambda c: UNKNOWN_CATEGORY if pd.isna(c) else f"A{int(c)}"
-    ).astype(str)
+    # astype(object): the labels may be all None, or the history empty
+    periods["category"] = (
+        periods["rider_category"].map(format_category)
+        .astype(object).fillna(UNKNOWN_CATEGORY).astype(str)
+    )
     return periods[["rider_id", "start_date", "end_date", "category"]]
 
 
