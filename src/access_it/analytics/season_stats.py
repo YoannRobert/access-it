@@ -35,7 +35,7 @@ import pandas as pd
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     CATEGORIES, CATEGORY_COMBINATIONS, TOP_THRESHOLDS, add_category_on_race_date,
-    add_value_on_race_date, check_race_categories, count_wins_and_tops,
+    add_shared_rank, add_value_on_race_date, check_race_categories, count_wins_and_tops,
     filter_results_by_categories, get_region_races, get_regional_committee_id, select_club,
     to_datetime
 )
@@ -282,10 +282,7 @@ def rank_most_titled_riders(
         .head(max_riders)
         .reset_index(drop=True)
     )
-    # Riders tied on every count share the rank of the first of them
-    is_first_of_tie = titled[criteria].ne(titled[criteria].shift()).any(axis=1)
-    titled["rank"] = pd.Series(titled.index + 1).where(is_first_of_tie).ffill().astype(int)
-    return titled[MOST_TITLED_COLUMNS]
+    return add_shared_rank(titled, criteria)[MOST_TITLED_COLUMNS]
 
 
 def compute_season_summary(

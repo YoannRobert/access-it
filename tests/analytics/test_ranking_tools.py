@@ -5,7 +5,7 @@ import pytest
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, check_categories,
+    SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, add_shared_rank, check_categories,
     check_race_categories, compute_places, count_wins_and_tops, filter_results_by_categories,
     get_reference_date, get_region_club_ids, get_region_races, rank_scoring_riders,
     scale_points, select_category, select_club, to_datetime
@@ -194,3 +194,14 @@ def test_results_filtered_on_the_categories_of_the_riders_keep_order_and_index()
 def test_unknown_category_filter_raises():
     with pytest.raises(ValueError, match="Unknown category filter"):
         filter_results_by_categories(FILTER_RESULTS, FILTER_RIDER_CATEGORIES, ["A1"], "club")
+
+
+def test_rows_tied_on_every_criterion_share_the_rank():
+    df = pd.DataFrame(
+        {"nb_wins": [3, 2, 2, 2, 1], "nb_top_3": [1, 5, 5, 4, 0], "name": list("vwxyz")},
+        index=[7, 3, 9, 1, 5]
+    )
+    ranked = add_shared_rank(df, ["nb_wins", "nb_top_3"])
+    assert ranked.columns.tolist() == ["nb_wins", "nb_top_3", "name", "rank"]
+    assert ranked.index.tolist() == [7, 3, 9, 1, 5]
+    assert ranked["rank"].tolist() == [1, 2, 2, 4, 5]

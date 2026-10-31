@@ -4,9 +4,9 @@ Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: default reference date,
 races and clubs of a region, category and club of a rider on the race date,
 places in a race, wins and tops of the riders by season, points of a scale,
-ranking of the riders with its tie-breaks, filter on a category, checks of
-the requested categories and of the categories of the races, and filter of
-the results on the categories.
+ranking of the riders with its tie-breaks, shared rank of tied rows, filter
+on a category, checks of the requested categories and of the categories of
+the races, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -288,6 +288,25 @@ def scale_points(results: pd.DataFrame, scale: tuple[int, ...]) -> pd.Series:
     """
     points = results["place"].map(lambda p: scale[p - 1] if p <= len(scale) else 0)
     return points.where(results["category"].notna(), 0)
+
+
+def add_shared_rank(df: pd.DataFrame, criteria: Sequence[str]) -> pd.DataFrame:
+    """Add the rank of each row of a sorted table: rows tied on every criterion share it.
+
+    The shared rank is that of the first row of the tie, and the next rank
+    is skipped (1, 2, 2, 4).
+
+    Args:
+        df: Rows already sorted from the first to the last.
+        criteria: Columns compared to find the ties.
+
+    Returns:
+        A copy of `df` with an integer rank column added, same index.
+    """
+    values = df[list(criteria)]
+    is_first_of_tie = values.ne(values.shift()).any(axis=1)
+    positions = pd.Series(range(1, len(df) + 1), index=df.index)
+    return df.assign(rank=positions.where(is_first_of_tie).ffill().astype(int))
 
 
 def select_club(clubs_by_date: pd.Series) -> str:
