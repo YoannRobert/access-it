@@ -37,10 +37,8 @@ from access_it.analytics.ranking_tools import (
     CATEGORIES, TOP_THRESHOLDS, add_category_on_race_date, add_value_on_race_date,
     count_wins_and_tops, get_region_races, get_regional_committee_id, select_club, to_datetime
 )
-from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
+from access_it.common.regions import check_covered_region
 from access_it.common.seasons import FIRST_SEASON
-
-COVERED_REGIONS = (BRETAGNE, PAYS_DE_LA_LOIRE)
 
 # Contiguous combinations of the categories of a race, as stored, in display order
 CATEGORY_COMBINATIONS = (
@@ -76,16 +74,6 @@ class SeasonSummary:
     races_by_categories: pd.DataFrame
     ranked_riders: pd.DataFrame
     most_titled_riders: pd.DataFrame
-
-
-def _check_region(region: str) -> None:
-    """Check that the region is covered.
-
-    Raises:
-        ValueError: If the region is not one of COVERED_REGIONS.
-    """
-    if region not in COVERED_REGIONS:
-        raise ValueError(f"Region not covered: {region!r} (expected one of {COVERED_REGIONS})")
 
 
 def _check_categories(categories: Sequence[str]) -> tuple[str, ...]:
@@ -146,7 +134,7 @@ def get_season_results(
         raise ValueError(
             f"Unknown category filter: {category_filter!r} (expected 'race' or 'rider')"
         )
-    _check_region(region)
+    check_covered_region(region)
     if season < FIRST_SEASON:
         raise ValueError(f"Season {season} is before the first season {FIRST_SEASON}")
     requested = _check_categories(categories)
@@ -223,7 +211,7 @@ def count_races_by_departement(
     Raises:
         ValueError: If the region is not covered or unknown.
     """
-    _check_region(region)
+    check_covered_region(region)
     region_id = get_regional_committee_id(regional_committees, region)
     codes = departemental_committees.loc[
         departemental_committees["regional_committee_id"] == region_id, "departement_code"
