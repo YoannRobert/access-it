@@ -7,9 +7,9 @@ from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, add_shared_rank, check_categories,
     check_category, check_race_categories, compute_places, count_wins_and_tops,
-    filter_results_by_categories, format_category, get_reference_date, get_region_club_ids,
-    get_region_races, rank_scoring_riders, scale_points, select_category, select_club,
-    to_datetime
+    filter_results_by_categories, format_category, format_club, get_reference_date,
+    get_region_club_ids, get_region_races, rank_scoring_riders, scale_points, select_category,
+    select_club, to_datetime
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -96,6 +96,14 @@ def test_category_labels_of_the_history():
     assert [format_category(c) for c in pd.array([1, 4], dtype="Int8")] == ["A1", "A4"]
     assert format_category(pd.NA) is None
     assert format_category(None) is None
+
+
+def test_club_names_with_a_label_when_unknown():
+    clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
+    club_ids = pd.Series(["5244001", "5244999", None], index=[3, 1, 2])
+    names = format_club(club_ids, clubs)
+    assert names.index.tolist() == [3, 1, 2]
+    assert names.tolist() == ["Club Nantes", UNKNOWN_CLUB, UNKNOWN_CLUB]
 
 
 def test_reference_date_is_the_day_after_the_last_race():

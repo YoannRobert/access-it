@@ -27,10 +27,10 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
+from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY
 from access_it.analytics.ranking_tools import (
     CATEGORIES, add_category_and_club_on_race_date, add_value_on_race_date, count_wins_and_tops,
-    format_category, get_region_club_ids, get_regional_committee_id, to_datetime
+    format_category, format_club, get_region_club_ids, get_regional_committee_id, to_datetime
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.common.regions import PAYS_DE_LA_LOIRE
@@ -200,9 +200,7 @@ def get_rider_clubs(
         UNKNOWN_CLUB).
     """
     periods = _get_periods(affiliations, "club_id", rider_id, reference_date)
-    periods["club"] = (
-        periods["club_id"].map(clubs.set_index("club_id")["name"]).fillna(UNKNOWN_CLUB)
-    )
+    periods["club"] = format_club(periods["club_id"], clubs)
     return periods[["rider_id", "start_date", "end_date", "club"]]
 
 

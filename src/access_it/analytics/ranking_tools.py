@@ -5,8 +5,9 @@ Used by the regional challenge (regional_rankings), the promotion points
 races and clubs of a region, category and club of a rider on the race date,
 places in a race, wins and tops of the riders (or other groups), points of a scale,
 ranking of the riders with its tie-breaks, shared rank of tied rows, filter
-on a category, label of a category, checks of the requested categories and of
-the categories of the races, and filter of the results on the categories.
+on a category, labels of a category and of a club, checks of the requested
+categories and of the categories of the races, and filter of the results on
+the categories.
 """
 
 from collections.abc import Sequence
@@ -137,6 +138,19 @@ def format_category(rider_category: object) -> str | None:
     return None if pd.isna(rider_category) else f"A{int(rider_category)}"
 
 
+def format_club(club_ids: pd.Series, clubs: pd.DataFrame) -> pd.Series:
+    """Names of the clubs, or UNKNOWN_CLUB if the club ID is missing or not in the club table.
+
+    Args:
+        club_ids: Club IDs.
+        clubs: Club table.
+
+    Returns:
+        The club names, with the index of `club_ids`.
+    """
+    return club_ids.map(clubs.set_index("club_id")["name"]).fillna(UNKNOWN_CLUB)
+
+
 def add_category_on_race_date(
         results: pd.DataFrame,
         rider_categories: pd.DataFrame
@@ -162,9 +176,7 @@ def add_category_and_club_on_race_date(
     results = add_value_on_race_date(results, affiliations, "club_id")
     # astype(object): a column of unknown categories only keeps the integer dtype of the history
     results["category"] = results["category"].astype(object).fillna(UNKNOWN_CATEGORY).astype(str)
-    results["club"] = (
-        results["club_id"].map(clubs.set_index("club_id")["name"]).fillna(UNKNOWN_CLUB)
-    )
+    results["club"] = format_club(results["club_id"], clubs)
     return results.drop(columns="club_id")
 
 
