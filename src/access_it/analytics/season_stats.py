@@ -34,16 +34,13 @@ import pandas as pd
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, TOP_THRESHOLDS, add_category_on_race_date, add_value_on_race_date,
-    count_wins_and_tops, get_region_races, get_regional_committee_id, select_club, to_datetime
+    CATEGORIES, CATEGORY_COMBINATIONS, TOP_THRESHOLDS, add_category_on_race_date,
+    add_value_on_race_date, check_race_categories, count_wins_and_tops,
+    filter_results_by_categories, get_region_races, get_regional_committee_id, select_club,
+    to_datetime
 )
 from access_it.common.regions import check_covered_region
 from access_it.common.seasons import FIRST_SEASON
-
-# Contiguous combinations of the categories of a race, as stored, in display order
-CATEGORY_COMBINATIONS = (
-    "A1", "A2", "A3", "A4", "A1,A2", "A2,A3", "A3,A4", "A1,A2,A3", "A2,A3,A4", "A1,A2,A3,A4"
-)
 
 SEASON_RESULT_COLUMNS = [
     "race_id", "race_date", "departement_code", "categories", "rider_id", "finish_rank"
@@ -74,24 +71,6 @@ class SeasonSummary:
     races_by_categories: pd.DataFrame
     ranked_riders: pd.DataFrame
     most_titled_riders: pd.DataFrame
-
-
-def _check_categories(categories: Sequence[str]) -> tuple[str, ...]:
-    """Requested categories without duplicates, from the highest one ("A1") to the lowest one.
-
-    Raises:
-        ValueError: If no category is given, if one is not "A1" to "A4", or
-            if they are not contiguous.
-    """
-    requested = set(categories)
-    if not requested or not requested <= set(CATEGORIES):
-        raise ValueError(
-            f"Invalid categories: {list(categories)!r} (expected some of {CATEGORIES})"
-        )
-    ordered = tuple(c for c in CATEGORIES if c in requested)
-    if ",".join(ordered) not in CATEGORY_COMBINATIONS:
-        raise ValueError(f"Categories not contiguous: {list(ordered)!r}")
-    return ordered
 
 
 def get_season_results(
@@ -125,32 +104,18 @@ def get_season_results(
         and rider_id.
 
     Raises:
-        ValueError: If category_filter is not "race" or "rider", if the region
-            is not covered or unknown, if the season is before FIRST_SEASON, if
-            the requested categories are invalid, or if a race of the season
-            and the region has non contiguous categories.
+        ValueError: If the region is not covered or unknown, if the season is
+            before FIRST_SEASON, if a race of the season and the region has non
+            contiguous categories, if category_filter is not "race" or "rider",
+            or if the requested categories are invalid.
     """
-    if category_filter not in ("race", "rider"):
-        raise ValueError(
-            f"Unknown category filter: {category_filter!r} (expected 'race' or 'rider')"
-        )
     check_covered_region(region)
     if season < FIRST_SEASON:
         raise ValueError(f"Season {season} is before the first season {FIRST_SEASON}")
-    requested = _check_categories(categories)
 
     region_id = get_regional_committee_id(regional_committees, region)
     season_races = get_region_races(races, departemental_committees, region_id, season)
-    is_contiguous = season_races["categories"].isin(CATEGORY_COMBINATIONS)
-    if not is_contiguous.all():
-        race_ids = season_races.loc[~is_contiguous, "race_id"].tolist()
-        raise ValueError(f"Races with non contiguous categories: {race_ids!r}")
-    if category_filter == "race":
-        has_requested = season_races["categories"].map(
-            lambda c: not set(c.split(",")).isdisjoint(requested)
-        ).astype(bool)
-        season_races = season_races.loc[has_requested]
-
+    check_race_categories(season_races)
     results = (
         rankings[["race_id", "rider_id", "finish_rank"]]
         .merge(
@@ -159,9 +124,7 @@ def get_season_results(
         )
         .assign(race_date=lambda df: to_datetime(df["race_date"]))
     )
-    if category_filter == "rider":
-        results = add_category_on_race_date(results, rider_categories)
-        results = results[results["category"].isin(requested)]
+    results = filter_results_by_categories(results, rider_categories, categories, category_filter)
     return (
         results[SEASON_RESULT_COLUMNS]
         .sort_values(["race_date", "race_id", "finish_rank", "rider_id"])

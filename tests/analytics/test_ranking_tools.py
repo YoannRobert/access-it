@@ -5,9 +5,10 @@ import pytest
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, compute_places,
-    count_wins_and_tops, get_reference_date, get_region_club_ids, get_region_races,
-    rank_scoring_riders, scale_points, select_category, select_club, to_datetime
+    SEASON_STATS_COLUMNS, add_category_and_club_on_race_date, check_categories,
+    check_race_categories, compute_places, count_wins_and_tops, filter_results_by_categories,
+    get_reference_date, get_region_club_ids, get_region_races, rank_scoring_riders,
+    scale_points, select_category, select_club, to_datetime
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -131,3 +132,65 @@ def test_category_and_club_on_the_race_date_with_labels_when_unknown():
     assert labelled[["category", "club"]].values.tolist() == [
         ["A3", UNKNOWN_CLUB], ["A2", "Club Nantes"], [UNKNOWN_CATEGORY, UNKNOWN_CLUB]
     ]
+
+
+def test_requested_categories_are_ordered_without_duplicates():
+    assert check_categories(["A3", "A2", "A3"]) == ("A2", "A3")
+
+
+@pytest.mark.parametrize(
+    "categories, message",
+    [([], "Invalid categories"), (["A1", "A5"], "Invalid categories"),
+     (["A1", "A3"], "Categories not contiguous")]
+)
+def test_invalid_requested_categories_raise(categories, message):
+    with pytest.raises(ValueError, match=message):
+        check_categories(categories)
+
+
+def test_races_with_non_contiguous_categories_raise():
+    races = pd.DataFrame({"race_id": ["r1", "r2", "r3"], "categories": ["A1,A2", "A1,A3", "A4"]})
+    check_race_categories(races.drop(index=1))
+    with pytest.raises(ValueError, match=r"Races with non contiguous categories: \['r2'\]"):
+        check_race_categories(races)
+
+
+# a goes up from A3 to A2 on May 1st; the category of c is unknown
+FILTER_RESULTS = pd.DataFrame(
+    {
+        "race_id": ["r1", "r1", "r2", "r3", "r3"],
+        "rider_id": ["a", "b", "a", "c", "b"],
+        "race_date": to_datetime(pd.Series([
+            f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-03-01",
+            f"{FIRST_SEASON}-04-01", f"{FIRST_SEASON}-04-01"
+        ])).to_numpy(),
+        "categories": ["A1,A2", "A1,A2", "A3,A4", "A4", "A4"],
+    },
+    index=[10, 11, 12, 13, 14]
+)
+FILTER_RIDER_CATEGORIES = pd.DataFrame({
+    "rider_id": ["a", "a", "b"],
+    "start_date": [f"{FIRST_SEASON}-01-01", f"{FIRST_SEASON}-05-01", f"{FIRST_SEASON}-01-01"],
+    "rider_category": pd.array([3, 2, 1], dtype="Int64"),
+})
+
+
+def test_results_filtered_on_the_categories_of_the_races_keep_order_and_index():
+    kept = filter_results_by_categories(
+        FILTER_RESULTS, FILTER_RIDER_CATEGORIES, ["A3", "A4"], "race"
+    )
+    assert kept.columns.tolist() == FILTER_RESULTS.columns.tolist()
+    assert kept.index.tolist() == [12, 13, 14]
+
+
+def test_results_filtered_on_the_categories_of_the_riders_keep_order_and_index():
+    kept = filter_results_by_categories(
+        FILTER_RESULTS, FILTER_RIDER_CATEGORIES, ["A2", "A3"], "rider"
+    )
+    assert kept.columns.tolist() == FILTER_RESULTS.columns.tolist()
+    assert kept.index.tolist() == [10, 12]
+
+
+def test_unknown_category_filter_raises():
+    with pytest.raises(ValueError, match="Unknown category filter"):
+        filter_results_by_categories(FILTER_RESULTS, FILTER_RIDER_CATEGORIES, ["A1"], "club")

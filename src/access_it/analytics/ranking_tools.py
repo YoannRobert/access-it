@@ -4,8 +4,13 @@ Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: default reference date,
 races and clubs of a region, category and club of a rider on the race date,
 places in a race, wins and tops of the riders by season, points of a scale,
-ranking of the riders with its tie-breaks, and filter on a category.
+ranking of the riders with its tie-breaks, filter on a category, checks of
+the requested categories and of the categories of the races, and filter of
+the results on the categories.
 """
+
+from collections.abc import Sequence
+from typing import Literal
 
 import pandas as pd
 
@@ -13,6 +18,11 @@ from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.etl.extract.clubs import individual_club_id_mask
 
 CATEGORIES = ("A1", "A2", "A3", "A4")
+
+# Contiguous combinations of the categories of a race, as stored, in display order
+CATEGORY_COMBINATIONS = (
+    "A1", "A2", "A3", "A4", "A1,A2", "A2,A3", "A3,A4", "A1,A2,A3", "A2,A3,A4", "A1,A2,A3,A4"
+)
 
 TOP_THRESHOLDS = (3, 5, 10, 20)
 SEASON_STATS_COLUMNS = [
@@ -153,6 +163,86 @@ def add_category_and_club_on_race_date(
         results["club_id"].map(clubs.set_index("club_id")["name"]).fillna(UNKNOWN_CLUB)
     )
     return results.drop(columns="club_id")
+
+
+def check_categories(categories: Sequence[str]) -> tuple[str, ...]:
+    """Requested categories without duplicates, from the highest one ("A1") to the lowest one.
+
+    Raises:
+        ValueError: If no category is given, if one is not "A1" to "A4", or
+            if they are not contiguous.
+    """
+    requested = set(categories)
+    if not requested or not requested <= set(CATEGORIES):
+        raise ValueError(
+            f"Invalid categories: {list(categories)!r} (expected some of {CATEGORIES})"
+        )
+    ordered = tuple(c for c in CATEGORIES if c in requested)
+    if ",".join(ordered) not in CATEGORY_COMBINATIONS:
+        raise ValueError(f"Categories not contiguous: {list(ordered)!r}")
+    return ordered
+
+
+def check_race_categories(races: pd.DataFrame) -> None:
+    """Check that the categories of every race are one of CATEGORY_COMBINATIONS.
+
+    Args:
+        races: Races with race_id and categories (as stored, e.g. "A1,A2").
+
+    Raises:
+        ValueError: If some races have non contiguous categories (their
+            race_id are given in the message).
+    """
+    is_contiguous = races["categories"].isin(CATEGORY_COMBINATIONS)
+    if not is_contiguous.all():
+        race_ids = races.loc[~is_contiguous, "race_id"].tolist()
+        raise ValueError(f"Races with non contiguous categories: {race_ids!r}")
+
+
+def filter_results_by_categories(
+        results: pd.DataFrame,
+        rider_categories: pd.DataFrame,
+        categories: Sequence[str],
+        category_filter: Literal["race", "rider"] = "race"
+    ) -> pd.DataFrame:
+    """Results of the requested categories.
+
+    "race" keeps the results of the races having at least one of the
+    requested categories; "rider" keeps the results of the riders whose
+    category on the race date is requested (unknown category: left out).
+
+    Args:
+        results: Results with categories (those of the race, as stored, e.g.
+            "A1,A2"), rider_id and race_date (converted by to_datetime).
+        rider_categories: Category history of the riders.
+        categories: Requested categories, contiguous, in any order ("A1" to "A4").
+        category_filter: "race" to filter on the categories of the races,
+            "rider" to filter on the categories of the riders on the race dates.
+
+    Returns:
+        The rows of `results` kept, with the same columns, order and index.
+
+    Raises:
+        ValueError: If category_filter is not "race" or "rider", or if the
+            requested categories are invalid (see check_categories).
+    """
+    if category_filter not in ("race", "rider"):
+        raise ValueError(
+            f"Unknown category filter: {category_filter!r} (expected 'race' or 'rider')"
+        )
+    requested = check_categories(categories)
+    if category_filter == "race":
+        is_kept = results["categories"].map(
+            lambda c: not set(c.split(",")).isdisjoint(requested)
+        ).astype(bool).to_numpy()
+    else:
+        # The categories on the race dates come back sorted by date: match them by position
+        positions = pd.RangeIndex(len(results))
+        dated = add_category_on_race_date(
+            results[["rider_id", "race_date"]].assign(position=positions), rider_categories
+        )
+        is_kept = positions.isin(dated.loc[dated["category"].isin(requested), "position"])
+    return results[is_kept]
 
 
 def compute_places(results: pd.DataFrame) -> pd.Series:
