@@ -39,7 +39,7 @@ from access_it.analytics.ranking_tools import (
     get_regional_committee_id, to_datetime
 )
 from access_it.common.regions import check_covered_region
-from access_it.common.seasons import FIRST_SEASON
+from access_it.common.seasons import FIRST_SEASON, check_season
 from access_it.etl.extract.clubs import individual_club_id_mask
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID
 
@@ -73,8 +73,7 @@ def get_club_results(
         ValueError: If the season is before FIRST_SEASON, or if a race of the
             season has non contiguous categories.
     """
-    if season < FIRST_SEASON:
-        raise ValueError(f"Season {season} is before the first season {FIRST_SEASON}")
+    check_season(season)
     season_races = races.loc[races["season"] == season, ["race_id", "race_date", "categories"]]
     check_race_categories(season_races)
     results = (

@@ -26,3 +26,13 @@ def check_first_season(first_season: int) -> None:
 
 
 check_first_season(FIRST_SEASON)  # stops any run of the ETL if the constant is wrong
+
+
+def check_season(season: int) -> None:
+    """Check that the season is covered.
+
+    Raises:
+        ValueError: If `season` is before FIRST_SEASON.
+    """
+    if season < FIRST_SEASON:
+        raise ValueError(f"Season {season} is before the first season {FIRST_SEASON}")

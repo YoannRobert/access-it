@@ -40,7 +40,7 @@ from access_it.analytics.ranking_tools import (
     to_datetime
 )
 from access_it.common.regions import check_covered_region
-from access_it.common.seasons import FIRST_SEASON
+from access_it.common.seasons import FIRST_SEASON, check_season
 
 SEASON_RESULT_COLUMNS = [
     "race_id", "race_date", "departement_code", "categories", "rider_id", "finish_rank"
@@ -110,8 +110,7 @@ def get_season_results(
             or if the requested categories are invalid.
     """
     check_covered_region(region)
-    if season < FIRST_SEASON:
-        raise ValueError(f"Season {season} is before the first season {FIRST_SEASON}")
+    check_season(season)
 
     region_id = get_regional_committee_id(regional_committees, region)
     season_races = get_region_races(races, departemental_committees, region_id, season)
