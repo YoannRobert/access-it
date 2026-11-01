@@ -143,6 +143,22 @@ def test_challenge_not_applicable_when_no_club_of_the_region():
     assert row["challenge"] == NOT_APPLICABLE
 
 
+def test_challenge_not_applicable_when_the_region_has_no_challenge():
+    tables = make_tables(
+        races=[("r1", f"{SEASON}-03-01", "56")],
+        results=[("r1", "b", 1)],
+        clubs={"b": [(f"{SEASON}-01-01", BZH)]},
+        categories={"b": [(f"{SEASON}-01-01", 3)]},
+    )
+    points = compute_season_points(
+        results_of(tables, "b"), points_of([]), points_of([]), CLUBS, DEPARTEMENTAL_COMMITTEES,
+        REGIONAL_COMMITTEES, tables["affiliations"], region=BRETAGNE
+    )
+    row = points.set_index(["rider_id", "season"]).loc[("b", SEASON)]
+    assert row[[f"challenge_points_a{c}" for c in range(1, 5)]].isna().all()
+    assert row["challenge"] == NOT_APPLICABLE
+
+
 def test_unknown_region_raises():
     tables = make_tables(
         races=[("r1", f"{SEASON}-03-01", "44")],

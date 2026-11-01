@@ -16,7 +16,8 @@ Rules:
 - a rider is concerned by the regional challenge in a season if, on the date
   of one of his races of the season, his club belongs to the region;
   otherwise his challenge points are empty and the challenge column is
-  "not applicable".
+  "not applicable"; in a region without a points scale in POINTS_SCALES of
+  regional_rankings, no rider is concerned.
 
 The functions select the riders by rider_id only; compute_season_points also
 works on the results of several riders. The
@@ -33,6 +34,7 @@ from access_it.analytics.ranking_tools import (
     get_region_club_ids, get_regional_committee_id, get_rider_results, to_datetime, to_day
 )
 from access_it.analytics.recent_form import compute_recent_form
+from access_it.analytics.regional_rankings import POINTS_SCALES
 from access_it.common.regions import PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
 
@@ -195,7 +197,8 @@ def compute_season_points(
         departemental_committees: Departemental committee table.
         regional_committees: Regional committee table.
         affiliations: Affiliation table (club history of the riders).
-        region: Name of the regional committee of the challenge.
+        region: Name of the regional committee of the challenge (no rider is
+            concerned if it has no points scale).
 
     Returns:
         One row per rider and season with a race: the SEASON_POINTS_COLUMNS
@@ -208,7 +211,10 @@ def compute_season_points(
     """
     keys = ["rider_id", "season"]
     region_id = get_regional_committee_id(regional_committees, region)
-    region_clubs = get_region_club_ids(clubs, departemental_committees, region_id)
+    region_clubs = (
+        get_region_club_ids(clubs, departemental_committees, region_id)
+        if region in POINTS_SCALES else []
+    )
     on_date = add_value_on_race_date(
         rider_results[keys + ["race_date"]],
         affiliations[affiliations["rider_id"].isin(rider_results["rider_id"])],
@@ -265,7 +271,8 @@ def compute_rider_profile(
         rider_id: Rider to show.
         reference_date: Day of the profile, as "YYYY-MM-DD" or a date
             (get_reference_date gives the default one).
-        region: Name of the regional committee of the challenge.
+        region: Name of the regional committee of the challenge (no rider is
+            concerned if it has no points scale).
         top_n: Last finish rank counting as a top N in the recent form.
         last_races: Maximum number of races used by the recent form.
         window_months: Length of the window of the recent form.
