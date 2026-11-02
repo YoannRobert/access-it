@@ -340,9 +340,10 @@ def get_rider_results(
         date (UNKNOWN_CATEGORY or UNKNOWN_CLUB if unknown).
 
     Raises:
-        ValueError: If a race of the rider has no date, then if a start date
-            of the rider in rider_categories is missing, then if a start date
-            of the rider in affiliations is missing.
+        ValueError: If a race of the rider has no date, then, if a race of
+            the rider is kept, if a start date of the rider in rider_categories
+            is missing, then if a start date of the rider in affiliations is
+            missing.
     """
     day = to_day(reference_date)
     results = (

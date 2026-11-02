@@ -83,9 +83,11 @@ def get_common_races(
         ValueError: If both riders are the same, then if one of them is not in
             the rider table, then if the season is before FIRST_SEASON, then if
             it is after the year of the reference date, then, for the rider and
-            then for the opponent, if one of his races has no date, then if one
-            of his start dates in rider_categories is missing, then if one of
-            his start dates in affiliations is missing.
+            then for the opponent, if one of his races has no date, then, if one
+            of his races is kept (from FIRST_SEASON to the reference date,
+            whatever the season), if one of his start dates in rider_categories
+            is missing, then if one of his start dates in affiliations is
+            missing.
     """
     if rider_id == opponent_id:
         raise ValueError(f"Same rider and opponent: {rider_id!r}")
@@ -178,9 +180,11 @@ def compute_head_to_head(
         ValueError: If both riders are the same, then if one of them is not in
             the rider table, then if the season is before FIRST_SEASON, then if
             it is after the year of the reference date, then, for the rider and
-            then for the opponent, if one of his races has no date, then if one
-            of his start dates in rider_categories is missing, then if one of
-            his start dates in affiliations is missing.
+            then for the opponent, if one of his races has no date, then, if one
+            of his races is kept (from FIRST_SEASON to the reference date,
+            whatever the season), if one of his start dates in rider_categories
+            is missing, then if one of his start dates in affiliations is
+            missing.
     """
     common_races = get_common_races(
         races, rankings, riders, clubs, affiliations, rider_categories, rider_id, opponent_id,

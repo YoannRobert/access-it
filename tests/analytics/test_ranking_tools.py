@@ -633,14 +633,9 @@ def test_results_with_unknown_category_and_club():
     assert results[["category", "club"]].values.tolist() == [[UNKNOWN_CATEGORY, UNKNOWN_CLUB]]
 
 
-@pytest.mark.parametrize("table, column, message", [
-    ("races", "race_date", "Missing race dates in the results"),
-    ("rider_categories", "start_date", "Missing start dates in the history"),
-    ("affiliations", "start_date", "Missing start dates in the history"),
-])
-def test_rider_results_missing_date_raises(table, column, message):
-    season = FIRST_SEASON + 1
-    tables = {
+def rider_results_tables(season: int) -> dict:
+    """Arguments of get_rider_results for one race of rider a, on March 1st of the season."""
+    return {
         "races": pd.DataFrame({
             "race_id": ["r1"], "race_date": [f"{season}-03-01"], "season": [season],
             "title": ["r1 title"],
@@ -656,6 +651,16 @@ def test_rider_results_missing_date_raises(table, column, message):
             "rider_category": pd.array([3], dtype="Int64"),
         }),
     }
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_rider_results_missing_date_raises(table, column, message):
+    season = FIRST_SEASON + 1
+    tables = rider_results_tables(season)
     tables[table].loc[0, column] = None
     with pytest.raises(ValueError, match=message):
         get_rider_results(**tables, rider_id="a", reference_date=f"{season}-10-01")
@@ -680,3 +685,13 @@ def test_rider_results_missing_race_date_raises_before_missing_start_date():
         get_rider_results(
             races, rankings, clubs, affiliations, rider_categories, "a", f"{season}-10-01"
         )
+
+
+@pytest.mark.parametrize("table", ["rider_categories", "affiliations"])
+def test_rider_results_without_a_kept_race_ignore_the_missing_start_dates(table):
+    season = FIRST_SEASON + 1
+    tables = rider_results_tables(season)
+    tables["races"].loc[0, "race_date"] = f"{season}-11-01"
+    tables[table].loc[0, "start_date"] = None
+    results = get_rider_results(**tables, rider_id="a", reference_date=f"{season}-10-01")
+    assert results.empty

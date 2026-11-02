@@ -182,3 +182,22 @@ def test_head_to_head_missing_race_date_raises_before_missing_start_date():
     tables["rider_categories"].loc[0, "start_date"] = None
     with pytest.raises(ValueError, match="Missing race dates in the results"):
         compute_head_to_head(*head_to_head_args(tables))
+
+
+@pytest.mark.parametrize("table", ["rider_categories", "affiliations"])
+def test_common_races_without_a_kept_race_ignore_the_missing_start_dates(table):
+    tables = head_to_head_tables()
+    tables["races"].loc[0, "race_date"] = f"{SEASON}-11-01"
+    tables[table].loc[0, "start_date"] = None
+    assert get_common_races(*head_to_head_args(tables)).empty
+
+
+@pytest.mark.parametrize("table", ["rider_categories", "affiliations"])
+def test_head_to_head_without_a_kept_race_ignores_the_missing_start_dates(table):
+    tables = head_to_head_tables()
+    tables["races"].loc[0, "race_date"] = f"{SEASON}-11-01"
+    tables[table].loc[0, "start_date"] = None
+    head_to_head = compute_head_to_head(*head_to_head_args(tables))
+    assert head_to_head.races.empty
+    counts = ["nb_common_races", "nb_rider_ahead", "nb_opponent_ahead", "nb_ties"]
+    assert head_to_head.summary.loc[0, counts].tolist() == [0, 0, 0, 0]
