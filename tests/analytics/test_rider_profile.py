@@ -239,3 +239,31 @@ def test_unknown_rider_raises(compute):
     )
     with pytest.raises(ValueError, match="Unknown rider: 'x'"):
         compute(tables)
+
+
+def test_rider_categories_missing_start_date_raises():
+    rider_categories = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [None], "rider_category": pd.array([3], dtype="Int64")}
+    )
+    with pytest.raises(ValueError, match="Missing start dates in the history"):
+        get_rider_categories(RIDERS, rider_categories, "a", REFERENCE_DATE)
+
+
+def test_rider_categories_unknown_rider_raises_before_missing_start_date():
+    rider_categories = pd.DataFrame(
+        {"rider_id": ["x"], "start_date": [None], "rider_category": pd.array([3], dtype="Int64")}
+    )
+    with pytest.raises(ValueError, match="Unknown rider: 'x'"):
+        get_rider_categories(RIDERS, rider_categories, "x", REFERENCE_DATE)
+
+
+def test_rider_clubs_missing_start_date_raises():
+    affiliations = pd.DataFrame({"rider_id": ["a"], "start_date": [None], "club_id": [PDL]})
+    with pytest.raises(ValueError, match="Missing start dates in the history"):
+        get_rider_clubs(RIDERS, CLUBS, affiliations, "a", REFERENCE_DATE)
+
+
+def test_rider_clubs_unknown_rider_raises_before_missing_start_date():
+    affiliations = pd.DataFrame({"rider_id": ["x"], "start_date": [None], "club_id": [PDL]})
+    with pytest.raises(ValueError, match="Unknown rider: 'x'"):
+        get_rider_clubs(RIDERS, CLUBS, affiliations, "x", REFERENCE_DATE)

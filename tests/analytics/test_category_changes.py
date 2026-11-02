@@ -143,3 +143,24 @@ def test_changes_filtered_on_the_category_of_arrival():
 def test_invalid_arguments_raise(kwargs, message):
     with pytest.raises(ValueError, match=message):
         category_changes(**kwargs)
+
+
+@pytest.mark.parametrize("table", ["rider_categories", "affiliations"])
+def test_category_changes_missing_date_raises(table):
+    tables = {"rider_categories": RIDER_CATEGORIES.copy(), "affiliations": AFFILIATIONS.copy()}
+    tables[table].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing start dates in the history"):
+        compute_category_changes(
+            tables["rider_categories"], RIDERS, CLUBS, tables["affiliations"],
+            DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES, SEASON
+        )
+
+
+def test_category_changes_unknown_category_raises_before_missing_start_date():
+    rider_categories = RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Unknown category"):
+        compute_category_changes(
+            rider_categories, RIDERS, CLUBS, AFFILIATIONS, DEPARTEMENTAL_COMMITTEES,
+            REGIONAL_COMMITTEES, SEASON, category="A5"
+        )

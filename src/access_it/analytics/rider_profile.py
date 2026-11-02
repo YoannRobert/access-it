@@ -31,9 +31,9 @@ import pandas as pd
 
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, add_value_on_race_date, check_rider, count_wins_and_tops, format_category,
-    format_club, get_region_club_ids, get_regional_committee_id, get_rider_results, to_datetime,
-    to_day
+    CATEGORIES, add_value_on_race_date, check_rider, check_start_dates, count_wins_and_tops,
+    format_category, format_club, get_region_club_ids, get_regional_committee_id,
+    get_rider_results, to_datetime, to_day
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.analytics.regional_rankings import POINTS_SCALES
@@ -81,6 +81,9 @@ def _get_periods(
     periods between the first day of FIRST_SEASON and the day before the
     reference date are kept, and their start_date is moved to the first day
     of FIRST_SEASON if earlier.
+
+    Raises:
+        ValueError: If a start date of the rider is missing.
     """
     day = to_day(reference_date)
     first_day = pd.Timestamp(year=FIRST_SEASON, month=1, day=1)
@@ -89,6 +92,7 @@ def _get_periods(
         .assign(start_date=lambda df: to_datetime(df["start_date"]))
         .sort_values("start_date")
     )
+    check_start_dates(periods["start_date"])
     periods["end_date"] = periods["start_date"].shift(-1) - pd.Timedelta(days=1)
     periods = periods[
         (periods["start_date"] < day)
@@ -120,7 +124,8 @@ def get_rider_categories(
         to "A4", or UNKNOWN_CATEGORY).
 
     Raises:
-        ValueError: If the rider is not in the rider table.
+        ValueError: If the rider is not in the rider table, then if a start
+            date of the rider in rider_categories is missing.
     """
     check_rider(riders, rider_id)
     periods = _get_periods(rider_categories, "rider_category", rider_id, reference_date)
@@ -153,7 +158,8 @@ def get_rider_clubs(
         UNKNOWN_CLUB).
 
     Raises:
-        ValueError: If the rider is not in the rider table.
+        ValueError: If the rider is not in the rider table, then if a start
+            date of the rider in affiliations is missing.
     """
     check_rider(riders, rider_id)
     periods = _get_periods(affiliations, "club_id", rider_id, reference_date)

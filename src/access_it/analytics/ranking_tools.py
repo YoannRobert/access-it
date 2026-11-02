@@ -292,6 +292,11 @@ def get_rider_results(
         One row per race of the rider: the RIDER_RESULT_COLUMNS, with the
         category ("A1" to "A4") and the club name of the rider on the race
         date (UNKNOWN_CATEGORY or UNKNOWN_CLUB if unknown).
+
+    Raises:
+        ValueError: If a race of the rider has no date, then if a start date
+            of the rider in rider_categories is missing, then if a start date
+            of the rider in affiliations is missing.
     """
     day = to_day(reference_date)
     results = (
@@ -299,6 +304,7 @@ def get_rider_results(
         .merge(races[["race_id", "race_date", "season", "title"]], on="race_id")
         .assign(race_date=lambda df: to_datetime(df["race_date"]))
     )
+    check_race_dates(results["race_date"])
     results = results[
         results["season"].between(FIRST_SEASON, day.year) & (results["race_date"] < day)
     ]

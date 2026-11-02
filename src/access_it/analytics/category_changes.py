@@ -44,8 +44,8 @@ import pandas as pd
 
 from access_it.analytics.labels import DEMOTION, FIRST_APPEARANCE, PROMOTION
 from access_it.analytics.ranking_tools import (
-    add_value_on_race_date, check_category, format_category, format_club, get_region_club_ids,
-    get_regional_committee_id, to_datetime
+    add_value_on_race_date, check_category, check_start_dates, format_category, format_club,
+    get_region_club_ids, get_regional_committee_id, to_datetime
 )
 from access_it.common.regions import check_covered_region
 from access_it.common.seasons import FIRST_SEASON, check_season
@@ -95,8 +95,11 @@ def compute_category_changes(
         appearance), category of arrival, last name, first name and rider_id.
 
     Raises:
-        ValueError: If the season is before FIRST_SEASON, if the region is
-            not covered or unknown, or if the category is not "A1" to "A4".
+        ValueError: If the season is before FIRST_SEASON, then if the region
+            is not covered, then if it is unknown, then if the category is not
+            "A1" to "A4", then if a start date of a known category in
+            rider_categories is missing, then if a start date of affiliations
+            is missing.
     """
     check_season(season)
     if region is not None:
@@ -116,6 +119,7 @@ def compute_category_changes(
         )
         .sort_values(["rider_id", "start_date"])
     )
+    check_start_dates(history["start_date"])
     history["previous_category"] = history.groupby("rider_id")["rider_category"].shift()
     changes = history[
         history["previous_category"].isna()

@@ -517,3 +517,52 @@ def test_results_with_unknown_category_and_club():
         races, rankings, clubs, affiliations, rider_categories, "a", f"{season}-10-01"
     )
     assert results[["category", "club"]].values.tolist() == [[UNKNOWN_CATEGORY, UNKNOWN_CLUB]]
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_rider_results_missing_date_raises(table, column, message):
+    season = FIRST_SEASON + 1
+    tables = {
+        "races": pd.DataFrame({
+            "race_id": ["r1"], "race_date": [f"{season}-03-01"], "season": [season],
+            "title": ["r1 title"],
+        }),
+        "rankings": pd.DataFrame({"race_id": ["r1"], "rider_id": ["a"], "finish_rank": [1]}),
+        "clubs": pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]}),
+        "affiliations": pd.DataFrame(
+            {"rider_id": ["a"], "start_date": [f"{season}-01-01"], "club_id": ["5244001"]}
+        ),
+        "rider_categories": pd.DataFrame({
+            "rider_id": ["a"],
+            "start_date": [f"{season}-01-01"],
+            "rider_category": pd.array([3], dtype="Int64"),
+        }),
+    }
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        get_rider_results(**tables, rider_id="a", reference_date=f"{season}-10-01")
+
+
+def test_rider_results_missing_race_date_raises_before_missing_start_date():
+    season = FIRST_SEASON + 1
+    races = pd.DataFrame(
+        {"race_id": ["r1"], "race_date": [None], "season": [season], "title": ["r1 title"]}
+    )
+    rankings = pd.DataFrame({"race_id": ["r1"], "rider_id": ["a"], "finish_rank": [1]})
+    clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
+    affiliations = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [f"{season}-01-01"], "club_id": ["5244001"]}
+    )
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a"],
+        "start_date": [None],
+        "rider_category": pd.array([3], dtype="Int64"),
+    })
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        get_rider_results(
+            races, rankings, clubs, affiliations, rider_categories, "a", f"{season}-10-01"
+        )
