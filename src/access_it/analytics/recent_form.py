@@ -14,7 +14,10 @@ top 5, top 10 and top 20 probabilities). Rules:
 - the rank is the absolute finish rank: a top N is finish_rank <= top_n, and
   tied riders all count; foreign riders are kept, nobody moves up;
 - a race where the rider is not ranked (did not finish or start) is absent
-  from the rankings, so it is not counted.
+  from the rankings, so it is not counted;
+- top_n is between 1 and MAX_TOP_N (tops at most 20), last_races and
+  window_months are at least 1 (checked by check_recent_form_arguments of
+  ranking_tools).
 
 Known limit: a top N is easier in a small field.
 
@@ -25,7 +28,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from access_it.analytics.ranking_tools import to_datetime, to_day
+from access_it.analytics.ranking_tools import check_recent_form_arguments, to_datetime, to_day
 
 COLUMNS = ["rider_id", "nb_races_used", "nb_top_n", "top_n_rate"]
 
@@ -49,15 +52,21 @@ def compute_recent_form(
         rider_ids: Riders to compute, chosen by the caller.
         reference_date: Day of the forecast, as "YYYY-MM-DD" or a date (the
             time of day is ignored); its races are excluded.
-        top_n: Last finish rank counting as a top N.
-        last_races: Maximum number of races used per rider.
-        window_months: Length of the window before the reference date.
+        top_n: Last finish rank counting as a top N, from 1 to MAX_TOP_N.
+        last_races: Maximum number of races used per rider, at least 1.
+        window_months: Length of the window before the reference date, at
+            least 1.
 
     Returns:
         One row per rider of rider_ids, in the same order: rider_id,
         nb_races_used, nb_top_n and top_n_rate (nb_top_n / nb_races_used,
         0 for a rider without race in the window).
+
+    Raises:
+        ValueError: If top_n is not between 1 and MAX_TOP_N, then if
+            last_races is lower than 1, then if window_months is lower than 1.
     """
+    check_recent_form_arguments(top_n, last_races, window_months)
     end = to_day(reference_date)
     start = end - pd.DateOffset(months=window_months)
     race_dates = races[["race_id", "race_date"]].assign(

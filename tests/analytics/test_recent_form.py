@@ -94,3 +94,13 @@ def test_reference_date_as_string_or_date(reference_date):
     results = [("r1", "2026-06-30", "a", 1), ("r2", "2026-07-01", "a", 1)]
     form = form_of(results, ["a"], reference_date=reference_date)
     assert form.loc["a", ["nb_races_used", "nb_top_n"]].tolist() == [1, 1]
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"top_n": 21}, "top_n must be between 1 and 20"),
+    ({"last_races": 0}, "last_races must be at least 1"),
+    ({"window_months": 0}, "window_months must be at least 1"),
+])
+def test_invalid_arguments_raise(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        form_of([("r1", "2026-06-30", "a", 1)], ["a"], **kwargs)

@@ -4,11 +4,12 @@ Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: conversion of the dates,
 default reference date, ID of a regional committee, races and clubs of a
 region, category and club of a rider on the race date, results of a rider,
-check of a rider, places in a race, wins and tops of the riders (or other
-groups), points of a scale, ranking of the riders with its tie-breaks, shared
-rank of tied rows, filter on a category, labels of a category and of a club,
-checks of the race dates and start dates, checks of the requested categories
-and of the categories of the races, and filter of the results on the categories.
+check of a rider, check of the arguments of the recent form, places in a
+race, wins and tops of the riders (or other groups), points of a scale,
+ranking of the riders with its tie-breaks, shared rank of tied rows, filter
+on a category, labels of a category and of a club, checks of the race dates
+and start dates, checks of the requested categories and of the categories of
+the races, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -28,6 +29,7 @@ CATEGORY_COMBINATIONS = (
 )
 
 TOP_THRESHOLDS = (3, 5, 10, 20)
+MAX_TOP_N = 20  # common rule of the analytics layer: tops at most 20
 SEASON_STATS_COLUMNS = [
     "rider_id", "season", "nb_races", "nb_wins", *[f"nb_top_{n}" for n in TOP_THRESHOLDS]
 ]
@@ -384,6 +386,26 @@ def check_rider(riders: pd.DataFrame, rider_id: str) -> None:
     """
     if not (riders["rider_id"] == rider_id).any():
         raise ValueError(f"Unknown rider: {rider_id!r}")
+
+
+def check_recent_form_arguments(top_n: int, last_races: int, window_months: int) -> None:
+    """Check the arguments of the recent form.
+
+    Args:
+        top_n: Last finish rank counting as a top N.
+        last_races: Maximum number of races used per rider.
+        window_months: Length of the window before the reference date.
+
+    Raises:
+        ValueError: If top_n is not between 1 and MAX_TOP_N, then if
+            last_races is lower than 1, then if window_months is lower than 1.
+    """
+    if not 1 <= top_n <= MAX_TOP_N:
+        raise ValueError(f"top_n must be between 1 and {MAX_TOP_N}, not {top_n}")
+    if last_races < 1:
+        raise ValueError(f"last_races must be at least 1, not {last_races}")
+    if window_months < 1:
+        raise ValueError(f"window_months must be at least 1, not {window_months}")
 
 
 def check_categories(categories: Sequence[str]) -> tuple[str, ...]:

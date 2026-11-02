@@ -287,12 +287,14 @@ def season_points_with(rider_results: pd.DataFrame, affiliations: pd.DataFrame) 
     )
 
 
-def profile_with(tables: dict, rider_id: str = "a", region: str = PAYS_DE_LA_LOIRE) -> RiderProfile:
-    """compute_rider_profile on the tables, without points."""
+def profile_with(
+        tables: dict, rider_id: str = "a", region: str = PAYS_DE_LA_LOIRE, **kwargs
+    ) -> RiderProfile:
+    """compute_rider_profile on the tables, without points (kwargs: recent form arguments)."""
     return compute_rider_profile(
         tables["races"], tables["rankings"], RIDERS, CLUBS, DEPARTEMENTAL_COMMITTEES,
         REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], points_of([]),
-        points_of([]), rider_id, REFERENCE_DATE, region
+        points_of([]), rider_id, REFERENCE_DATE, region, **kwargs
     )
 
 
@@ -353,3 +355,18 @@ def test_rider_profile_unknown_region_raises_before_missing_race_date():
     tables["races"].loc[0, "race_date"] = None
     with pytest.raises(ValueError, match="Unknown region"):
         profile_with(tables, region="NOWHERE")
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"top_n": 21}, "top_n must be between 1 and 20"),
+    ({"last_races": 0}, "last_races must be at least 1"),
+    ({"window_months": 0}, "window_months must be at least 1"),
+])
+def test_rider_profile_invalid_recent_form_arguments_raise(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        profile_with(profile_tables(), **kwargs)
+
+
+def test_rider_profile_invalid_top_n_raises_before_unknown_rider():
+    with pytest.raises(ValueError, match="top_n must be between 1 and 20"):
+        profile_with(profile_tables(), rider_id="x", top_n=21)

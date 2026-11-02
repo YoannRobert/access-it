@@ -31,9 +31,9 @@ import pandas as pd
 
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, add_value_on_race_date, check_rider, check_start_dates, count_wins_and_tops,
-    format_category, format_club, get_region_club_ids, get_regional_committee_id,
-    get_rider_results, to_datetime, to_day
+    CATEGORIES, add_value_on_race_date, check_recent_form_arguments, check_rider,
+    check_start_dates, count_wins_and_tops, format_category, format_club, get_region_club_ids,
+    get_regional_committee_id, get_rider_results, to_datetime, to_day
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.analytics.regional_rankings import POINTS_SCALES
@@ -297,19 +297,24 @@ def compute_rider_profile(
             (get_reference_date gives the default one).
         region: Name of the regional committee of the challenge (no rider is
             concerned if it has no points scale).
-        top_n: Last finish rank counting as a top N in the recent form.
-        last_races: Maximum number of races used by the recent form.
-        window_months: Length of the window of the recent form.
+        top_n: Last finish rank counting as a top N in the recent form, from
+            1 to MAX_TOP_N.
+        last_races: Maximum number of races used by the recent form, at
+            least 1.
+        window_months: Length of the window of the recent form, at least 1.
 
     Returns:
         The RiderProfile of the rider.
 
     Raises:
-        ValueError: If the rider is not in the rider table, then if the region
-            is unknown, then if a race of the rider has no date, then if a start
+        ValueError: If top_n is not between 1 and MAX_TOP_N, then if
+            last_races is lower than 1, then if window_months is lower than 1,
+            then if the rider is not in the rider table, then if the region is
+            unknown, then if a race of the rider has no date, then if a start
             date of the rider in rider_categories is missing, then if a start
             date of the rider in affiliations is missing.
     """
+    check_recent_form_arguments(top_n, last_races, window_months)
     check_rider(riders, rider_id)
     get_regional_committee_id(regional_committees, region)
     results = get_rider_results(

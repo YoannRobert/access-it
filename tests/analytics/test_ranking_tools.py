@@ -9,7 +9,8 @@ from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
     add_category_on_race_date, add_shared_rank, add_value_on_race_date, check_categories,
-    check_category, check_race_categories, check_race_dates, check_rider, check_start_dates,
+    check_category, check_race_categories, check_race_dates, check_recent_form_arguments,
+    check_rider, check_start_dates,
     compute_places, count_wins_and_tops, filter_results_by_categories, format_category,
     format_club, get_reference_date, get_region_club_ids, get_region_races,
     get_regional_committee_id, get_rider_results, rank_scoring_riders, scale_points,
@@ -102,6 +103,35 @@ def test_check_rider_accepts_a_known_rider_and_raises_otherwise():
     check_rider(riders, "a")
     with pytest.raises(ValueError, match="Unknown rider: 'x'"):
         check_rider(riders, "x")
+
+
+VALID_RECENT_FORM_ARGUMENTS = {"top_n": 20, "last_races": 10, "window_months": 6}
+
+
+def test_check_recent_form_arguments_accepts_the_bounds():
+    for kwargs in ({"top_n": 1}, {"top_n": 20}, {"last_races": 1}, {"window_months": 1}):
+        check_recent_form_arguments(**{**VALID_RECENT_FORM_ARGUMENTS, **kwargs})
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"top_n": 0}, "top_n must be between 1 and 20, not 0"),
+    ({"top_n": 21}, "top_n must be between 1 and 20, not 21"),
+    ({"last_races": 0}, "last_races must be at least 1, not 0"),
+    ({"last_races": -1}, "last_races must be at least 1, not -1"),
+    ({"window_months": 0}, "window_months must be at least 1, not 0"),
+])
+def test_check_recent_form_arguments_raises(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        check_recent_form_arguments(**{**VALID_RECENT_FORM_ARGUMENTS, **kwargs})
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"top_n": 21, "last_races": 0}, "top_n must be between 1 and 20"),
+    ({"last_races": 0, "window_months": 0}, "last_races must be at least 1"),
+])
+def test_check_recent_form_arguments_raises_in_order(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        check_recent_form_arguments(**{**VALID_RECENT_FORM_ARGUMENTS, **kwargs})
 
 
 def test_regional_committee_id_of_a_known_region_and_raises_otherwise():
