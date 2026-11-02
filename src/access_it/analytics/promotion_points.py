@@ -170,7 +170,8 @@ def get_promotion_ranking(
         national total and a rank among them), without the category and regions columns.
 
     Raises:
-        ValueError: If the category or the region is unknown.
+        ValueError: If the category is unknown, then if `region` is given
+            without `regional_committees`, then if the region is unknown.
     """
     ranking = select_category(promotion_rankings, category)
     if region is not None:

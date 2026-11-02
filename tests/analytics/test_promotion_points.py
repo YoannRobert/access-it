@@ -184,6 +184,13 @@ def test_unknown_region_or_category_raises():
         get_promotion_ranking(rankings, "A5")
 
 
+def test_region_without_regional_committees_raises():
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    rankings = rankings_of(tables)
+    with pytest.raises(ValueError, match="regional_committees is required"):
+        get_promotion_ranking(rankings, "A4", PAYS_DE_LA_LOIRE)
+
+
 def test_empty_season_gives_an_empty_ranking():
     tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
     rankings = compute_promotion_rankings(**tables, season=SEASON - 1)
