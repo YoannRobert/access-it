@@ -1,16 +1,16 @@
 """Building blocks shared by the modules of the analytics package.
 
 Used by the regional challenge (regional_rankings), the promotion points
-(promotion_points) and the other analytics modules: conversion of the dates,
-default reference date, ID of a regional committee, races and clubs of a
-region, category and club of a rider on the race date, results of a rider,
-check of a rider, check of an argument that must be at least 1, check of
-the arguments of the recent form, places in a race, wins and tops of the
-riders (or other groups), points of a scale, ranking of the riders with its
-tie-breaks, shared rank of tied rows, filter on a category, labels of a
-category and of a club, checks of the race dates and start dates, checks of
-the category filter, of the requested categories and of the categories of
-the races, and filter of the results on the categories.
+(promotion_points) and the other analytics modules: conversion of the dates
+and check of the reference date, default reference date, ID of a regional
+committee, races and clubs of a region, category and club of a rider on the
+race date, results of a rider, check of a rider, check of an argument that
+must be at least 1, check of the arguments of the recent form, places in a
+race, wins and tops of the riders (or other groups), points of a scale,
+ranking of the riders with its tie-breaks, shared rank of tied rows, filter on
+a category, labels of a category and of a club, checks of the race dates and
+start dates, checks of the category filter, of the requested categories and of
+the categories of the races, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -59,8 +59,15 @@ def to_day(reference_date: str | pd.Timestamp) -> pd.Timestamp:
 
     Returns:
         The day of `reference_date`, at midnight.
+
+    Raises:
+        ValueError: If the reference date is missing (None, NaT, an empty
+            string or NaN).
     """
-    return to_datetime(pd.Series([reference_date])).dt.normalize().iloc[0]
+    day = to_datetime(pd.Series([reference_date])).dt.normalize().iloc[0]
+    if pd.isna(day):
+        raise ValueError(f"Missing reference date: {reference_date!r}")
+    return day
 
 
 def get_reference_date(races: pd.DataFrame) -> pd.Timestamp:
@@ -340,10 +347,10 @@ def get_rider_results(
         date (UNKNOWN_CATEGORY or UNKNOWN_CLUB if unknown).
 
     Raises:
-        ValueError: If a race of the rider has no date, then, if a race of
-            the rider is kept, if a start date of the rider in rider_categories
-            is missing, then if a start date of the rider in affiliations is
-            missing.
+        ValueError: If the reference date is missing, then if a race of the
+            rider has no date, then, if a race of the rider is kept, if a
+            start date of the rider in rider_categories is missing, then if a
+            start date of the rider in affiliations is missing.
     """
     day = to_day(reference_date)
     results = (

@@ -200,6 +200,14 @@ def test_reference_date_is_brought_back_to_its_day():
     assert to_day(pd.Timestamp("2026-07-01 18:00")) == day
 
 
+@pytest.mark.parametrize(
+    "reference_date", [None, pd.NaT, "", float("nan")], ids=["none", "nat", "empty", "nan"]
+)
+def test_missing_reference_date_raises(reference_date):
+    with pytest.raises(ValueError, match="Missing reference date"):
+        to_day(reference_date)
+
+
 def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
     departemental_committees = pd.DataFrame({
         "departemental_committee_id": ["5244", "5285", "5385"],
@@ -685,6 +693,19 @@ def test_rider_results_missing_race_date_raises_before_missing_start_date():
         get_rider_results(
             races, rankings, clubs, affiliations, rider_categories, "a", f"{season}-10-01"
         )
+
+
+def test_rider_results_missing_reference_date_raises():
+    tables = rider_results_tables(FIRST_SEASON + 1)
+    with pytest.raises(ValueError, match="Missing reference date"):
+        get_rider_results(**tables, rider_id="a", reference_date=None)
+
+
+def test_rider_results_missing_reference_date_raises_before_missing_race_date():
+    tables = rider_results_tables(FIRST_SEASON + 1)
+    tables["races"].loc[0, "race_date"] = None
+    with pytest.raises(ValueError, match="Missing reference date"):
+        get_rider_results(**tables, rider_id="a", reference_date=None)
 
 
 @pytest.mark.parametrize("table", ["rider_categories", "affiliations"])

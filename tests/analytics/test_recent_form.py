@@ -104,3 +104,13 @@ def test_reference_date_as_string_or_date(reference_date):
 def test_invalid_arguments_raise(kwargs, message):
     with pytest.raises(ValueError, match=message):
         form_of([("r1", "2026-06-30", "a", 1)], ["a"], **kwargs)
+
+
+def test_missing_reference_date_raises():
+    with pytest.raises(ValueError, match="Missing reference date"):
+        form_of([("r1", "2026-06-30", "a", 1)], ["a"], reference_date=None)
+
+
+def test_invalid_window_months_raises_before_missing_reference_date():
+    with pytest.raises(ValueError, match="window_months must be at least 1"):
+        form_of([("r1", "2026-06-30", "a", 1)], ["a"], reference_date=None, window_months=0)

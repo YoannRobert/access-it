@@ -83,7 +83,8 @@ def _get_periods(
     of FIRST_SEASON if earlier.
 
     Raises:
-        ValueError: If a start date of the rider is missing.
+        ValueError: If the reference date is missing, then if a start date of
+            the rider is missing.
     """
     day = to_day(reference_date)
     first_day = pd.Timestamp(year=FIRST_SEASON, month=1, day=1)
@@ -124,8 +125,9 @@ def get_rider_categories(
         to "A4", or UNKNOWN_CATEGORY).
 
     Raises:
-        ValueError: If the rider is not in the rider table, then if a start
-            date of the rider in rider_categories is missing.
+        ValueError: If the rider is not in the rider table, then if the
+            reference date is missing, then if a start date of the rider in
+            rider_categories is missing.
     """
     check_rider(riders, rider_id)
     periods = _get_periods(rider_categories, "rider_category", rider_id, reference_date)
@@ -158,8 +160,9 @@ def get_rider_clubs(
         UNKNOWN_CLUB).
 
     Raises:
-        ValueError: If the rider is not in the rider table, then if a start
-            date of the rider in affiliations is missing.
+        ValueError: If the rider is not in the rider table, then if the
+            reference date is missing, then if a start date of the rider in
+            affiliations is missing.
     """
     check_rider(riders, rider_id)
     periods = _get_periods(affiliations, "club_id", rider_id, reference_date)
@@ -306,9 +309,10 @@ def compute_rider_profile(
         ValueError: If top_n is not between 1 and MAX_TOP_N, then if
             last_races is lower than 1, then if window_months is lower than 1,
             then if the rider is not in the rider table, then if the region is
-            unknown, then if a race of the rider has no date, then if a start
-            date of the rider in rider_categories is missing, then if a start
-            date of the rider in affiliations is missing.
+            unknown, then if the reference date is missing, then if a race of
+            the rider has no date, then if a start date of the rider in
+            rider_categories is missing, then if a start date of the rider in
+            affiliations is missing.
     """
     check_recent_form_arguments(top_n, last_races, window_months)
     check_rider(riders, rider_id)

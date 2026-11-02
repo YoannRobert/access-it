@@ -269,6 +269,48 @@ def test_rider_clubs_unknown_rider_raises_before_missing_start_date():
         get_rider_clubs(RIDERS, CLUBS, affiliations, "x", REFERENCE_DATE)
 
 
+def test_rider_categories_missing_reference_date_raises():
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a"], "start_date": [f"{SEASON}-01-01"],
+        "rider_category": pd.array([3], dtype="Int64"),
+    })
+    with pytest.raises(ValueError, match="Missing reference date"):
+        get_rider_categories(RIDERS, rider_categories, "a", None)
+
+
+@pytest.mark.parametrize("rider_id, start_date, message", [
+    ("x", f"{SEASON}-01-01", "Unknown rider: 'x'"),
+    ("a", None, "Missing reference date"),
+], ids=["unknown-rider", "missing-start-date"])
+def test_rider_categories_missing_reference_date_raises_in_order(rider_id, start_date, message):
+    rider_categories = pd.DataFrame({
+        "rider_id": [rider_id], "start_date": [start_date],
+        "rider_category": pd.array([3], dtype="Int64"),
+    })
+    with pytest.raises(ValueError, match=message):
+        get_rider_categories(RIDERS, rider_categories, rider_id, None)
+
+
+def test_rider_clubs_missing_reference_date_raises():
+    affiliations = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [f"{SEASON}-01-01"], "club_id": [PDL]}
+    )
+    with pytest.raises(ValueError, match="Missing reference date"):
+        get_rider_clubs(RIDERS, CLUBS, affiliations, "a", None)
+
+
+@pytest.mark.parametrize("rider_id, start_date, message", [
+    ("x", f"{SEASON}-01-01", "Unknown rider: 'x'"),
+    ("a", None, "Missing reference date"),
+], ids=["unknown-rider", "missing-start-date"])
+def test_rider_clubs_missing_reference_date_raises_in_order(rider_id, start_date, message):
+    affiliations = pd.DataFrame(
+        {"rider_id": [rider_id], "start_date": [start_date], "club_id": [PDL]}
+    )
+    with pytest.raises(ValueError, match=message):
+        get_rider_clubs(RIDERS, CLUBS, affiliations, rider_id, None)
+
+
 def profile_tables() -> dict:
     """Tables of one race of rider a."""
     return make_tables(
@@ -288,13 +330,17 @@ def season_points_with(rider_results: pd.DataFrame, affiliations: pd.DataFrame) 
 
 
 def profile_with(
-        tables: dict, rider_id: str = "a", region: str = PAYS_DE_LA_LOIRE, **kwargs
+        tables: dict,
+        rider_id: str = "a",
+        region: str = PAYS_DE_LA_LOIRE,
+        reference_date: str | None = REFERENCE_DATE,
+        **kwargs
     ) -> RiderProfile:
     """compute_rider_profile on the tables, without points (kwargs: recent form arguments)."""
     return compute_rider_profile(
         tables["races"], tables["rankings"], RIDERS, CLUBS, DEPARTEMENTAL_COMMITTEES,
         REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], points_of([]),
-        points_of([]), rider_id, REFERENCE_DATE, region, **kwargs
+        points_of([]), rider_id, reference_date, region, **kwargs
     )
 
 
@@ -370,3 +416,19 @@ def test_rider_profile_invalid_recent_form_arguments_raise(kwargs, message):
 def test_rider_profile_invalid_top_n_raises_before_unknown_rider():
     with pytest.raises(ValueError, match="top_n must be between 1 and 20"):
         profile_with(profile_tables(), rider_id="x", top_n=21)
+
+
+def test_rider_profile_missing_reference_date_raises():
+    with pytest.raises(ValueError, match="Missing reference date"):
+        profile_with(profile_tables(), reference_date=None)
+
+
+@pytest.mark.parametrize("region, race_date, message", [
+    ("NOWHERE", f"{SEASON}-03-01", "Unknown region"),
+    (PAYS_DE_LA_LOIRE, None, "Missing reference date"),
+], ids=["unknown-region", "missing-race-date"])
+def test_rider_profile_missing_reference_date_raises_in_order(region, race_date, message):
+    tables = profile_tables()
+    tables["races"].loc[0, "race_date"] = race_date
+    with pytest.raises(ValueError, match=message):
+        profile_with(tables, region=region, reference_date=None)

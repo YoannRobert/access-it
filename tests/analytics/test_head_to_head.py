@@ -201,3 +201,22 @@ def test_head_to_head_without_a_kept_race_ignores_the_missing_start_dates(table)
     assert head_to_head.races.empty
     counts = ["nb_common_races", "nb_rider_ahead", "nb_opponent_ahead", "nb_ties"]
     assert head_to_head.summary.loc[0, counts].tolist() == [0, 0, 0, 0]
+
+
+@pytest.mark.parametrize("compute", [get_common_races, compute_head_to_head])
+def test_missing_reference_date_raises(compute):
+    with pytest.raises(ValueError, match="Missing reference date"):
+        compute(*head_to_head_args(head_to_head_tables())[:-1], None)
+
+
+@pytest.mark.parametrize("compute", [get_common_races, compute_head_to_head])
+@pytest.mark.parametrize("season, race_date, message", [
+    (FIRST_SEASON - 1, f"{SEASON}-03-01", "is before the first season"),
+    (SEASON + 1, f"{SEASON}-03-01", "Missing reference date"),
+    (None, None, "Missing reference date"),
+], ids=["season-before-first-season", "season-after-reference-year", "missing-race-date"])
+def test_missing_reference_date_raises_in_order(compute, season, race_date, message):
+    tables = head_to_head_tables()
+    tables["races"].loc[0, "race_date"] = race_date
+    with pytest.raises(ValueError, match=message):
+        compute(*head_to_head_args(tables)[:-1], None, season)

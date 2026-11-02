@@ -5,7 +5,7 @@ top 5, top 10 and top 20 probabilities). Rules:
 
 - only the races strictly before the reference date count, so that no
   future result leaks into a feature; the reference date is brought back to
-  its day by to_day of ranking_tools;
+  its day, and checked, by to_day of ranking_tools;
 - the races of the window count, from reference_date minus window_months
   (included); for each rider, his last_races most recent ones are used; two
   races of the same day are ordered by finish rank (best place kept first),
@@ -64,7 +64,8 @@ def compute_recent_form(
 
     Raises:
         ValueError: If top_n is not between 1 and MAX_TOP_N, then if
-            last_races is lower than 1, then if window_months is lower than 1.
+            last_races is lower than 1, then if window_months is lower than 1,
+            then if the reference date is missing.
     """
     check_recent_form_arguments(top_n, last_races, window_months)
     end = to_day(reference_date)
