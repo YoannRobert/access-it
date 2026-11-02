@@ -1,15 +1,18 @@
 """Unit tests of the building blocks shared by the rankings."""
 
+from datetime import date
+
 import pandas as pd
 import pytest
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
-    add_shared_rank, check_categories, check_category, check_race_categories, compute_places,
-    count_wins_and_tops, filter_results_by_categories, format_category, format_club,
-    get_reference_date, get_region_club_ids, get_region_races, get_rider_results,
-    rank_scoring_riders, scale_points, select_category, select_club, to_datetime
+    add_shared_rank, add_value_on_race_date, check_categories, check_category,
+    check_race_categories, compute_places, count_wins_and_tops, filter_results_by_categories,
+    format_category, format_club, get_reference_date, get_region_club_ids, get_region_races,
+    get_rider_results, rank_scoring_riders, scale_points, select_category, select_club,
+    to_datetime
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -144,13 +147,82 @@ def test_races_of_a_region_are_those_of_the_season_in_its_departements():
     assert region_races["race_id"].tolist() == ["r1", "r3"]
 
 
+@pytest.mark.parametrize("race_dates", [
+    [f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-03-01"],
+    [date(FIRST_SEASON, 6, 1), date(FIRST_SEASON, 3, 1)],
+    pd.to_datetime([f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-03-01"]).as_unit("us"),
+])
+def test_value_on_the_race_date_whatever_the_type_of_the_race_dates(race_dates):
+    results = pd.DataFrame({"rider_id": ["a", "a"], "race_date": race_dates})
+    history = pd.DataFrame({
+        "rider_id": ["a", "a"],
+        "start_date": [f"{FIRST_SEASON}-01-01", f"{FIRST_SEASON}-05-01"],
+        "club_id": ["c1", "c2"],
+    })
+    on_date = add_value_on_race_date(results, history, "club_id")
+    assert on_date["race_date"].dtype == "datetime64[ns]"
+    assert on_date["race_date"].tolist() == [
+        pd.Timestamp(f"{FIRST_SEASON}-03-01"), pd.Timestamp(f"{FIRST_SEASON}-06-01")
+    ]
+    assert on_date["club_id"].tolist() == ["c1", "c2"]
+
+
+def test_value_on_the_race_date_sorted_by_date_with_the_index_reset():
+    results = pd.DataFrame(
+        {"rider_id": ["a", "a"], "race_date": [f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-03-01"]},
+        index=[7, 3]
+    )
+    history = pd.DataFrame({
+        "rider_id": ["a", "a"],
+        "start_date": [f"{FIRST_SEASON}-01-01", f"{FIRST_SEASON}-05-01"],
+        "club_id": ["c1", "c2"],
+    })
+    on_date = add_value_on_race_date(results, history, "club_id")
+    assert on_date.index.tolist() == [0, 1]
+    assert on_date["race_date"].is_monotonic_increasing
+
+
+@pytest.mark.parametrize("missing_date", [None, ""])
+def test_missing_race_date_raises(missing_date):
+    results = pd.DataFrame(
+        {"rider_id": ["a", "a"], "race_date": [f"{FIRST_SEASON}-06-01", missing_date]}
+    )
+    history = pd.DataFrame({
+        "rider_id": ["a", "a"],
+        "start_date": [f"{FIRST_SEASON}-01-01", f"{FIRST_SEASON}-05-01"],
+        "club_id": ["c1", "c2"],
+    })
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        add_value_on_race_date(results, history, "club_id")
+
+
+def test_missing_start_date_raises():
+    results = pd.DataFrame({"rider_id": ["a"], "race_date": [f"{FIRST_SEASON}-06-01"]})
+    history = pd.DataFrame({
+        "rider_id": ["a", "a"],
+        "start_date": [f"{FIRST_SEASON}-01-01", None],
+        "club_id": ["c1", "c2"],
+    })
+    with pytest.raises(ValueError, match="Missing start dates in the history"):
+        add_value_on_race_date(results, history, "club_id")
+
+
+def test_missing_race_date_raises_before_missing_start_date():
+    results = pd.DataFrame({"rider_id": ["a"], "race_date": [None]})
+    history = pd.DataFrame({
+        "rider_id": ["a", "a"],
+        "start_date": [f"{FIRST_SEASON}-01-01", None],
+        "club_id": ["c1", "c2"],
+    })
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        add_value_on_race_date(results, history, "club_id")
+
+
 def test_category_and_club_on_the_race_date_with_labels_when_unknown():
     results = pd.DataFrame({
         "race_id": ["r1", "r2", "r3"],
         "rider_id": ["a", "a", "b"],
-        "race_date": to_datetime(pd.Series(
-            [f"{FIRST_SEASON}-03-01", f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-06-01"]
-        )),
+        "race_date": [f"{FIRST_SEASON}-03-01", f"{FIRST_SEASON}-06-01", f"{FIRST_SEASON}-06-01"],
     })
     clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
     affiliations = pd.DataFrame(

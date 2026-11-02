@@ -123,15 +123,36 @@ def add_value_on_race_date(
     ) -> pd.DataFrame:
     """Add to each result the value of `column` of the period of `history` covering the race date.
 
-    History periods (rider_id, start_date, column) start at start_date and
-    end the day before the next start_date of the same rider. The value is
-    missing if the race is before the first period of the rider.
+    History periods start at start_date and end the day before the next
+    start_date of the same rider. The value is missing if the race is before
+    the first period of the rider. The race dates and the start dates are
+    converted by to_datetime, whatever their input type (string, date,
+    timestamp).
+
+    Args:
+        results: Results with rider_id and race_date (not missing, readable as a date).
+        history: History periods with rider_id, start_date (not missing,
+            readable as a date) and `column`.
+        column: Column of `history` added to the results.
+
+    Returns:
+        The results with all their columns, race_date as datetime64[ns], and
+        `column`; sorted by race date (required by merge_asof), with the
+        index reset.
+
+    Raises:
+        ValueError: If a race date of the results is missing, then if a start
+            date of the history is missing.
     """
-    history = (
-        history[["rider_id", "start_date", column]]
-        .assign(start_date=lambda df: to_datetime(df["start_date"]))
-        .sort_values("start_date")
+    results = results.assign(race_date=lambda df: to_datetime(df["race_date"]))
+    if results["race_date"].isna().any():
+        raise ValueError("Missing race dates in the results")
+    history = history[["rider_id", "start_date", column]].assign(
+        start_date=lambda df: to_datetime(df["start_date"])
     )
+    if history["start_date"].isna().any():
+        raise ValueError("Missing start dates in the history")
+    history = history.sort_values("start_date")
     return pd.merge_asof(
         results.sort_values("race_date"),
         history,
@@ -164,7 +185,16 @@ def add_category_on_race_date(
         results: pd.DataFrame,
         rider_categories: pd.DataFrame
     ) -> pd.DataFrame:
-    """Add the category of the rider on the race date ("A1" to "A4", missing if unknown)."""
+    """Add the category of the rider on the race date ("A1" to "A4", missing if unknown).
+
+    Args:
+        results: Results with rider_id and race_date (see add_value_on_race_date).
+        rider_categories: Category history of the riders.
+
+    Returns:
+        The results with all their columns, race_date as datetime64[ns], and
+        category; sorted by race date, with the index reset.
+    """
     results = add_value_on_race_date(results, rider_categories, "rider_category")
     results["category"] = results["rider_category"].map(format_category)
     return results.drop(columns="rider_category")
@@ -179,7 +209,17 @@ def add_category_and_club_on_race_date(
     """Add the category and the club name of the rider on the race date, as labels.
 
     The category is "A1" to "A4", or UNKNOWN_CATEGORY; the club is the name
-    of the club, or UNKNOWN_CLUB. The results are sorted by race date.
+    of the club, or UNKNOWN_CLUB.
+
+    Args:
+        results: Results with rider_id and race_date (see add_value_on_race_date).
+        clubs: Club table.
+        affiliations: Club history of the riders.
+        rider_categories: Category history of the riders.
+
+    Returns:
+        The results with all their columns, race_date as datetime64[ns],
+        category and club; sorted by race date, with the index reset.
     """
     results = add_category_on_race_date(results, rider_categories)
     results = add_value_on_race_date(results, affiliations, "club_id")
