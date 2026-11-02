@@ -170,6 +170,23 @@ def test_invalid_arguments_raise(kwargs, message):
         club_rankings(**kwargs)
 
 
+@pytest.mark.parametrize("compute", [
+    lambda regional_committees: rank_clubs(
+        get_club_results(RACES, RANKINGS, AFFILIATIONS, SEASON), CLUBS, DEPARTEMENTS,
+        DEPARTEMENTAL_COMMITTEES, regional_committees, RIDER_CATEGORIES, SEASON,
+        PAYS_DE_LA_LOIRE
+    ),
+    lambda regional_committees: compute_club_rankings(
+        RACES, RANKINGS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES, regional_committees,
+        AFFILIATIONS, RIDER_CATEGORIES, SEASON, PAYS_DE_LA_LOIRE
+    ),
+], ids=["rank_clubs", "club_rankings"])
+def test_unknown_region_raises(compute):
+    regional_committees = REGIONAL_COMMITTEES[REGIONAL_COMMITTEES["name"] != PAYS_DE_LA_LOIRE]
+    with pytest.raises(ValueError, match="Unknown region"):
+        compute(regional_committees)
+
+
 def test_races_of_the_season_with_non_contiguous_categories_raise():
     races = RACES.assign(categories=["A1,A2", "A2,A4", "A1"])
     with pytest.raises(ValueError, match="non contiguous"):

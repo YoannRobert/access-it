@@ -11,9 +11,11 @@ from access_it.analytics.ranking_tools import (
     add_category_on_race_date, add_shared_rank, add_value_on_race_date, check_categories,
     check_category, check_race_categories, check_race_dates, check_rider, check_start_dates,
     compute_places, count_wins_and_tops, filter_results_by_categories, format_category,
-    format_club, get_reference_date, get_region_club_ids, get_region_races, get_rider_results,
-    rank_scoring_riders, scale_points, select_category, select_club, to_datetime, to_day
+    format_club, get_reference_date, get_region_club_ids, get_region_races,
+    get_regional_committee_id, get_rider_results, rank_scoring_riders, scale_points,
+    select_category, select_club, to_datetime, to_day
 )
+from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 
@@ -102,6 +104,15 @@ def test_check_rider_accepts_a_known_rider_and_raises_otherwise():
         check_rider(riders, "x")
 
 
+def test_regional_committee_id_of_a_known_region_and_raises_otherwise():
+    regional_committees = pd.DataFrame({
+        "regional_committee_id": ["52", "53"], "name": [PAYS_DE_LA_LOIRE, BRETAGNE]
+    })
+    assert get_regional_committee_id(regional_committees, BRETAGNE) == "53"
+    with pytest.raises(ValueError, match="Unknown region"):
+        get_regional_committee_id(regional_committees[:1], BRETAGNE)
+
+
 def test_check_race_dates_accepts_dates_and_raises_on_a_missing_one():
     check_race_dates(to_datetime(pd.Series([f"{FIRST_SEASON}-06-01"])))
     with pytest.raises(ValueError, match="Missing race dates in the results"):
@@ -134,7 +145,7 @@ def test_reference_date_is_the_day_after_the_last_race():
 
 
 def test_reference_date_of_an_empty_race_table_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="No race to find the reference date from"):
         get_reference_date(pd.DataFrame({"race_date": []}))
 
 

@@ -184,16 +184,16 @@ def test_most_titled_riders_in_rider_filter_keep_the_requested_categories():
     assert row["category"] == "A2" and row["nb_races"] == 1
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"category_filter": "club"},
-    {"region": NOT_COVERED_REGION},
-    {"season": FIRST_SEASON - 1},
-    {"categories": []},
-    {"categories": ["A5"]},
-    {"categories": ["A1", "A3"]},
+@pytest.mark.parametrize("kwargs, message", [
+    ({"category_filter": "club"}, "Unknown category filter"),
+    ({"region": NOT_COVERED_REGION}, "Region not covered"),
+    ({"season": FIRST_SEASON - 1}, "before the first season"),
+    ({"categories": []}, "Invalid categories"),
+    ({"categories": ["A5"]}, "Invalid categories"),
+    ({"categories": ["A1", "A3"]}, "Categories not contiguous"),
 ])
-def test_invalid_arguments_raise(kwargs):
-    with pytest.raises(ValueError):
+def test_invalid_arguments_raise(kwargs, message):
+    with pytest.raises(ValueError, match=message):
         season_results(**kwargs)
 
 
@@ -207,7 +207,7 @@ def test_race_with_non_contiguous_categories_raises_before_any_filter():
 
 
 def test_departements_of_a_region_not_covered_raise():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Region not covered"):
         count_races_by_departement(
             season_results(), DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES,
             NOT_COVERED_REGION
@@ -215,8 +215,28 @@ def test_departements_of_a_region_not_covered_raise():
 
 
 def test_max_riders_lower_than_one_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="max_riders must be at least 1"):
         most_titled(season_results(), max_riders=0)
+
+
+@pytest.mark.parametrize("compute", [
+    lambda regional_committees: get_season_results(
+        RACES, RANKINGS, DEPARTEMENTAL_COMMITTEES, regional_committees, RIDER_CATEGORIES,
+        SEASON, PAYS_DE_LA_LOIRE
+    ),
+    lambda regional_committees: count_races_by_departement(
+        season_results(), DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES, regional_committees,
+        PAYS_DE_LA_LOIRE
+    ),
+    lambda regional_committees: compute_season_summary(
+        RACES, RANKINGS, RIDERS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES,
+        regional_committees, AFFILIATIONS, RIDER_CATEGORIES, SEASON, PAYS_DE_LA_LOIRE
+    ),
+], ids=["results", "departements", "summary"])
+def test_unknown_region_raises(compute):
+    regional_committees = REGIONAL_COMMITTEES[REGIONAL_COMMITTEES["name"] != PAYS_DE_LA_LOIRE]
+    with pytest.raises(ValueError, match="Unknown region"):
+        compute(regional_committees)
 
 
 @pytest.mark.parametrize("category_filter, table, column, message", [

@@ -145,6 +145,15 @@ def test_invalid_arguments_raise(kwargs, message):
         category_changes(**kwargs)
 
 
+def test_unknown_region_raises():
+    regional_committees = REGIONAL_COMMITTEES[REGIONAL_COMMITTEES["name"] != PAYS_DE_LA_LOIRE]
+    with pytest.raises(ValueError, match="Unknown region"):
+        compute_category_changes(
+            RIDER_CATEGORIES, RIDERS, CLUBS, AFFILIATIONS, DEPARTEMENTAL_COMMITTEES,
+            regional_committees, SEASON, PAYS_DE_LA_LOIRE
+        )
+
+
 @pytest.mark.parametrize("table", ["rider_categories", "affiliations"])
 def test_category_changes_missing_date_raises(table):
     tables = {"rider_categories": RIDER_CATEGORIES.copy(), "affiliations": AFFILIATIONS.copy()}
