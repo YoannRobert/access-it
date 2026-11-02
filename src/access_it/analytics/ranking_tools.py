@@ -194,6 +194,10 @@ def add_category_on_race_date(
     Returns:
         The results with all their columns, race_date as datetime64[ns], and
         category; sorted by race date, with the index reset.
+
+    Raises:
+        ValueError: If a race date of the results is missing, then if a start
+            date of rider_categories is missing.
     """
     results = add_value_on_race_date(results, rider_categories, "rider_category")
     results["category"] = results["rider_category"].map(format_category)
@@ -220,6 +224,11 @@ def add_category_and_club_on_race_date(
     Returns:
         The results with all their columns, race_date as datetime64[ns],
         category and club; sorted by race date, with the index reset.
+
+    Raises:
+        ValueError: If a race date of the results is missing, then if a start
+            date of rider_categories is missing, then if a start date of
+            affiliations is missing.
     """
     results = add_category_on_race_date(results, rider_categories)
     results = add_value_on_race_date(results, affiliations, "club_id")

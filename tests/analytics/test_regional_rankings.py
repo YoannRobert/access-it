@@ -271,6 +271,45 @@ def test_unknown_category_raises():
         get_category_ranking(pd.DataFrame(columns=COLUMNS), "A5")
 
 
+MISSING_DATES = [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+]
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_challenge_points_missing_date_raises(table, column, message):
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        points_of(tables)
+
+
+def test_challenge_points_missing_race_date_raises_before_missing_start_date():
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables["races"].loc[0, "race_date"] = None
+    tables["affiliations"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        points_of(tables)
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_regional_rankings_missing_date_raises(table, column, message):
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        compute_regional_rankings(**tables, season=SEASON)
+
+
+def test_regional_rankings_missing_race_date_raises_before_missing_start_date():
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables["races"].loc[0, "race_date"] = None
+    tables["affiliations"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        compute_regional_rankings(**tables, season=SEASON)
+
+
 def test_individual_licensee_counts_in_the_region_of_his_committee():
     tables = single_race(
         ranks={"a": 1, "b": 2, "c": 3},

@@ -191,6 +191,45 @@ def test_region_without_regional_committees_raises():
         get_promotion_ranking(rankings, "A4", PAYS_DE_LA_LOIRE)
 
 
+MISSING_DATES = [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+]
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_promotion_points_missing_date_raises(table, column, message):
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        points_of(tables)
+
+
+def test_promotion_points_missing_race_date_raises_before_missing_start_date():
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables["races"].loc[0, "race_date"] = None
+    tables["affiliations"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        points_of(tables)
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_promotion_rankings_missing_date_raises(table, column, message):
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        rankings_of(tables)
+
+
+def test_promotion_rankings_missing_race_date_raises_before_missing_start_date():
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
+    tables["races"].loc[0, "race_date"] = None
+    tables["affiliations"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        rankings_of(tables)
+
+
 def test_empty_season_gives_an_empty_ranking():
     tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
     rankings = compute_promotion_rankings(**tables, season=SEASON - 1)

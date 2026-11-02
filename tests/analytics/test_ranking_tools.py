@@ -8,8 +8,8 @@ import pytest
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
-    add_shared_rank, add_value_on_race_date, check_categories, check_category,
-    check_race_categories, check_rider, compute_places, count_wins_and_tops,
+    add_category_on_race_date, add_shared_rank, add_value_on_race_date, check_categories,
+    check_category, check_race_categories, check_rider, compute_places, count_wins_and_tops,
     filter_results_by_categories, format_category, format_club, get_reference_date,
     get_region_club_ids, get_region_races, get_rider_results, rank_scoring_riders, scale_points,
     select_category, select_club, to_datetime, to_day
@@ -230,6 +230,73 @@ def test_missing_race_date_raises_before_missing_start_date():
     })
     with pytest.raises(ValueError, match="Missing race dates in the results"):
         add_value_on_race_date(results, history, "club_id")
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("results", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+])
+def test_category_on_race_date_missing_date_raises(table, column, message):
+    tables = {
+        "results": pd.DataFrame({"rider_id": ["a"], "race_date": [f"{FIRST_SEASON}-06-01"]}),
+        "rider_categories": pd.DataFrame({
+            "rider_id": ["a"],
+            "start_date": [f"{FIRST_SEASON}-01-01"],
+            "rider_category": pd.array([3], dtype="Int64"),
+        }),
+    }
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        add_category_on_race_date(**tables)
+
+
+def test_category_on_race_date_missing_race_date_raises_before_missing_start_date():
+    results = pd.DataFrame({"rider_id": ["a"], "race_date": [None]})
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a"],
+        "start_date": [None],
+        "rider_category": pd.array([3], dtype="Int64"),
+    })
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        add_category_on_race_date(results, rider_categories)
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("results", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_category_and_club_on_race_date_missing_date_raises(table, column, message):
+    tables = {
+        "results": pd.DataFrame({"rider_id": ["a"], "race_date": [f"{FIRST_SEASON}-06-01"]}),
+        "clubs": pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]}),
+        "affiliations": pd.DataFrame(
+            {"rider_id": ["a"], "start_date": [f"{FIRST_SEASON}-01-01"], "club_id": ["5244001"]}
+        ),
+        "rider_categories": pd.DataFrame({
+            "rider_id": ["a"],
+            "start_date": [f"{FIRST_SEASON}-01-01"],
+            "rider_category": pd.array([3], dtype="Int64"),
+        }),
+    }
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        add_category_and_club_on_race_date(**tables)
+
+
+def test_category_and_club_on_race_date_missing_race_date_raises_before_missing_start_date():
+    results = pd.DataFrame({"rider_id": ["a"], "race_date": [None]})
+    clubs = pd.DataFrame({"club_id": ["5244001"], "name": ["Club Nantes"]})
+    affiliations = pd.DataFrame(
+        {"rider_id": ["a"], "start_date": [f"{FIRST_SEASON}-01-01"], "club_id": ["5244001"]}
+    )
+    rider_categories = pd.DataFrame({
+        "rider_id": ["a"],
+        "start_date": [None],
+        "rider_category": pd.array([3], dtype="Int64"),
+    })
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        add_category_and_club_on_race_date(results, clubs, affiliations, rider_categories)
 
 
 def test_category_and_club_on_the_race_date_with_labels_when_unknown():

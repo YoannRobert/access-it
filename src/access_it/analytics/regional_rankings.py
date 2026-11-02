@@ -87,7 +87,10 @@ def compute_challenge_points(
         unknown) and points (0 beyond the 20th place or if the category is unknown).
 
     Raises:
-        ValueError: If the region is unknown or has no configured points scale.
+        ValueError: If the region is unknown, then if it has no configured
+            points scale, then if a race of the season held in the region and
+            having results has no date, then if a start date of affiliations
+            is missing, then if a start date of rider_categories is missing.
     """
     region_id = _get_region_id(regional_committees, region)
 
@@ -145,7 +148,10 @@ def compute_regional_rankings(
         one for an individual licence) and nb_scoring_races; sorted by category and rank.
 
     Raises:
-        ValueError: If the region is unknown or has no configured points scale.
+        ValueError: If the region is unknown, then if it has no configured
+            points scale, then if a race of the season held in the region and
+            having results has no date, then if a start date of affiliations
+            is missing, then if a start date of rider_categories is missing.
     """
     points = compute_challenge_points(
         races=races,
