@@ -75,11 +75,13 @@ def get_reference_date(races: pd.DataFrame) -> pd.Timestamp:
         The day after the last race_date of the table, at midnight.
 
     Raises:
-        ValueError: If the race table is empty.
+        ValueError: If the race table is empty, then if a race date is missing.
     """
     if races.empty:
         raise ValueError("No race to find the reference date from")
-    return to_datetime(races["race_date"]).max().normalize() + pd.Timedelta(days=1)
+    race_dates = to_datetime(races["race_date"])
+    check_race_dates(race_dates)
+    return race_dates.max().normalize() + pd.Timedelta(days=1)
 
 
 def get_regional_committee_id(regional_committees: pd.DataFrame, region: str) -> str:

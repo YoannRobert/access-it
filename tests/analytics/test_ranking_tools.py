@@ -185,6 +185,14 @@ def test_reference_date_of_an_empty_race_table_raises():
         get_reference_date(pd.DataFrame({"race_date": []}))
 
 
+@pytest.mark.parametrize(
+    "race_dates", [["2026-10-25", None, "2026-10-20"], [None, None]]
+)
+def test_reference_date_with_a_missing_race_date_raises(race_dates):
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        get_reference_date(pd.DataFrame({"race_date": race_dates}))
+
+
 def test_reference_date_is_brought_back_to_its_day():
     day = pd.Timestamp("2026-07-01")
     assert to_day("2026-07-01") == day
