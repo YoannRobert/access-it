@@ -107,6 +107,69 @@ def test_unknown_race_raises():
         ranking_of("r9")
 
 
+MISSING_DATES = [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+]
+
+
+def race_tables() -> dict:
+    """Copies of the tables that hold dates."""
+    return {
+        "races": RACES.copy(), "rider_categories": RIDER_CATEGORIES.copy(),
+        "affiliations": AFFILIATIONS.copy(),
+    }
+
+
+def ranking_with(tables: dict) -> pd.DataFrame:
+    """Ranking of r1 with the given tables holding dates."""
+    return get_race_ranking(
+        tables["races"], RANKINGS, RIDERS, CLUBS, tables["affiliations"],
+        tables["rider_categories"], "r1"
+    )
+
+
+def summary_with(tables: dict) -> RaceSummary:
+    """Summary of r1 with the given tables holding dates."""
+    return compute_race_summary(
+        tables["races"], RANKINGS, RIDERS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES,
+        REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], "r1"
+    )
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_race_ranking_missing_date_raises(table, column, message):
+    tables = race_tables()
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        ranking_with(tables)
+
+
+def test_race_ranking_missing_race_date_raises_before_missing_start_date():
+    tables = race_tables()
+    tables["races"].loc[0, "race_date"] = None
+    tables["rider_categories"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        ranking_with(tables)
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_race_summary_missing_date_raises(table, column, message):
+    tables = race_tables()
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        summary_with(tables)
+
+
+def test_race_summary_missing_race_date_raises_before_missing_start_date():
+    tables = race_tables()
+    tables["races"].loc[0, "race_date"] = None
+    tables["rider_categories"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        summary_with(tables)
+
+
 def test_summary_gathers_the_header_and_the_ranking():
     summary = compute_race_summary(
         RACES, RANKINGS, RIDERS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES,

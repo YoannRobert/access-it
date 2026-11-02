@@ -267,3 +267,89 @@ def test_rider_clubs_unknown_rider_raises_before_missing_start_date():
     affiliations = pd.DataFrame({"rider_id": ["x"], "start_date": [None], "club_id": [PDL]})
     with pytest.raises(ValueError, match="Unknown rider: 'x'"):
         get_rider_clubs(RIDERS, CLUBS, affiliations, "x", REFERENCE_DATE)
+
+
+def profile_tables() -> dict:
+    """Tables of one race of rider a."""
+    return make_tables(
+        races=[("r1", f"{SEASON}-03-01", "44")],
+        results=[("r1", "a", 1)],
+        clubs={"a": [(f"{SEASON}-01-01", PDL)]},
+        categories={"a": [(f"{SEASON}-01-01", 3)]},
+    )
+
+
+def season_points_with(rider_results: pd.DataFrame, affiliations: pd.DataFrame) -> pd.DataFrame:
+    """compute_season_points without points, with the given results and affiliations."""
+    return compute_season_points(
+        rider_results, points_of([]), points_of([]), CLUBS, DEPARTEMENTAL_COMMITTEES,
+        REGIONAL_COMMITTEES, affiliations
+    )
+
+
+def profile_with(tables: dict, rider_id: str = "a", region: str = PAYS_DE_LA_LOIRE) -> RiderProfile:
+    """compute_rider_profile on the tables, without points."""
+    return compute_rider_profile(
+        tables["races"], tables["rankings"], RIDERS, CLUBS, DEPARTEMENTAL_COMMITTEES,
+        REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], points_of([]),
+        points_of([]), rider_id, REFERENCE_DATE, region
+    )
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("rider_results", "race_date", "Missing race dates in the results"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_season_points_missing_date_raises(table, column, message):
+    tables = profile_tables()
+    tables["rider_results"] = results_of(tables)
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        season_points_with(tables["rider_results"], tables["affiliations"])
+
+
+def test_season_points_missing_race_date_raises_before_missing_start_date():
+    tables = profile_tables()
+    rider_results = results_of(tables)
+    rider_results.loc[0, "race_date"] = None
+    tables["affiliations"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        season_points_with(rider_results, tables["affiliations"])
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_rider_profile_missing_date_raises(table, column, message):
+    tables = profile_tables()
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        profile_with(tables)
+
+
+def test_rider_profile_missing_race_date_raises_before_missing_start_date():
+    tables = profile_tables()
+    tables["races"].loc[0, "race_date"] = None
+    tables["rider_categories"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        profile_with(tables)
+
+
+def test_rider_profile_unknown_rider_raises_before_missing_race_date():
+    tables = make_tables(
+        races=[("r1", None, "44")],
+        results=[("r1", "x", 1)],
+        clubs={"x": [(f"{SEASON}-01-01", PDL)]},
+        categories={"x": [(f"{SEASON}-01-01", 3)]},
+    )
+    with pytest.raises(ValueError, match="Unknown rider: 'x'"):
+        profile_with(tables, rider_id="x")
+
+
+def test_rider_profile_unknown_region_raises_before_missing_race_date():
+    tables = profile_tables()
+    tables["races"].loc[0, "race_date"] = None
+    with pytest.raises(ValueError, match="Unknown region"):
+        profile_with(tables, region="NOWHERE")

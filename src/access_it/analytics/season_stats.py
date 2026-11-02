@@ -248,7 +248,10 @@ def rank_most_titled_riders(
         last name, first name and rider_id.
 
     Raises:
-        ValueError: If max_riders is lower than 1.
+        ValueError: If max_riders is lower than 1, then if a race date of
+            season_results is missing, then if a start date of a rider of
+            season_results in rider_categories is missing, then if a start date
+            of a rider of season_results in affiliations is missing.
     """
     if max_riders < 1:
         raise ValueError(f"max_riders must be at least 1, not {max_riders}")

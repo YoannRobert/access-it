@@ -176,6 +176,118 @@ def test_races_of_the_season_with_non_contiguous_categories_raise():
         get_club_results(races, RANKINGS, AFFILIATIONS, SEASON)
 
 
+@pytest.mark.parametrize("table, column, message", [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_club_results_missing_date_raises(table, column, message):
+    tables = {"races": RACES.copy(), "affiliations": AFFILIATIONS.copy()}
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        get_club_results(tables["races"], RANKINGS, tables["affiliations"], SEASON)
+
+
+def test_club_results_missing_race_date_raises_before_missing_start_date():
+    races = RACES.copy()
+    races.loc[0, "race_date"] = None
+    affiliations = AFFILIATIONS.copy()
+    affiliations.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        get_club_results(races, RANKINGS, affiliations, SEASON)
+
+
+def rank_clubs_with(
+        club_results: pd.DataFrame, rider_categories: pd.DataFrame, **kwargs
+    ) -> pd.DataFrame:
+    """rank_clubs on the test tables, with the given results, category history and arguments."""
+    return rank_clubs(
+        club_results, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES,
+        rider_categories, SEASON, **kwargs
+    )
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("club_results", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+])
+def test_rank_clubs_missing_date_raises(table, column, message):
+    tables = {
+        "club_results": get_club_results(RACES, RANKINGS, AFFILIATIONS, SEASON),
+        "rider_categories": RIDER_CATEGORIES.copy(),
+    }
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        rank_clubs_with(
+            tables["club_results"], tables["rider_categories"], category_filter="rider"
+        )
+
+
+def test_rank_clubs_race_filter_does_not_check_the_category_history():
+    club_results = get_club_results(RACES, RANKINGS, AFFILIATIONS, SEASON)
+    rider_categories = RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    ranking = rank_clubs_with(club_results, rider_categories, category_filter="race")
+    assert ranking.equals(rank_clubs_with(club_results, RIDER_CATEGORIES, category_filter="race"))
+
+
+def test_rank_clubs_missing_race_date_raises_before_missing_start_date():
+    club_results = get_club_results(RACES, RANKINGS, AFFILIATIONS, SEASON)
+    club_results.loc[0, "race_date"] = None
+    rider_categories = RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        rank_clubs_with(club_results, rider_categories, category_filter="rider")
+
+
+def test_rank_clubs_invalid_max_clubs_raises_before_missing_start_date():
+    club_results = get_club_results(RACES, RANKINGS, AFFILIATIONS, SEASON)
+    rider_categories = RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="max_clubs must be at least 1"):
+        rank_clubs_with(club_results, rider_categories, category_filter="rider", max_clubs=0)
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+])
+def test_club_rankings_missing_date_raises(table, column, message):
+    tables = {
+        "races": RACES.copy(), "affiliations": AFFILIATIONS.copy(),
+        "rider_categories": RIDER_CATEGORIES.copy(),
+    }
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        compute_club_rankings(
+            tables["races"], RANKINGS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES,
+            REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], SEASON,
+            category_filter="rider"
+        )
+
+
+def test_club_rankings_race_filter_does_not_check_the_category_history():
+    rider_categories = RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    ranking = compute_club_rankings(
+        RACES, RANKINGS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES,
+        AFFILIATIONS, rider_categories, SEASON, category_filter="race"
+    )
+    assert ranking.equals(club_rankings(category_filter="race"))
+
+
+def test_club_rankings_missing_race_date_raises_before_missing_start_date():
+    races = RACES.copy()
+    races.loc[0, "race_date"] = None
+    affiliations = AFFILIATIONS.copy()
+    affiliations.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        compute_club_rankings(
+            races, RANKINGS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES,
+            affiliations, RIDER_CATEGORIES, SEASON, category_filter="rider"
+        )
+
+
 def test_rank_clubs_without_any_result_shows_the_clubs_with_zeros():
     club_results = get_club_results(RACES, RANKINGS, AFFILIATIONS, SEASON).iloc[:0]
     ranking = rank_clubs(

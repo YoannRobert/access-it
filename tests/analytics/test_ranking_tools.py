@@ -397,6 +397,37 @@ def test_unknown_category_filter_raises():
         filter_results_by_categories(FILTER_RESULTS, FILTER_RIDER_CATEGORIES, ["A1"], "club")
 
 
+@pytest.mark.parametrize("table, column, message", [
+    ("results", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+])
+def test_results_by_categories_missing_date_raises(table, column, message):
+    tables = {"results": FILTER_RESULTS.copy(), "rider_categories": FILTER_RIDER_CATEGORIES.copy()}
+    tables[table].loc[tables[table].index[0], column] = None
+    with pytest.raises(ValueError, match=message):
+        filter_results_by_categories(
+            tables["results"], tables["rider_categories"], ["A1"], "rider"
+        )
+
+
+def test_results_by_categories_race_filter_does_not_check_the_dates():
+    results = FILTER_RESULTS.copy()
+    results.loc[results.index[0], "race_date"] = None
+    rider_categories = FILTER_RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    kept = filter_results_by_categories(results, rider_categories, ["A3", "A4"], "race")
+    assert kept.index.tolist() == [12, 13, 14]
+
+
+def test_results_by_categories_missing_race_date_raises_before_missing_start_date():
+    results = FILTER_RESULTS.copy()
+    results.loc[results.index[0], "race_date"] = None
+    rider_categories = FILTER_RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        filter_results_by_categories(results, rider_categories, ["A1"], "rider")
+
+
 def test_rows_tied_on_every_criterion_share_the_rank():
     df = pd.DataFrame(
         {"nb_wins": [3, 2, 2, 2, 1], "nb_top_3": [1, 5, 5, 4, 0], "name": list("vwxyz")},

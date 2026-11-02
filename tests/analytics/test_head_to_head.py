@@ -125,3 +125,60 @@ def test_invalid_arguments_raise(rider_id, opponent_id, season, message):
             tables["races"], tables["rankings"], RIDERS, CLUBS, AFFILIATIONS, RIDER_CATEGORIES,
             rider_id, opponent_id, REFERENCE_DATE, season
         )
+
+
+MISSING_DATES = [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+]
+
+
+def head_to_head_tables() -> dict:
+    """Tables of one race of riders a and b."""
+    tables = make_tables(
+        races=[("r1", f"{SEASON}-03-01")], results=[("r1", "a", 1), ("r1", "b", 2)]
+    )
+    return tables | {
+        "affiliations": AFFILIATIONS.copy(), "rider_categories": RIDER_CATEGORIES.copy()
+    }
+
+
+def head_to_head_args(tables: dict) -> tuple:
+    """Positional arguments of get_common_races and compute_head_to_head for riders a and b."""
+    return (
+        tables["races"], tables["rankings"], RIDERS, CLUBS, tables["affiliations"],
+        tables["rider_categories"], "a", "b", REFERENCE_DATE
+    )
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_common_races_missing_date_raises(table, column, message):
+    tables = head_to_head_tables()
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        get_common_races(*head_to_head_args(tables))
+
+
+def test_common_races_missing_race_date_raises_before_missing_start_date():
+    tables = head_to_head_tables()
+    tables["races"].loc[0, "race_date"] = None
+    tables["rider_categories"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        get_common_races(*head_to_head_args(tables))
+
+
+@pytest.mark.parametrize("table, column, message", MISSING_DATES)
+def test_head_to_head_missing_date_raises(table, column, message):
+    tables = head_to_head_tables()
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        compute_head_to_head(*head_to_head_args(tables))
+
+
+def test_head_to_head_missing_race_date_raises_before_missing_start_date():
+    tables = head_to_head_tables()
+    tables["races"].loc[0, "race_date"] = None
+    tables["rider_categories"].loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        compute_head_to_head(*head_to_head_args(tables))

@@ -120,7 +120,10 @@ def get_race_ranking(
         then last name, first name and rider_id.
 
     Raises:
-        ValueError: If the race is unknown.
+        ValueError: If the race is unknown, then if it has results and no date,
+            then if a start date of a ranked rider in rider_categories is
+            missing, then if a start date of a ranked rider in affiliations is
+            missing.
     """
     results = (
         rankings.loc[rankings["race_id"] == race_id, ["race_id", "rider_id", "finish_rank"]]
@@ -173,7 +176,10 @@ def compute_race_summary(
         The RaceSummary of the race.
 
     Raises:
-        ValueError: If the race is unknown.
+        ValueError: If the race is unknown, then if it has results and no date,
+            then if a start date of a ranked rider in rider_categories is
+            missing, then if a start date of a ranked rider in affiliations is
+            missing.
     """
     return RaceSummary(
         header=get_race_header(

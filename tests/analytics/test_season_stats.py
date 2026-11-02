@@ -256,6 +256,64 @@ def test_season_results_missing_race_date_raises_before_missing_start_date():
         )
 
 
+@pytest.mark.parametrize("table, column, message", [
+    ("season_results", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_most_titled_riders_missing_date_raises(table, column, message):
+    tables = {
+        "season_results": season_results(), "rider_categories": RIDER_CATEGORIES.copy(),
+        "affiliations": AFFILIATIONS.copy(),
+    }
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        rank_most_titled_riders(
+            tables["season_results"], RIDERS, CLUBS, tables["affiliations"],
+            tables["rider_categories"], SEASON
+        )
+
+
+def test_most_titled_riders_missing_race_date_raises_before_missing_start_date():
+    results = season_results()
+    results.loc[0, "race_date"] = None
+    rider_categories = RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        rank_most_titled_riders(results, RIDERS, CLUBS, AFFILIATIONS, rider_categories, SEASON)
+
+
+@pytest.mark.parametrize("table, column, message", [
+    ("races", "race_date", "Missing race dates in the results"),
+    ("rider_categories", "start_date", "Missing start dates in the history"),
+    ("affiliations", "start_date", "Missing start dates in the history"),
+])
+def test_season_summary_missing_date_raises(table, column, message):
+    tables = {
+        "races": RACES.copy(), "rider_categories": RIDER_CATEGORIES.copy(),
+        "affiliations": AFFILIATIONS.copy(),
+    }
+    tables[table].loc[0, column] = None
+    with pytest.raises(ValueError, match=message):
+        compute_season_summary(
+            tables["races"], RANKINGS, RIDERS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES,
+            REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], SEASON,
+            PAYS_DE_LA_LOIRE
+        )
+
+
+def test_season_summary_missing_race_date_raises_before_missing_start_date():
+    races = RACES.copy()
+    races.loc[0, "race_date"] = None
+    rider_categories = RIDER_CATEGORIES.copy()
+    rider_categories.loc[0, "start_date"] = None
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        compute_season_summary(
+            races, RANKINGS, RIDERS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES,
+            REGIONAL_COMMITTEES, AFFILIATIONS, rider_categories, SEASON, PAYS_DE_LA_LOIRE
+        )
+
+
 def test_season_summary_gathers_the_statistics():
     summary = compute_season_summary(
         RACES, RANKINGS, RIDERS, CLUBS, DEPARTEMENTS, DEPARTEMENTAL_COMMITTEES,

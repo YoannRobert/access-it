@@ -403,8 +403,10 @@ def filter_results_by_categories(
         The rows of `results` kept, with the same columns, order and index.
 
     Raises:
-        ValueError: If category_filter is not "race" or "rider", or if the
-            requested categories are invalid (see check_categories).
+        ValueError: If category_filter is not "race" or "rider", then if the
+            requested categories are invalid (see check_categories), then, with
+            "rider", if a race date of the results is missing, then if a start
+            date of rider_categories is missing.
     """
     if category_filter not in ("race", "rider"):
         raise ValueError(

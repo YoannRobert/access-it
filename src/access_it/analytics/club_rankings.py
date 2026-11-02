@@ -70,8 +70,10 @@ def get_club_results(
         rank and rider_id.
 
     Raises:
-        ValueError: If the season is before FIRST_SEASON, or if a race of the
-            season has non contiguous categories.
+        ValueError: If the season is before FIRST_SEASON, then if a race of the
+            season has non contiguous categories, then if a race of the season
+            having results has no date, then if a start date of a rider of these
+            results in affiliations is missing.
     """
     check_season(season)
     season_races = races.loc[races["season"] == season, ["race_id", "race_date", "categories"]]
@@ -129,10 +131,14 @@ def rank_clubs(
         name and club_id.
 
     Raises:
-        ValueError: If the region is not covered or unknown, if category_filter
-            is not "race" or "rider", if the requested categories are invalid,
-            or if max_clubs is lower than 1.
+        ValueError: If max_clubs is lower than 1, then if the region is not
+            covered, then if it is unknown, then if category_filter is not
+            "race" or "rider", then if the requested categories are invalid,
+            then, with "rider", if a race date of club_results is missing, then
+            if a start date of rider_categories is missing.
     """
+    if max_clubs < 1:
+        raise ValueError(f"max_clubs must be at least 1, not {max_clubs}")
     ranked_clubs = clubs[(clubs["min_year"] <= season) & (season <= clubs["max_year"])]
     if region is not None:
         check_covered_region(region)
@@ -147,8 +153,6 @@ def rank_clubs(
 
     results = club_results[club_results["club_id"].isin(ranked_clubs["club_id"])]
     counted = filter_results_by_categories(results, rider_categories, categories, category_filter)
-    if max_clubs < 1:
-        raise ValueError(f"max_clubs must be at least 1, not {max_clubs}")
 
     criteria = ["nb_wins", *[f"nb_top_{n}" for n in TOP_THRESHOLDS]]
     stats = count_wins_and_tops(counted, by=("club_id",)).set_index("club_id")

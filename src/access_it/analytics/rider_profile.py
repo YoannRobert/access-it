@@ -227,7 +227,9 @@ def compute_season_points(
         NOT_APPLICABLE or missing); sorted by rider and from the oldest season.
 
     Raises:
-        ValueError: If the region is unknown.
+        ValueError: If the region is unknown, then if a race date of
+            rider_results is missing, then if a start date of affiliations of
+            the riders of rider_results is missing.
     """
     keys = ["rider_id", "season"]
     region_id = get_regional_committee_id(regional_committees, region)
@@ -303,9 +305,13 @@ def compute_rider_profile(
         The RiderProfile of the rider.
 
     Raises:
-        ValueError: If the rider is not in the rider table, or if the region
-            is unknown.
+        ValueError: If the rider is not in the rider table, then if the region
+            is unknown, then if a race of the rider has no date, then if a start
+            date of the rider in rider_categories is missing, then if a start
+            date of the rider in affiliations is missing.
     """
+    check_rider(riders, rider_id)
+    get_regional_committee_id(regional_committees, region)
     results = get_rider_results(
         races, rankings, clubs, affiliations, rider_categories, rider_id, reference_date
     )
