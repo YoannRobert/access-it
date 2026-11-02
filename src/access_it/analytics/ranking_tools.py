@@ -292,6 +292,20 @@ def check_category(category: str) -> None:
         raise ValueError(f"Unknown category: {category!r} (expected one of {CATEGORIES})")
 
 
+def check_rider(riders: pd.DataFrame, rider_id: str) -> None:
+    """Check that the rider is in the rider table.
+
+    Args:
+        riders: Rider table.
+        rider_id: Rider to check.
+
+    Raises:
+        ValueError: If the rider is not in the rider table.
+    """
+    if not (riders["rider_id"] == rider_id).any():
+        raise ValueError(f"Unknown rider: {rider_id!r}")
+
+
 def check_categories(categories: Sequence[str]) -> tuple[str, ...]:
     """Requested categories without duplicates, from the highest one ("A1") to the lowest one.
 

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from access_it.analytics.ranking_tools import get_rider_results, to_day
+from access_it.analytics.ranking_tools import check_rider, get_rider_results, to_day
 from access_it.common.seasons import check_season
 
 COMMON_RACE_COLUMNS = [
@@ -87,8 +87,7 @@ def get_common_races(
     if rider_id == opponent_id:
         raise ValueError(f"Same rider and opponent: {rider_id!r}")
     for rider in (rider_id, opponent_id):
-        if not (riders["rider_id"] == rider).any():
-            raise ValueError(f"Unknown rider: {rider!r}")
+        check_rider(riders, rider)
     if season is not None:
         check_season(season)
         year = to_day(reference_date).year
