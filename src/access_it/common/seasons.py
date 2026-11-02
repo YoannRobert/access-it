@@ -15,6 +15,9 @@ NATIONAL_FIRST_SEASON = 2026
 def check_first_season(first_season: int) -> None:
     """Check that the first season is not before the creation of the Access categories.
 
+    Args:
+        first_season: First season covered, as a calendar year.
+
     Raises:
         ValueError: If `first_season` is before ACCESS_CATEGORIES_FIRST_SEASON.
     """
@@ -30,6 +33,9 @@ check_first_season(FIRST_SEASON)  # stops any run of the ETL if the constant is 
 
 def check_season(season: int) -> None:
     """Check that the season is covered.
+
+    Args:
+        season: Season to check, as a calendar year.
 
     Raises:
         ValueError: If `season` is before FIRST_SEASON.

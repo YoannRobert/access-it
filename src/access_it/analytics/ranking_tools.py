@@ -36,12 +36,26 @@ RIDER_RESULT_COLUMNS = [
 
 
 def to_datetime(s: pd.Series) -> pd.Series:
-    """Dates as datetime64[ns], whatever their input type (string, date, timestamp)."""
+    """Dates as datetime64[ns], whatever their input type (string, date, timestamp).
+
+    Args:
+        s: Dates to convert.
+
+    Returns:
+        The dates as datetime64[ns], same index as `s`.
+    """
     return pd.to_datetime(s).astype("datetime64[ns]")
 
 
 def to_day(reference_date: str | pd.Timestamp) -> pd.Timestamp:
-    """Reference date as a timestamp at midnight."""
+    """Reference date as a timestamp at midnight.
+
+    Args:
+        reference_date: Date to convert, as a string or a timestamp.
+
+    Returns:
+        The day of `reference_date`, at midnight.
+    """
     return to_datetime(pd.Series([reference_date])).dt.normalize().iloc[0]
 
 
@@ -49,6 +63,12 @@ def get_reference_date(races: pd.DataFrame) -> pd.Timestamp:
     """Default reference date of the analytics: the day after the last race of the table.
 
     Every race of the table, the last one included, is strictly before it.
+
+    Args:
+        races: Race table, with race_date.
+
+    Returns:
+        The day after the last race_date of the table, at midnight.
 
     Raises:
         ValueError: If the race table is empty.
@@ -60,6 +80,13 @@ def get_reference_date(races: pd.DataFrame) -> pd.Timestamp:
 
 def get_regional_committee_id(regional_committees: pd.DataFrame, region: str) -> str:
     """ID of the regional committee named `region` (name as in regional_committees).
+
+    Args:
+        regional_committees: Regional committee table.
+        region: Name of the regional committee.
+
+    Returns:
+        The regional_committee_id of the committee.
 
     Raises:
         ValueError: If the region is unknown.
@@ -108,6 +135,9 @@ def get_region_club_ids(
         clubs: Club table.
         departemental_committees: Departemental committee table.
         region_id: ID of the regional committee (see get_regional_committee_id).
+
+    Returns:
+        The club_id of these clubs, with the index of the club table.
     """
     region_committee_ids = departemental_committees.loc[
         departemental_committees["regional_committee_id"] == region_id,
@@ -188,7 +218,14 @@ def add_value_on_race_date(
 
 
 def format_category(rider_category: object) -> str | None:
-    """Label of a category of the history: "A1" to "A4", or None if unknown."""
+    """Label of a category of the history: "A1" to "A4", or None if unknown.
+
+    Args:
+        rider_category: Category of the history (1 to 4), or a missing value.
+
+    Returns:
+        "A1" to "A4", or None if `rider_category` is missing.
+    """
     return None if pd.isna(rider_category) else f"A{int(rider_category)}"
 
 
@@ -324,6 +361,9 @@ def get_rider_results(
 def check_category(category: str) -> None:
     """Check that the category is one of "A1" to "A4".
 
+    Args:
+        category: Category to check.
+
     Raises:
         ValueError: If the category is not one of CATEGORIES.
     """
@@ -347,6 +387,12 @@ def check_rider(riders: pd.DataFrame, rider_id: str) -> None:
 
 def check_categories(categories: Sequence[str]) -> tuple[str, ...]:
     """Requested categories without duplicates, from the highest one ("A1") to the lowest one.
+
+    Args:
+        categories: Requested categories, in any order, duplicates allowed.
+
+    Returns:
+        The requested categories without duplicates, from "A1" to "A4".
 
     Raises:
         ValueError: If no category is given, if one is not "A1" to "A4", or
@@ -433,6 +479,12 @@ def compute_places(results: pd.DataFrame) -> pd.Series:
     The riders removed before (absent from `results`) are skipped: the riders
     behind them move up. Tied riders share the place and the next one is
     skipped (1, 2, 2, 4).
+
+    Args:
+        results: Results with race_id and finish_rank.
+
+    Returns:
+        The integer place of each result, same index as `results`.
     """
     return results.groupby("race_id")["finish_rank"].rank(method="min").astype(int)
 
@@ -480,6 +532,13 @@ def scale_points(results: pd.DataFrame, scale: tuple[int, ...]) -> pd.Series:
     """Points of each result: those of its place in the scale.
 
     A result gets 0 beyond the last place of the scale, or if its category is unknown.
+
+    Args:
+        results: Results with place and category.
+        scale: Points of the places, from the first one.
+
+    Returns:
+        The points of each result, same index as `results`.
     """
     points = results["place"].map(lambda p: scale[p - 1] if p <= len(scale) else 0)
     return points.where(results["category"].notna(), 0)
@@ -508,6 +567,12 @@ def select_club(clubs_by_date: pd.Series) -> str:
     """Club shown in a ranking: the first one of the year, unless it is an individual licence.
 
     In that case, the first club that follows is shown, if any.
+
+    Args:
+        clubs_by_date: Club IDs of a rider in the year, sorted by date.
+
+    Returns:
+        The club ID shown.
     """
     regular_clubs = clubs_by_date[~individual_club_id_mask(clubs_by_date)]
     return regular_clubs.iloc[0] if not regular_clubs.empty else clubs_by_date.iloc[0]
@@ -571,6 +636,13 @@ def rank_scoring_riders(
 
 def select_category(rankings: pd.DataFrame, category: str) -> pd.DataFrame:
     """Rows of one category of rankings, without the category column.
+
+    Args:
+        rankings: Rankings with a category column.
+        category: Category to select, "A1" to "A4".
+
+    Returns:
+        The rows of `category`, without the category column, index reset.
 
     Raises:
         ValueError: If the category is not one of "A1" to "A4".
