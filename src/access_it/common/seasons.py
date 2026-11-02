@@ -1,4 +1,9 @@
-"""Seasons covered by the project."""
+"""Seasons covered by the project.
+
+First season of the Access categories, first season covered by the project,
+first season of the result pages of the other regions, and checks of the
+first season and of a requested season.
+"""
 
 # The Access categories (Access 1 to 4) were created in 2023: before, these
 # categories had another name, and the result pages cannot be parsed.

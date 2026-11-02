@@ -1,9 +1,10 @@
 """Building blocks shared by the modules of the analytics package.
 
 Used by the regional challenge (regional_rankings), the promotion points
-(promotion_points) and the other analytics modules: default reference date,
-races and clubs of a region, category and club of a rider on the race date,
-results of a rider, places in a race, wins and tops of the riders (or other
+(promotion_points) and the other analytics modules: conversion of the dates,
+default reference date, ID of a regional committee, races and clubs of a
+region, category and club of a rider on the race date, results of a rider,
+check of a rider, places in a race, wins and tops of the riders (or other
 groups), points of a scale, ranking of the riders with its tie-breaks, shared
 rank of tied rows, filter on a category, labels of a category and of a club,
 checks of the race dates and start dates, checks of the requested categories

@@ -1,4 +1,8 @@
-"""Names of the regional committees covered by the project, as in regional_committees."""
+"""Regional committees covered by the project.
+
+Names of the regional committees, as in regional_committees, list of the
+covered regions, and check that a requested region is one of them.
+"""
 
 BRETAGNE = "BRETAGNE"
 PAYS_DE_LA_LOIRE = "PAYS DE LA LOIRE"
