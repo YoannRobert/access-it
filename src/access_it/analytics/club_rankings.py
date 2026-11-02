@@ -35,8 +35,8 @@ import pandas as pd
 
 from access_it.analytics.ranking_tools import (
     CATEGORIES, TOP_THRESHOLDS, add_shared_rank, add_value_on_race_date, check_at_least_one,
-    check_race_categories, count_wins_and_tops, filter_results_by_categories,
-    get_region_club_ids, get_regional_committee_id, to_datetime
+    check_categories, check_category_filter, check_race_categories, count_wins_and_tops,
+    filter_results_by_categories, get_region_club_ids, get_regional_committee_id, to_datetime
 )
 from access_it.common.regions import check_covered_region
 from access_it.common.seasons import check_season
@@ -219,8 +219,15 @@ def compute_club_rankings(
         The output of rank_clubs.
 
     Raises:
-        ValueError: See get_club_results and rank_clubs.
+        ValueError: The arguments are checked first, in the order of rank_clubs,
+            then the season; then see get_club_results and rank_clubs.
     """
+    check_at_least_one(max_clubs, "max_clubs")
+    if region is not None:
+        check_covered_region(region)
+        get_regional_committee_id(regional_committees, region)
+    check_category_filter(category_filter)
+    check_categories(categories)
     club_results = get_club_results(races, rankings, affiliations, season)
     return rank_clubs(
         club_results, clubs, departements, departemental_committees, regional_committees,

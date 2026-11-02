@@ -305,6 +305,39 @@ def test_club_rankings_missing_race_date_raises_before_missing_start_date():
         )
 
 
+
+# r1 has non contiguous categories and no date: every check of the data fails
+INVALID_RACES = RACES.assign(
+    categories=["A1,A3", *RACES["categories"][1:]], race_date=[None, *RACES["race_date"][1:]]
+)
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"max_clubs": 0}, "max_clubs must be at least 1"),
+    ({"region": NOT_COVERED_REGION}, "Region not covered"),
+    (
+        {
+            "region": PAYS_DE_LA_LOIRE,
+            "regional_committees": REGIONAL_COMMITTEES[
+                REGIONAL_COMMITTEES["name"] != PAYS_DE_LA_LOIRE
+            ],
+        },
+        "Unknown region"
+    ),
+    ({"category_filter": "club"}, "Unknown category filter"),
+    ({"categories": ["A1", "A3"]}, "Categories not contiguous"),
+    ({"season": FIRST_SEASON - 1}, "before the first season"),
+], ids=["max_clubs", "not_covered_region", "unknown_region", "filter", "categories", "season"])
+def test_club_rankings_invalid_argument_raises_before_invalid_data(kwargs, message):
+    arguments = {
+        "races": INVALID_RACES, "rankings": RANKINGS, "clubs": CLUBS,
+        "departements": DEPARTEMENTS, "departemental_committees": DEPARTEMENTAL_COMMITTEES,
+        "regional_committees": REGIONAL_COMMITTEES, "affiliations": AFFILIATIONS,
+        "rider_categories": RIDER_CATEGORIES, "season": SEASON,
+    } | kwargs
+    with pytest.raises(ValueError, match=message):
+        compute_club_rankings(**arguments)
+
 def test_rank_clubs_without_any_result_shows_the_clubs_with_zeros():
     club_results = get_club_results(RACES, RANKINGS, AFFILIATIONS, SEASON).iloc[:0]
     ranking = rank_clubs(

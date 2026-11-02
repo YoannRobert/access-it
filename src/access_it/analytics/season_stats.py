@@ -35,9 +35,10 @@ import pandas as pd
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     CATEGORIES, CATEGORY_COMBINATIONS, TOP_THRESHOLDS, add_category_on_race_date,
-    add_shared_rank, add_value_on_race_date, check_at_least_one, check_race_categories,
-    check_race_dates, count_wins_and_tops, filter_results_by_categories, get_region_races,
-    get_regional_committee_id, select_club, to_datetime
+    add_shared_rank, add_value_on_race_date, check_at_least_one, check_categories,
+    check_category_filter, check_race_categories, check_race_dates, count_wins_and_tops,
+    filter_results_by_categories, get_region_races, get_regional_committee_id, select_club,
+    to_datetime
 )
 from access_it.common.regions import check_covered_region
 from access_it.common.seasons import check_season
@@ -105,17 +106,19 @@ def get_season_results(
 
     Raises:
         ValueError: If the region is not covered, then if the season is before
-            FIRST_SEASON, then if the region is unknown, then if a race of the
-            season and the region has non contiguous categories, then if one of
-            these races having results has no date, then if category_filter is
-            not "race" or "rider", then if the requested categories are
-            invalid, then, with "rider", if a start date of rider_categories
+            FIRST_SEASON, then if the region is unknown, then if category_filter
+            is not "race" or "rider", then if the requested categories are
+            invalid, then if a race of the season and the region has non
+            contiguous categories, then if one of these races having results
+            has no date, then, with "rider", if a start date of rider_categories
             is missing.
     """
     check_covered_region(region)
     check_season(season)
-
     region_id = get_regional_committee_id(regional_committees, region)
+    check_category_filter(category_filter)
+    check_categories(categories)
+
     season_races = get_region_races(races, departemental_committees, region_id, season)
     check_race_categories(season_races)
     results = (
@@ -329,8 +332,10 @@ def compute_season_summary(
         The SeasonSummary of the season.
 
     Raises:
-        ValueError: See get_season_results and rank_most_titled_riders.
+        ValueError: If max_riders is lower than 1, then see get_season_results
+            and rank_most_titled_riders.
     """
+    check_at_least_one(max_riders, "max_riders")
     season_results = get_season_results(
         races, rankings, departemental_committees, regional_committees, rider_categories,
         season, region, categories, category_filter

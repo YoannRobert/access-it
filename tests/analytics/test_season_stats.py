@@ -276,6 +276,36 @@ def test_season_results_missing_race_date_raises_before_missing_start_date():
         )
 
 
+# r1 has non contiguous categories and no date: every check of the data fails
+INVALID_RACES = RACES.assign(
+    categories=["A1,A3", *RACES["categories"][1:]], race_date=[None, *RACES["race_date"][1:]]
+)
+INVALID_ARGUMENTS = [
+    ({"region": NOT_COVERED_REGION}, "Region not covered"),
+    ({"season": FIRST_SEASON - 1}, "before the first season"),
+    (
+        {"regional_committees": REGIONAL_COMMITTEES[
+            REGIONAL_COMMITTEES["name"] != PAYS_DE_LA_LOIRE
+        ]},
+        "Unknown region"
+    ),
+    ({"category_filter": "club"}, "Unknown category filter"),
+    ({"categories": ["A1", "A3"]}, "Categories not contiguous"),
+]
+INVALID_ARGUMENT_IDS = ["not_covered_region", "season", "unknown_region", "filter", "categories"]
+
+
+@pytest.mark.parametrize("kwargs, message", INVALID_ARGUMENTS, ids=INVALID_ARGUMENT_IDS)
+def test_season_results_invalid_argument_raises_before_invalid_data(kwargs, message):
+    arguments = {
+        "races": INVALID_RACES, "rankings": RANKINGS,
+        "departemental_committees": DEPARTEMENTAL_COMMITTEES,
+        "regional_committees": REGIONAL_COMMITTEES, "rider_categories": RIDER_CATEGORIES,
+        "season": SEASON, "region": PAYS_DE_LA_LOIRE,
+    } | kwargs
+    with pytest.raises(ValueError, match=message):
+        get_season_results(**arguments)
+
 @pytest.mark.parametrize("table, column, message", [
     ("season_results", "race_date", "Missing race dates in the results"),
     ("rider_categories", "start_date", "Missing start dates in the history"),
@@ -333,6 +363,22 @@ def test_season_summary_missing_race_date_raises_before_missing_start_date():
             REGIONAL_COMMITTEES, AFFILIATIONS, rider_categories, SEASON, PAYS_DE_LA_LOIRE
         )
 
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [({"max_riders": 0}, "max_riders must be at least 1"), *INVALID_ARGUMENTS],
+    ids=["max_riders", *INVALID_ARGUMENT_IDS]
+)
+def test_season_summary_invalid_argument_raises_before_invalid_data(kwargs, message):
+    arguments = {
+        "races": INVALID_RACES, "rankings": RANKINGS, "riders": RIDERS, "clubs": CLUBS,
+        "departements": DEPARTEMENTS, "departemental_committees": DEPARTEMENTAL_COMMITTEES,
+        "regional_committees": REGIONAL_COMMITTEES, "affiliations": AFFILIATIONS,
+        "rider_categories": RIDER_CATEGORIES, "season": SEASON, "region": PAYS_DE_LA_LOIRE,
+    } | kwargs
+    with pytest.raises(ValueError, match=message):
+        compute_season_summary(**arguments)
 
 def test_season_summary_gathers_the_statistics():
     summary = compute_season_summary(
