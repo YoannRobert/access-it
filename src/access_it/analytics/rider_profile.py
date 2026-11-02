@@ -19,8 +19,9 @@ Rules:
   "not applicable"; in a region without a points scale in POINTS_SCALES of
   regional_rankings, no rider is concerned.
 
-The functions select the riders by rider_id only; compute_season_points also
-works on the results of several riders. The
+The functions select the riders by rider_id only; an unknown rider_id raises a
+ValueError, while a rider without race has empty tables; compute_season_points
+also works on the results of several riders. The
 computation is free of any Streamlit dependency.
 """
 
@@ -30,8 +31,9 @@ import pandas as pd
 
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, add_value_on_race_date, count_wins_and_tops, format_category, format_club,
-    get_region_club_ids, get_regional_committee_id, get_rider_results, to_datetime, to_day
+    CATEGORIES, add_value_on_race_date, check_rider, count_wins_and_tops, format_category,
+    format_club, get_region_club_ids, get_regional_committee_id, get_rider_results, to_datetime,
+    to_day
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.analytics.regional_rankings import POINTS_SCALES
@@ -100,6 +102,7 @@ def _get_periods(
 
 
 def get_rider_categories(
+        riders: pd.DataFrame,
         rider_categories: pd.DataFrame,
         rider_id: str,
         reference_date: str | pd.Timestamp
@@ -107,6 +110,7 @@ def get_rider_categories(
     """Successive categories of a rider, from the oldest (see _get_periods).
 
     Args:
+        riders: Rider table.
         rider_categories: Category history of the riders.
         rider_id: Rider to show.
         reference_date: Day of the profile, as "YYYY-MM-DD" or a date.
@@ -114,7 +118,11 @@ def get_rider_categories(
     Returns:
         One row per period: rider_id, start_date, end_date and category ("A1"
         to "A4", or UNKNOWN_CATEGORY).
+
+    Raises:
+        ValueError: If the rider is not in the rider table.
     """
+    check_rider(riders, rider_id)
     periods = _get_periods(rider_categories, "rider_category", rider_id, reference_date)
     # astype(object): the labels may be all None, or the history empty
     periods["category"] = (
@@ -125,6 +133,7 @@ def get_rider_categories(
 
 
 def get_rider_clubs(
+        riders: pd.DataFrame,
         clubs: pd.DataFrame,
         affiliations: pd.DataFrame,
         rider_id: str,
@@ -133,6 +142,7 @@ def get_rider_clubs(
     """Successive clubs of a rider, from the oldest (see _get_periods).
 
     Args:
+        riders: Rider table.
         clubs: Club table.
         affiliations: Affiliation table (club history of the riders).
         rider_id: Rider to show.
@@ -141,7 +151,11 @@ def get_rider_clubs(
     Returns:
         One row per period: rider_id, start_date, end_date and club (name, or
         UNKNOWN_CLUB).
+
+    Raises:
+        ValueError: If the rider is not in the rider table.
     """
+    check_rider(riders, rider_id)
     periods = _get_periods(affiliations, "club_id", rider_id, reference_date)
     periods["club"] = format_club(periods["club_id"], clubs)
     return periods[["rider_id", "start_date", "end_date", "club"]]
@@ -240,6 +254,7 @@ def compute_season_points(
 def compute_rider_profile(
         races: pd.DataFrame,
         rankings: pd.DataFrame,
+        riders: pd.DataFrame,
         clubs: pd.DataFrame,
         departemental_committees: pd.DataFrame,
         regional_committees: pd.DataFrame,
@@ -259,6 +274,7 @@ def compute_rider_profile(
     Args:
         races: Race table.
         rankings: Ranking table.
+        riders: Rider table.
         clubs: Club table.
         departemental_committees: Departemental committee table.
         regional_committees: Regional committee table.
@@ -281,15 +297,16 @@ def compute_rider_profile(
         The RiderProfile of the rider.
 
     Raises:
-        ValueError: If the region is unknown.
+        ValueError: If the rider is not in the rider table, or if the region
+            is unknown.
     """
     results = get_rider_results(
         races, rankings, clubs, affiliations, rider_categories, rider_id, reference_date
     )
     return RiderProfile(
         results=results,
-        categories=get_rider_categories(rider_categories, rider_id, reference_date),
-        clubs=get_rider_clubs(clubs, affiliations, rider_id, reference_date),
+        categories=get_rider_categories(riders, rider_categories, rider_id, reference_date),
+        clubs=get_rider_clubs(riders, clubs, affiliations, rider_id, reference_date),
         season_stats=count_wins_and_tops(results),
         season_points=compute_season_points(
             results, promotion_points, challenge_points, clubs, departemental_committees,

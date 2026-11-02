@@ -32,6 +32,7 @@ CLUBS = pd.DataFrame({
     "departemental_committee_id": ["5244", "5385"],
 })
 PDL, BZH = CLUBS["club_id"]
+RIDERS = pd.DataFrame({"rider_id": ["a", "b"]})
 
 
 def make_tables(races: list[tuple], results: list[tuple], clubs: dict, categories: dict) -> dict:
@@ -91,7 +92,7 @@ def test_category_periods_from_the_first_season_to_the_reference_date():
         ],
         "rider_category": pd.array([4, 3, None, 2, 1, 4], dtype="Int64"),
     })
-    periods = get_rider_categories(rider_categories, "a", REFERENCE_DATE)
+    periods = get_rider_categories(RIDERS, rider_categories, "a", REFERENCE_DATE)
     assert periods.columns.tolist() == ["rider_id", "start_date", "end_date", "category"]
     assert periods["category"].tolist() == ["A3", UNKNOWN_CATEGORY, "A2"]
     assert periods["start_date"].tolist() == pd.to_datetime(
@@ -109,7 +110,7 @@ def test_club_periods_with_an_unknown_club():
         "start_date": [f"{SEASON}-01-01", f"{SEASON}-05-01"],
         "club_id": [PDL, "0000000"],
     })
-    periods = get_rider_clubs(CLUBS, affiliations, "a", REFERENCE_DATE)
+    periods = get_rider_clubs(RIDERS, CLUBS, affiliations, "a", REFERENCE_DATE)
     assert periods["club"].tolist() == ["Club Nantes", UNKNOWN_CLUB]
 
 
@@ -189,8 +190,9 @@ def test_profile_from_the_computed_points():
         tables["rider_categories"], SEASON
     )
     profile = compute_rider_profile(
-        *common, CLUBS, DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES, tables["affiliations"],
-        tables["rider_categories"], promotion, challenge, "a", REFERENCE_DATE
+        *common, RIDERS, CLUBS, DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES,
+        tables["affiliations"], tables["rider_categories"], promotion, challenge, "a",
+        REFERENCE_DATE
     )
     assert isinstance(profile, RiderProfile)
     assert profile.season_stats[["nb_races", "nb_wins"]].values.tolist() == [[2, 1]]
@@ -209,7 +211,7 @@ def test_profile_of_a_rider_without_race():
         categories={"a": [(f"{SEASON}-01-01", 3)], "b": [(f"{SEASON}-01-01", 3)]},
     )
     profile = compute_rider_profile(
-        tables["races"], tables["rankings"], CLUBS, DEPARTEMENTAL_COMMITTEES,
+        tables["races"], tables["rankings"], RIDERS, CLUBS, DEPARTEMENTAL_COMMITTEES,
         REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], points_of([]),
         points_of([]), "a", REFERENCE_DATE
     )
@@ -217,3 +219,23 @@ def test_profile_of_a_rider_without_race():
     assert profile.season_points.columns.tolist() == SEASON_POINTS_COLUMNS
     assert len(profile.categories) == 1 and len(profile.clubs) == 1
     assert profile.recent_form[["nb_races_used", "top_n_rate"]].values.tolist() == [[0, 0.0]]
+
+
+@pytest.mark.parametrize("compute", [
+    lambda tables: get_rider_categories(RIDERS, tables["rider_categories"], "x", REFERENCE_DATE),
+    lambda tables: get_rider_clubs(RIDERS, CLUBS, tables["affiliations"], "x", REFERENCE_DATE),
+    lambda tables: compute_rider_profile(
+        tables["races"], tables["rankings"], RIDERS, CLUBS, DEPARTEMENTAL_COMMITTEES,
+        REGIONAL_COMMITTEES, tables["affiliations"], tables["rider_categories"], points_of([]),
+        points_of([]), "x", REFERENCE_DATE
+    ),
+], ids=["categories", "clubs", "profile"])
+def test_unknown_rider_raises(compute):
+    tables = make_tables(
+        races=[("r1", f"{SEASON}-03-01", "44")],
+        results=[("r1", "a", 1)],
+        clubs={"a": [(f"{SEASON}-01-01", PDL)]},
+        categories={"a": [(f"{SEASON}-01-01", 3)]},
+    )
+    with pytest.raises(ValueError, match="Unknown rider: 'x'"):
+        compute(tables)
