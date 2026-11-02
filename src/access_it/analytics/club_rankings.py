@@ -135,7 +135,8 @@ def rank_clubs(
             covered, then if it is unknown, then if category_filter is not
             "race" or "rider", then if the requested categories are invalid,
             then, with "rider", if a race date of club_results is missing, then
-            if a start date of rider_categories is missing.
+            if a start date of a rider of the results of the ranked clubs in
+            rider_categories is missing.
     """
     check_at_least_one(max_clubs, "max_clubs")
     ranked_clubs = clubs[(clubs["min_year"] <= season) & (season <= clubs["max_year"])]

@@ -110,8 +110,8 @@ def get_season_results(
             is not "race" or "rider", then if the requested categories are
             invalid, then if a race of the season and the region has non
             contiguous categories, then if one of these races having results
-            has no date, then, with "rider", if a start date of rider_categories
-            is missing.
+            has no date, then, with "rider", if a start date of a rider ranked
+            in these races in rider_categories is missing.
     """
     check_covered_region(region)
     check_season(season)

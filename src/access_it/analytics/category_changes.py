@@ -98,8 +98,8 @@ def compute_category_changes(
         ValueError: If the season is before FIRST_SEASON, then if the region
             is not covered, then if it is unknown, then if the category is not
             "A1" to "A4", then if a start date of a known category in
-            rider_categories is missing, then if a start date of affiliations
-            is missing.
+            rider_categories is missing, then if a start date of a rider with a
+            change kept (season and category) in affiliations is missing.
     """
     check_season(season)
     if region is not None:

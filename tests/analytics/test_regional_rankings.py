@@ -294,6 +294,14 @@ def test_challenge_points_missing_race_date_raises_before_missing_start_date():
         points_of(tables)
 
 
+@pytest.mark.parametrize("table", ["affiliations", "rider_categories"])
+def test_missing_start_date_of_an_unranked_rider_does_not_raise(table):
+    tables = single_race(ranks={"a": 1}, clubs={"a": PDL, "z": PDL}, categories={"a": 4, "z": 4})
+    history = tables[table]
+    history.loc[history["rider_id"] == "z", "start_date"] = None
+    assert points_of(tables) == {"a": 30}
+
+
 @pytest.mark.parametrize("table, column, message", MISSING_DATES)
 def test_regional_rankings_missing_date_raises(table, column, message):
     tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})

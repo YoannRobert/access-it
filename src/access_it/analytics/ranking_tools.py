@@ -189,12 +189,13 @@ def add_value_on_race_date(
     start_date of the same rider. The value is missing if the race is before
     the first period of the rider. The race dates and the start dates are
     converted by to_datetime, whatever their input type (string, date,
-    timestamp).
+    timestamp). Only the periods of the riders of the results are read, so a
+    missing start date of another rider is not an error.
 
     Args:
         results: Results with rider_id and race_date (not missing, readable as a date).
-        history: History periods with rider_id, start_date (not missing,
-            readable as a date) and `column`.
+        history: History periods with rider_id, start_date (not missing for
+            the riders of the results, readable as a date) and `column`.
         column: Column of `history` added to the results.
 
     Returns:
@@ -204,11 +205,13 @@ def add_value_on_race_date(
 
     Raises:
         ValueError: If a race date of the results is missing, then if a start
-            date of the history is missing.
+            date of a rider of the results in the history is missing.
     """
     results = results.assign(race_date=lambda df: to_datetime(df["race_date"]))
     check_race_dates(results["race_date"])
-    history = history[["rider_id", "start_date", column]].assign(
+    history = history.loc[
+        history["rider_id"].isin(results["rider_id"]), ["rider_id", "start_date", column]
+    ].assign(
         start_date=lambda df: to_datetime(df["start_date"])
     )
     check_start_dates(history["start_date"])
@@ -264,7 +267,7 @@ def add_category_on_race_date(
 
     Raises:
         ValueError: If a race date of the results is missing, then if a start
-            date of rider_categories is missing.
+            date of a rider of the results in rider_categories is missing.
     """
     results = add_value_on_race_date(results, rider_categories, "rider_category")
     results["category"] = results["rider_category"].map(format_category)
@@ -294,8 +297,8 @@ def add_category_and_club_on_race_date(
 
     Raises:
         ValueError: If a race date of the results is missing, then if a start
-            date of rider_categories is missing, then if a start date of
-            affiliations is missing.
+            date of a rider of the results in rider_categories is missing, then
+            if a start date of a rider of the results in affiliations is missing.
     """
     results = add_category_on_race_date(results, rider_categories)
     results = add_value_on_race_date(results, affiliations, "club_id")
@@ -508,7 +511,7 @@ def filter_results_by_categories(
         ValueError: If category_filter is not "race" or "rider", then if the
             requested categories are invalid (see check_categories), then, with
             "rider", if a race date of the results is missing, then if a start
-            date of rider_categories is missing.
+            date of a rider of the results in rider_categories is missing.
     """
     check_category_filter(category_filter)
     requested = check_categories(categories)

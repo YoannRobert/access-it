@@ -66,8 +66,9 @@ def compute_promotion_points(
 
     Raises:
         ValueError: If a race of the season having results has no date, then
-            if a start date of affiliations is missing, then if a start date
-            of rider_categories is missing.
+            if a start date of a rider ranked in these races in affiliations is
+            missing, then if a start date of a rider among them, the foreign
+            riders on the race date excepted, in rider_categories is missing.
     """
     season_races = races.loc[races["season"] == season, ["race_id", "race_date"]].assign(
         race_date=lambda df: to_datetime(df["race_date"])
@@ -145,8 +146,9 @@ def compute_promotion_rankings(
 
     Raises:
         ValueError: If a race of the season having results has no date, then
-            if a start date of affiliations is missing, then if a start date
-            of rider_categories is missing.
+            if a start date of a rider ranked in these races in affiliations is
+            missing, then if a start date of a rider among them, the foreign
+            riders on the race date excepted, in rider_categories is missing.
     """
     points = compute_promotion_points(races, rankings, affiliations, rider_categories, season)
     scoring = points[points["points"] > 0]

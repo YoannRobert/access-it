@@ -288,6 +288,16 @@ def test_missing_start_date_raises():
         add_value_on_race_date(results, history, "club_id")
 
 
+def test_missing_start_date_of_a_rider_absent_from_the_results_does_not_raise():
+    results = pd.DataFrame({"rider_id": ["a"], "race_date": [f"{FIRST_SEASON}-06-01"]})
+    history = pd.DataFrame({
+        "rider_id": ["a", "z"],
+        "start_date": [f"{FIRST_SEASON}-01-01", None],
+        "club_id": ["c1", "c2"],
+    })
+    assert add_value_on_race_date(results, history, "club_id")["club_id"].tolist() == ["c1"]
+
+
 def test_missing_race_date_raises_before_missing_start_date():
     results = pd.DataFrame({"rider_id": ["a"], "race_date": [None]})
     history = pd.DataFrame({
@@ -488,6 +498,17 @@ def test_results_by_categories_missing_race_date_raises_before_missing_start_dat
     rider_categories.loc[0, "start_date"] = None
     with pytest.raises(ValueError, match="Missing race dates in the results"):
         filter_results_by_categories(results, rider_categories, ["A1"], "rider")
+
+
+def test_category_filter_ignores_the_missing_start_date_of_a_rider_absent_from_the_results():
+    rider_categories = pd.concat([
+        FILTER_RIDER_CATEGORIES,
+        pd.DataFrame({
+            "rider_id": ["z"], "start_date": [None], "rider_category": pd.array([2], dtype="Int64")
+        }),
+    ], ignore_index=True)
+    kept = filter_results_by_categories(FILTER_RESULTS, rider_categories, ["A2", "A3"], "rider")
+    assert kept.index.tolist() == [10, 12]
 
 
 def test_rows_tied_on_every_criterion_share_the_rank():

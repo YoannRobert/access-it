@@ -165,6 +165,19 @@ def test_category_changes_missing_date_raises(table):
         )
 
 
+def test_missing_start_date_of_a_rider_without_change_does_not_raise():
+    # h has no known category, so no change
+    affiliations = pd.concat([
+        AFFILIATIONS,
+        pd.DataFrame({"rider_id": ["h"], "start_date": [None], "club_id": ["5244001"]}),
+    ], ignore_index=True)
+    changes = compute_category_changes(
+        RIDER_CATEGORIES, RIDERS, CLUBS, affiliations, DEPARTEMENTAL_COMMITTEES,
+        REGIONAL_COMMITTEES, SEASON
+    )
+    assert changes.equals(category_changes())
+
+
 def test_category_changes_unknown_category_raises_before_missing_start_date():
     rider_categories = RIDER_CATEGORIES.copy()
     rider_categories.loc[0, "start_date"] = None
