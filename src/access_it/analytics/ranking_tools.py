@@ -9,8 +9,8 @@ the arguments of the recent form, places in a race, wins and tops of the
 riders (or other groups), points of a scale, ranking of the riders with its
 tie-breaks, shared rank of tied rows, filter on a category, labels of a
 category and of a club, checks of the race dates and start dates, checks of
-the requested categories and of the categories of the races, and filter of
-the results on the categories.
+the category filter, of the requested categories and of the categories of
+the races, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -423,6 +423,22 @@ def check_recent_form_arguments(top_n: int, last_races: int, window_months: int)
         raise ValueError(f"window_months must be at least 1, not {window_months}")
 
 
+def check_category_filter(category_filter: str) -> None:
+    """Check that the category filter is "race" or "rider".
+
+    Args:
+        category_filter: "race" to filter on the categories of the races,
+            "rider" to filter on the categories of the riders on the race dates.
+
+    Raises:
+        ValueError: If category_filter is not "race" or "rider".
+    """
+    if category_filter not in ("race", "rider"):
+        raise ValueError(
+            f"Unknown category filter: {category_filter!r} (expected 'race' or 'rider')"
+        )
+
+
 def check_categories(categories: Sequence[str]) -> tuple[str, ...]:
     """Requested categories without duplicates, from the highest one ("A1") to the lowest one.
 
@@ -492,10 +508,7 @@ def filter_results_by_categories(
             "rider", if a race date of the results is missing, then if a start
             date of rider_categories is missing.
     """
-    if category_filter not in ("race", "rider"):
-        raise ValueError(
-            f"Unknown category filter: {category_filter!r} (expected 'race' or 'rider')"
-        )
+    check_category_filter(category_filter)
     requested = check_categories(categories)
     if category_filter == "race":
         is_kept = results["categories"].map(

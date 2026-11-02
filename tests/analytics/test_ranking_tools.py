@@ -9,8 +9,8 @@ from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
     add_category_on_race_date, add_shared_rank, add_value_on_race_date, check_at_least_one,
-    check_categories, check_category, check_race_categories, check_race_dates,
-    check_recent_form_arguments, check_rider, check_start_dates,
+    check_categories, check_category, check_category_filter, check_race_categories,
+    check_race_dates, check_recent_form_arguments, check_rider, check_start_dates,
     compute_places, count_wins_and_tops, filter_results_by_categories, format_category,
     format_club, get_reference_date, get_region_club_ids, get_region_races,
     get_regional_committee_id, get_rider_results, rank_scoring_riders, scale_points,
@@ -380,6 +380,13 @@ def test_category_and_club_on_the_race_date_with_labels_when_unknown():
     assert labelled[["category", "club"]].values.tolist() == [
         ["A3", UNKNOWN_CLUB], ["A2", "Club Nantes"], [UNKNOWN_CATEGORY, UNKNOWN_CLUB]
     ]
+
+
+def test_check_category_filter_accepts_race_and_rider_and_raises_otherwise():
+    for category_filter in ("race", "rider"):
+        check_category_filter(category_filter)
+    with pytest.raises(ValueError, match="Unknown category filter: 'club'"):
+        check_category_filter("club")
 
 
 def test_requested_categories_are_ordered_without_duplicates():
