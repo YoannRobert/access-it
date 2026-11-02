@@ -4,12 +4,13 @@ Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: conversion of the dates,
 default reference date, ID of a regional committee, races and clubs of a
 region, category and club of a rider on the race date, results of a rider,
-check of a rider, check of the arguments of the recent form, places in a
-race, wins and tops of the riders (or other groups), points of a scale,
-ranking of the riders with its tie-breaks, shared rank of tied rows, filter
-on a category, labels of a category and of a club, checks of the race dates
-and start dates, checks of the requested categories and of the categories of
-the races, and filter of the results on the categories.
+check of a rider, check of an argument that must be at least 1, check of
+the arguments of the recent form, places in a race, wins and tops of the
+riders (or other groups), points of a scale, ranking of the riders with its
+tie-breaks, shared rank of tied rows, filter on a category, labels of a
+category and of a club, checks of the race dates and start dates, checks of
+the requested categories and of the categories of the races, and filter of
+the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -386,6 +387,20 @@ def check_rider(riders: pd.DataFrame, rider_id: str) -> None:
     """
     if not (riders["rider_id"] == rider_id).any():
         raise ValueError(f"Unknown rider: {rider_id!r}")
+
+
+def check_at_least_one(value: int, name: str) -> None:
+    """Check that an argument is at least 1.
+
+    Args:
+        value: Value of the argument.
+        name: Name of the argument, given in the message.
+
+    Raises:
+        ValueError: If value is lower than 1.
+    """
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1, not {value}")
 
 
 def check_recent_form_arguments(top_n: int, last_races: int, window_months: int) -> None:

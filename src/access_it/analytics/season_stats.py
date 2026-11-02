@@ -35,8 +35,8 @@ import pandas as pd
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     CATEGORIES, CATEGORY_COMBINATIONS, TOP_THRESHOLDS, add_category_on_race_date,
-    add_shared_rank, add_value_on_race_date, check_race_categories, check_race_dates,
-    count_wins_and_tops, filter_results_by_categories, get_region_races,
+    add_shared_rank, add_value_on_race_date, check_at_least_one, check_race_categories,
+    check_race_dates, count_wins_and_tops, filter_results_by_categories, get_region_races,
     get_regional_committee_id, select_club, to_datetime
 )
 from access_it.common.regions import check_covered_region
@@ -253,8 +253,7 @@ def rank_most_titled_riders(
             season_results in rider_categories is missing, then if a start date
             of a rider of season_results in affiliations is missing.
     """
-    if max_riders < 1:
-        raise ValueError(f"max_riders must be at least 1, not {max_riders}")
+    check_at_least_one(max_riders, "max_riders")
     rider_ids = season_results["rider_id"].unique()
     results = add_category_on_race_date(
         season_results, rider_categories[rider_categories["rider_id"].isin(rider_ids)]

@@ -34,9 +34,9 @@ from typing import Literal
 import pandas as pd
 
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, TOP_THRESHOLDS, add_shared_rank, add_value_on_race_date, check_race_categories,
-    count_wins_and_tops, filter_results_by_categories, get_region_club_ids,
-    get_regional_committee_id, to_datetime
+    CATEGORIES, TOP_THRESHOLDS, add_shared_rank, add_value_on_race_date, check_at_least_one,
+    check_race_categories, count_wins_and_tops, filter_results_by_categories,
+    get_region_club_ids, get_regional_committee_id, to_datetime
 )
 from access_it.common.regions import check_covered_region
 from access_it.common.seasons import check_season
@@ -137,8 +137,7 @@ def rank_clubs(
             then, with "rider", if a race date of club_results is missing, then
             if a start date of rider_categories is missing.
     """
-    if max_clubs < 1:
-        raise ValueError(f"max_clubs must be at least 1, not {max_clubs}")
+    check_at_least_one(max_clubs, "max_clubs")
     ranked_clubs = clubs[(clubs["min_year"] <= season) & (season <= clubs["max_year"])]
     if region is not None:
         check_covered_region(region)
