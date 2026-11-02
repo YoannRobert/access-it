@@ -40,7 +40,7 @@ from access_it.analytics.ranking_tools import (
     get_regional_committee_id, select_club, to_datetime
 )
 from access_it.common.regions import check_covered_region
-from access_it.common.seasons import FIRST_SEASON, check_season
+from access_it.common.seasons import check_season
 
 SEASON_RESULT_COLUMNS = [
     "race_id", "race_date", "departement_code", "categories", "rider_id", "finish_rank"

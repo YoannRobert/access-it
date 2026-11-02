@@ -39,7 +39,7 @@ from access_it.analytics.ranking_tools import (
     get_regional_committee_id, to_datetime
 )
 from access_it.common.regions import check_covered_region
-from access_it.common.seasons import FIRST_SEASON, check_season
+from access_it.common.seasons import check_season
 from access_it.etl.extract.clubs import individual_club_id_mask
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID
 
