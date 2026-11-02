@@ -4,7 +4,8 @@ Shown in the dashboard, then reused as a feature of the models (win, podium,
 top 5, top 10 and top 20 probabilities). Rules:
 
 - only the races strictly before the reference date count, so that no
-  future result leaks into a feature;
+  future result leaks into a feature; the reference date is brought back to
+  its day by to_day of ranking_tools;
 - the races of the window count, from reference_date minus window_months
   (included); for each rider, his last_races most recent ones are used; two
   races of the same day are ordered by finish rank (best place kept first),
@@ -24,7 +25,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from access_it.analytics.ranking_tools import to_datetime
+from access_it.analytics.ranking_tools import to_datetime, to_day
 
 COLUMNS = ["rider_id", "nb_races_used", "nb_top_n", "top_n_rate"]
 
@@ -57,7 +58,7 @@ def compute_recent_form(
         nb_races_used, nb_top_n and top_n_rate (nb_top_n / nb_races_used,
         0 for a rider without race in the window).
     """
-    end = to_datetime(pd.Series([reference_date])).dt.normalize().iloc[0]
+    end = to_day(reference_date)
     start = end - pd.DateOffset(months=window_months)
     race_dates = races[["race_id", "race_date"]].assign(
         race_date=lambda df: to_datetime(df["race_date"])

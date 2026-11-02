@@ -12,7 +12,7 @@ from access_it.analytics.ranking_tools import (
     check_race_categories, check_rider, compute_places, count_wins_and_tops,
     filter_results_by_categories, format_category, format_club, get_reference_date,
     get_region_club_ids, get_region_races, get_rider_results, rank_scoring_riders, scale_points,
-    select_category, select_club, to_datetime
+    select_category, select_club, to_datetime, to_day
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -124,6 +124,13 @@ def test_reference_date_is_the_day_after_the_last_race():
 def test_reference_date_of_an_empty_race_table_raises():
     with pytest.raises(ValueError):
         get_reference_date(pd.DataFrame({"race_date": []}))
+
+
+def test_reference_date_is_brought_back_to_its_day():
+    day = pd.Timestamp("2026-07-01")
+    assert to_day("2026-07-01") == day
+    assert to_day(date(2026, 7, 1)) == day
+    assert to_day(pd.Timestamp("2026-07-01 18:00")) == day
 
 
 def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
