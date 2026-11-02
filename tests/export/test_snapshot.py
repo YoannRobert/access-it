@@ -26,7 +26,7 @@ def test_unexpected_file_in_the_snapshot_raises(tmp_path):
     zip_path = tmp_path / "snapshot.zip"
     with zipfile.ZipFile(zip_path, mode="w") as zf:
         zf.writestr("notes.txt", "x")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unexpected file in the snapshot"):
         read_snapshot_zip(zip_path)
 
 

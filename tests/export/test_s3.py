@@ -48,7 +48,7 @@ def test_snapshot_key_from_a_file_name_or_a_key():
 
 @pytest.mark.parametrize("name", ["other.txt", "snapshot_2026.zip", "snapshots/other.zip"])
 def test_invalid_snapshot_names_are_rejected(name):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid snapshot name"):
         snapshot_key_from_name(name)
 
 
