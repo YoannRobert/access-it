@@ -24,7 +24,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.1,<10", "ruff", "jupyter", "boto3-stubs[s3]>=1.43,<2"]
+# ruff: upper bound on the minor version, since its 0.x minor releases may change the rules
+dev = ["pytest>=9.1,<10", "ruff>=0.16,<0.17", "jupyter", "boto3-stubs[s3]>=1.43,<2"]
 app = ["streamlit", "fastapi", "uvicorn", "plotly"]
 ml = ["scikit-learn", "xgboost", "mlflow"]
 
@@ -33,6 +34,9 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

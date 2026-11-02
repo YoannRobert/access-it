@@ -140,7 +140,7 @@ clubs et des référentiels, que seul le transform complète. La
 [procédure d'exploitation](docs/exploitation.md) décrit les messages de l'ETL, les contrôles
 bloquants et le nettoyage de la base.
 
-## Tests
+## Tests et lint
 
 ```bash
 python -m pytest tests -q -m "not regression"
@@ -157,6 +157,12 @@ python tests/regression/transform_regression.py compare     # compare le code ac
 
 La référence est à régénérer (`baseline --overwrite`) après chaque changement volontaire des
 sorties du transform.
+
+Le lint utilise ruff, avec les règles et la version fixées dans `pyproject.toml` :
+
+```bash
+ruff check .
+```
 
 ## Licence
 
