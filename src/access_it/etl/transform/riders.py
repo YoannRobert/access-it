@@ -346,7 +346,9 @@ class RiderLookup:
             pairs = list(zip(last_names, first_names))
             self._name_indexes[case_sensitive] = {
                 "name": _group_positions(pairs),
-                "full_name": _group_positions([f"{l} {f}" for l, f in pairs]),
+                "full_name": _group_positions(
+                    [f"{last_name} {first_name}" for last_name, first_name in pairs]
+                ),
                 "red_list_name": _group_positions(
                     [pair if uci_id == RED_LIST else None for pair, uci_id in zip(pairs, self.uci_ids)]
                 ),

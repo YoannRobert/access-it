@@ -464,7 +464,7 @@ def identify_riders_categories_on_startlist(
                     df0[cat_col] = df0[col]
                     df0 = df0.drop(columns=[col])
                     break
-            if (not cat_col in df0.columns) and (category is not None):
+            if (cat_col not in df0.columns) and (category is not None):
                 df0[cat_col] = category
         cols = df0.columns.to_list()
 

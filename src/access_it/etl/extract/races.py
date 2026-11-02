@@ -129,7 +129,7 @@ def iter_organizations_from_search_url(
     elif isinstance(dept, int):
         dept = f"{dept:02d}"
     else:
-        raise ValueError(f"departement must be an int or None")
+        raise ValueError("departement must be an int or None")
     results_url = f"{BASE_URL}/resultats"
     page = 1
     while True and (max_pages == -1 or page <= max_pages):
