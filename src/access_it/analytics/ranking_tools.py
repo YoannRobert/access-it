@@ -354,12 +354,7 @@ def get_rider_results(
     results = results[
         results["season"].between(FIRST_SEASON, day.year) & (results["race_date"] < day)
     ]
-    results = add_category_and_club_on_race_date(
-        results,
-        clubs,
-        affiliations[affiliations["rider_id"] == rider_id],
-        rider_categories[rider_categories["rider_id"] == rider_id]
-    )
+    results = add_category_and_club_on_race_date(results, clubs, affiliations, rider_categories)
     return (
         results[RIDER_RESULT_COLUMNS]
         .sort_values(["race_date", "finish_rank", "race_id"], ascending=[False, True, False])

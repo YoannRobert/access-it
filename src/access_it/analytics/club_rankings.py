@@ -83,10 +83,7 @@ def get_club_results(
         .merge(season_races, on="race_id")
         .assign(race_date=lambda df: to_datetime(df["race_date"]))
     )
-    rider_ids = results["rider_id"].unique()
-    results = add_value_on_race_date(
-        results, affiliations[affiliations["rider_id"].isin(rider_ids)], "club_id"
-    )
+    results = add_value_on_race_date(results, affiliations, "club_id")
     columns = ["race_id", "race_date", "categories", "rider_id", "finish_rank", "club_id"]
     return (
         results[columns]

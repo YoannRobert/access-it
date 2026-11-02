@@ -130,13 +130,7 @@ def get_race_ranking(
         .merge(_get_race(races, race_id)[["race_id", "race_date"]], on="race_id")
         .assign(race_date=lambda df: to_datetime(df["race_date"]))
     )
-    ranked_rider_ids = results["rider_id"]
-    results = add_category_and_club_on_race_date(
-        results,
-        clubs,
-        affiliations[affiliations["rider_id"].isin(ranked_rider_ids)],
-        rider_categories[rider_categories["rider_id"].isin(ranked_rider_ids)]
-    )
+    results = add_category_and_club_on_race_date(results, clubs, affiliations, rider_categories)
     return (
         results
         .merge(riders[["rider_id", "last_name", "first_name"]], on="rider_id", how="left")

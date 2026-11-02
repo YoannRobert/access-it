@@ -257,13 +257,10 @@ def rank_most_titled_riders(
             of a rider of season_results in affiliations is missing.
     """
     check_at_least_one(max_riders, "max_riders")
-    rider_ids = season_results["rider_id"].unique()
-    results = add_category_on_race_date(
-        season_results, rider_categories[rider_categories["rider_id"].isin(rider_ids)]
+    results = add_category_on_race_date(season_results, rider_categories)
+    results = add_value_on_race_date(results, affiliations, "club_id").sort_values(
+        ["race_date", "race_id"]
     )
-    results = add_value_on_race_date(
-        results, affiliations[affiliations["rider_id"].isin(rider_ids)], "club_id"
-    ).sort_values(["race_date", "race_id"])
 
     # "A1" is the highest category and the smallest label
     highest_categories = (

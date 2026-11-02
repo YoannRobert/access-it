@@ -237,11 +237,7 @@ def compute_season_points(
         get_region_club_ids(clubs, departemental_committees, region_id)
         if region in POINTS_SCALES else []
     )
-    on_date = add_value_on_race_date(
-        rider_results[keys + ["race_date"]],
-        affiliations[affiliations["rider_id"].isin(rider_results["rider_id"])],
-        "club_id"
-    )
+    on_date = add_value_on_race_date(rider_results[keys + ["race_date"]], affiliations, "club_id")
     is_concerned = on_date["club_id"].isin(region_clubs).groupby(
         [on_date["rider_id"], on_date["season"]]
     ).any()
