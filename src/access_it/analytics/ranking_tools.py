@@ -6,8 +6,8 @@ races and clubs of a region, category and club of a rider on the race date,
 results of a rider, places in a race, wins and tops of the riders (or other
 groups), points of a scale, ranking of the riders with its tie-breaks, shared
 rank of tied rows, filter on a category, labels of a category and of a club,
-checks of the requested categories and of the categories of the races, and
-filter of the results on the categories.
+checks of the race dates and start dates, checks of the requested categories
+and of the categories of the races, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -116,6 +116,32 @@ def get_region_club_ids(
     return clubs.loc[clubs["departemental_committee_id"].isin(region_committee_ids), "club_id"]
 
 
+def check_race_dates(race_dates: pd.Series) -> None:
+    """Check that no race date is missing.
+
+    Args:
+        race_dates: Race dates converted by to_datetime.
+
+    Raises:
+        ValueError: If a race date is missing.
+    """
+    if race_dates.isna().any():
+        raise ValueError("Missing race dates in the results")
+
+
+def check_start_dates(start_dates: pd.Series) -> None:
+    """Check that no start date of a history is missing.
+
+    Args:
+        start_dates: Start dates of the periods of a history, converted by to_datetime.
+
+    Raises:
+        ValueError: If a start date is missing.
+    """
+    if start_dates.isna().any():
+        raise ValueError("Missing start dates in the history")
+
+
 def add_value_on_race_date(
         results: pd.DataFrame,
         history: pd.DataFrame,
@@ -145,13 +171,11 @@ def add_value_on_race_date(
             date of the history is missing.
     """
     results = results.assign(race_date=lambda df: to_datetime(df["race_date"]))
-    if results["race_date"].isna().any():
-        raise ValueError("Missing race dates in the results")
+    check_race_dates(results["race_date"])
     history = history[["rider_id", "start_date", column]].assign(
         start_date=lambda df: to_datetime(df["start_date"])
     )
-    if history["start_date"].isna().any():
-        raise ValueError("Missing start dates in the history")
+    check_start_dates(history["start_date"])
     history = history.sort_values("start_date")
     return pd.merge_asof(
         results.sort_values("race_date"),

@@ -9,10 +9,10 @@ from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
     add_category_on_race_date, add_shared_rank, add_value_on_race_date, check_categories,
-    check_category, check_race_categories, check_rider, compute_places, count_wins_and_tops,
-    filter_results_by_categories, format_category, format_club, get_reference_date,
-    get_region_club_ids, get_region_races, get_rider_results, rank_scoring_riders, scale_points,
-    select_category, select_club, to_datetime, to_day
+    check_category, check_race_categories, check_race_dates, check_rider, check_start_dates,
+    compute_places, count_wins_and_tops, filter_results_by_categories, format_category,
+    format_club, get_reference_date, get_region_club_ids, get_region_races, get_rider_results,
+    rank_scoring_riders, scale_points, select_category, select_club, to_datetime, to_day
 )
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
@@ -100,6 +100,18 @@ def test_check_rider_accepts_a_known_rider_and_raises_otherwise():
     check_rider(riders, "a")
     with pytest.raises(ValueError, match="Unknown rider: 'x'"):
         check_rider(riders, "x")
+
+
+def test_check_race_dates_accepts_dates_and_raises_on_a_missing_one():
+    check_race_dates(to_datetime(pd.Series([f"{FIRST_SEASON}-06-01"])))
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        check_race_dates(to_datetime(pd.Series([f"{FIRST_SEASON}-06-01", None])))
+
+
+def test_check_start_dates_accepts_dates_and_raises_on_a_missing_one():
+    check_start_dates(to_datetime(pd.Series([f"{FIRST_SEASON}-01-01"])))
+    with pytest.raises(ValueError, match="Missing start dates in the history"):
+        check_start_dates(to_datetime(pd.Series([f"{FIRST_SEASON}-01-01", None])))
 
 
 def test_category_labels_of_the_history():
