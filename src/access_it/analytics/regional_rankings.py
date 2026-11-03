@@ -17,7 +17,7 @@ configured. Its rules:
 - a rider who changes category keeps his points and his place in the
   ranking of the former category and starts from zero in the new one;
 - ties in points are broken by the numbers of 1st, 2nd... 20th places,
-  then by last name and first name.
+  then by last name, first name and rider_id.
 
 The computation is free of any Streamlit dependency; the dashboard caches
 compute_regional_rankings (one call computes the four categories).

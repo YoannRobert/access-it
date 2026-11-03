@@ -14,7 +14,7 @@ category, which comes from the category history of the riders. Rules:
   total in each category he had during the season, and a race adds points to
   one total only; a rider of unknown category keeps his place but scores no points;
 - ties in points are broken by the numbers of 1st, 2nd... 5th places, then
-  by last name and first name.
+  by last name, first name and rider_id.
 
 A rider belongs to the regions of his clubs on the dates of all his races of
 the season, all categories together (individual licensees of unknown

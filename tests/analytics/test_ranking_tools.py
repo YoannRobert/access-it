@@ -86,6 +86,21 @@ def test_riders_ranked_by_points_then_places_then_names():
     ]
 
 
+def test_riders_tied_on_points_places_and_names_ranked_by_rider_id():
+    scoring = pd.DataFrame({
+        "race_id": ["r1", "r2"],
+        "rider_id": ["b", "a"],
+        "club_id": ["X"] * 2,
+        "place": [1, 1],
+        "category": ["A1"] * 2,
+        "points": [6, 6],
+    })
+    riders = pd.DataFrame({"rider_id": ["a", "b"], "last_name": "A", "first_name": "x"})
+    clubs = pd.DataFrame({"club_id": ["X"], "name": ["Club X"]})
+    ranking = rank_scoring_riders(scoring, riders, clubs, max_place=5)
+    assert ranking[["rider_id", "rank"]].values.tolist() == [["a", 1], ["b", 2]]
+
+
 def test_unknown_category_raises():
     with pytest.raises(ValueError, match="Unknown category"):
         select_category(pd.DataFrame(columns=["category"]), "A5")

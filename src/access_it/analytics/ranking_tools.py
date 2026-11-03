@@ -646,7 +646,7 @@ def rank_scoring_riders(
     """Rank the riders of each category by their total of points.
 
     Ties in points are broken by the numbers of 1st, 2nd... `max_place`-th
-    places, then by last name and first name.
+    places, then by last name, first name and rider_id.
 
     Args:
         scoring: Results with points (race_id, race_date, rider_id, club_id,
@@ -680,8 +680,8 @@ def rank_scoring_riders(
             clubs[["club_id", "name"]].rename(columns={"name": "club"}), on="club_id", how="left"
         )
         .sort_values(
-            ["category", "points", *place_columns, "last_name", "first_name"],
-            ascending=[True, False, *[False] * max_place, True, True]
+            ["category", "points", *place_columns, "last_name", "first_name", "rider_id"],
+            ascending=[True, False, *[False] * max_place, True, True, True]
         )
     )
     ranking["rank"] = ranking.groupby("category").cumcount() + 1
