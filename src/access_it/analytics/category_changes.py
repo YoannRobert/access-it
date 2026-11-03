@@ -52,7 +52,7 @@ from access_it.common.seasons import FIRST_SEASON, check_season
 
 CATEGORY_CHANGE_COLUMNS = [
     "season", "change_date", "change_type", "from_category", "to_category",
-    "last_name", "first_name", "club"
+    "last_name", "first_name", "club", "rider_id"
 ]
 
 # Order of the types of change in the output

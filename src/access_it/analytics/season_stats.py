@@ -52,7 +52,7 @@ RACES_BY_CATEGORIES_COLUMNS = ["categories", "nb_races"]
 RANKED_RIDERS_COLUMNS = ["nb_ranked_riders"]
 MOST_TITLED_COLUMNS = [
     "rank", "last_name", "first_name", "club", "category", "nb_wins",
-    *[f"nb_top_{n}" for n in TOP_THRESHOLDS], "nb_races"
+    *[f"nb_top_{n}" for n in TOP_THRESHOLDS], "nb_races", "rider_id"
 ]
 
 

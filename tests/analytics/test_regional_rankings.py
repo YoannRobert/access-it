@@ -253,7 +253,7 @@ def test_output_columns_and_season_filter():
     tables = single_race(ranks={"a": 1}, clubs={"a": PDL}, categories={"a": 4})
     rankings = compute_regional_rankings(**tables, season=SEASON)
     assert rankings.columns.tolist() == COLUMNS
-    assert rankings.iloc[0].tolist() == ["A4", 1, 30, "NAME_a", "First_a", "Club Nantes", 1]
+    assert rankings.iloc[0].tolist() == ["A4", 1, 30, "NAME_a", "First_a", "Club Nantes", 1, "a"]
     empty = compute_regional_rankings(**tables, season=SEASON - 1)
     assert empty.empty and empty.columns.tolist() == COLUMNS
 

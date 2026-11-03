@@ -38,7 +38,7 @@ PROMOTION_SCALE = (6, 4, 3, 2, 1)
 
 COLUMNS = [
     "category", "rank", "points", "last_name", "first_name", "club",
-    "nb_scoring_races", "nb_wins", "region"
+    "nb_scoring_races", "nb_wins", "region", "rider_id"
 ]
 
 

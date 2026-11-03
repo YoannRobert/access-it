@@ -37,7 +37,9 @@ POINTS_SCALES = {
     PAYS_DE_LA_LOIRE: (30, 26, 24, 22, 20) + tuple(range(15, 0, -1)),
 }
 
-COLUMNS = ["category", "rank", "points", "last_name", "first_name", "club", "nb_scoring_races"]
+COLUMNS = [
+    "category", "rank", "points", "last_name", "first_name", "club", "nb_scoring_races", "rider_id"
+]
 
 __all__ = [
     "CATEGORIES", "COLUMNS", "POINTS_SCALES", "compute_challenge_points",
@@ -147,7 +149,8 @@ def compute_regional_rankings(
         One row per category and rider having scored points: category, rank,
         points, last_name, first_name, club (name of the first club of the year
         with which the rider scored points in the category, the first following
-        one for an individual licence) and nb_scoring_races; sorted by category and rank.
+        one for an individual licence), nb_scoring_races and rider_id; sorted by
+        category and rank.
 
     Raises:
         ValueError: If the region is unknown, then if it has no configured

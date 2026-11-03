@@ -140,7 +140,9 @@ def test_columns_and_first_region_of_the_season():
     )
     ranking = get_promotion_ranking(rankings_of(tables), "A2")
     assert ranking.columns.tolist() == [c for c in COLUMNS if c != "category"]
-    assert ranking.iloc[0].tolist() == [1, 12, "NAME_a", "First_a", "Club Vannes", 2, 2, BRETAGNE]
+    assert ranking.iloc[0].tolist() == [
+        1, 12, "NAME_a", "First_a", "Club Vannes", 2, 2, BRETAGNE, "a"
+    ]
 
 
 def test_region_filter_keeps_the_national_total_and_ranks_again():
