@@ -223,6 +223,11 @@ def test_missing_reference_date_raises(reference_date):
         to_day(reference_date)
 
 
+def test_missing_date_raises_with_its_name():
+    with pytest.raises(ValueError, match="Missing start date: None"):
+        to_day(None, "start date")
+
+
 def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
     departemental_committees = pd.DataFrame({
         "departemental_committee_id": ["5244", "5285", "5385"],

@@ -52,22 +52,23 @@ def to_datetime(s: pd.Series) -> pd.Series:
     return pd.to_datetime(s).astype("datetime64[ns]")
 
 
-def to_day(reference_date: str | pd.Timestamp) -> pd.Timestamp:
-    """Reference date as a timestamp at midnight.
+def to_day(date: str | pd.Timestamp, name: str = "reference date") -> pd.Timestamp:
+    """Date (by default the reference date) as a timestamp at midnight.
 
     Args:
-        reference_date: Date to convert, as a string or a timestamp.
+        date: Date to convert, as a string or a timestamp.
+        name: Name of the date in the error message (e.g. "start date").
 
     Returns:
-        The day of `reference_date`, at midnight.
+        The day of `date`, at midnight.
 
     Raises:
-        ValueError: If the reference date is missing (None, NaT, an empty
-            string or NaN).
+        ValueError: If the date is missing (None, NaT, an empty string or
+            NaN), with `name` in the message.
     """
-    day = to_datetime(pd.Series([reference_date])).dt.normalize().iloc[0]
+    day = to_datetime(pd.Series([date])).dt.normalize().iloc[0]
     if pd.isna(day):
-        raise ValueError(f"Missing reference date: {reference_date!r}")
+        raise ValueError(f"Missing {name}: {date!r}")
     return day
 
 
