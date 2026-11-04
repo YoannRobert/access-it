@@ -26,7 +26,8 @@ dependencies = [
 [project.optional-dependencies]
 # ruff: upper bound on the minor version, since its 0.x minor releases may change the rules
 dev = ["pytest>=9.1,<10", "ruff>=0.16,<0.17", "jupyter", "boto3-stubs[s3]>=1.43,<2"]
-app = ["streamlit", "fastapi", "uvicorn", "plotly"]
+api = ["fastapi", "uvicorn"]
+dashboard = ["streamlit>=1.66,<2", "altair>=6.3,<7"]
 ml = ["scikit-learn", "xgboost", "mlflow"]
 
 [tool.setuptools.packages.find]
