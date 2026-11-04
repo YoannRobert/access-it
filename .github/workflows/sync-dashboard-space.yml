@@ -1,0 +1,39 @@
+name: Sync Dashboard Space
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/dashboard/**'
+      - 'src/access_it/**'
+      - 'pyproject.toml'
+      - '.github/workflows/sync-dashboard-space.yml'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Push to HuggingFace Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_DIR: ${{ runner.temp }}/space
+        run: |
+          mkdir -p $SPACE_DIR
+          cp -r pyproject.toml src/ $SPACE_DIR
+          mkdir -p $SPACE_DIR/app
+          cp -r app/dashboard $SPACE_DIR/app/dashboard
+          cp $SPACE_DIR/app/dashboard/README.md $SPACE_DIR/app/dashboard/Dockerfile $SPACE_DIR
+          cd $SPACE_DIR
+          git init -b main
+          git config user.email "ci@github.com"
+          git config user.name "GitHub Actions"
+          git add .
+          git commit -m "Sync from GitHub – ${{ github.sha }}"
+          git push --force \
+            "https://YoannRobert:${HF_TOKEN}@huggingface.co/spaces/YoannRobert/access-it" \
+            main
