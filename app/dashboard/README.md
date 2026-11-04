@@ -5,7 +5,7 @@ colorFrom: yellow
 colorTo: blue
 sdk: docker
 app_port: 7860
-license: mits
+license: mit
 tags:
 - streamlit
 pinned: false
