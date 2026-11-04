@@ -12,9 +12,9 @@ from access_it.analytics.ranking_tools import (
     check_categories, check_category, check_category_filter, check_race_categories,
     check_race_dates, check_recent_form_arguments, check_rider, check_start_dates,
     compute_places, count_wins_and_tops, filter_results_by_categories, format_category,
-    format_club, get_reference_date, get_region_club_ids, get_region_races,
-    get_regional_committee_id, get_rider_results, rank_scoring_riders, scale_points,
-    select_category, select_club, to_datetime, to_day
+    format_club, get_reference_date, get_region_club_ids, get_region_departement_codes,
+    get_region_races, get_regional_committee_id, get_rider_results, rank_scoring_riders,
+    scale_points, select_category, select_club, to_datetime, to_day
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
@@ -234,6 +234,16 @@ def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
     })
     club_ids = get_region_club_ids(clubs, departemental_committees, "52")
     assert club_ids.tolist() == ["5244001", "5285001", "5244800"]
+
+
+def test_departements_of_a_region_without_duplicates_and_sorted():
+    departemental_committees = pd.DataFrame({
+        "regional_committee_id": ["52", "53", "52", "52"],
+        "departement_code": ["85", "56", "44", "85"],
+    })
+    codes = get_region_departement_codes(departemental_committees, "52")
+    assert codes.tolist() == ["44", "85"]
+    assert codes.index.tolist() == [0, 1]
 
 
 def test_races_of_a_region_are_those_of_the_season_in_its_departements():

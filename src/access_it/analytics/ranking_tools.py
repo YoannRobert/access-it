@@ -3,14 +3,15 @@
 Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: conversion of the dates
 and check of the reference date, default reference date, ID of a regional
-committee, races and clubs of a region, category and club of a rider on the
-race date, results of a rider, check of a rider, check of an argument that
-must be at least 1, check of the arguments of the recent form, places in a
-race, wins and tops of the riders (or other groups), points of a scale,
-ranking of the riders with its tie-breaks, shared rank of tied rows, filter on
-a category, labels of a category and of a club, checks of the race dates and
-start dates, checks of the category filter, of the requested categories and of
-the categories of the races, and filter of the results on the categories.
+committee, departements, races and clubs of a region, category and club of a
+rider on the race date, results of a rider, check of a rider, check of an
+argument that must be at least 1, check of the arguments of the recent form,
+places in a race, wins and tops of the riders (or other groups), points of a
+scale, ranking of the riders with its tie-breaks, shared rank of tied rows,
+filter on a category, labels of a category and of a club, checks of the race
+dates and start dates, checks of the category filter, of the requested
+categories and of the categories of the races, and filter of the results on
+the categories.
 """
 
 from collections.abc import Sequence
@@ -110,6 +111,28 @@ def get_regional_committee_id(regional_committees: pd.DataFrame, region: str) ->
     return regional_committees.loc[is_region, "regional_committee_id"].iloc[0]
 
 
+def get_region_departement_codes(
+        departemental_committees: pd.DataFrame,
+        region_id: str
+    ) -> pd.Series:
+    """Codes of the departements of a region: those of its departemental committees.
+
+    Args:
+        departemental_committees: Departemental committee table.
+        region_id: ID of the regional committee (see get_regional_committee_id).
+
+    Returns:
+        The departement_code of these committees, without duplicates, sorted,
+        with the index reset.
+    """
+    return (
+        departemental_committees.loc[
+            departemental_committees["regional_committee_id"] == region_id, "departement_code"
+        ]
+        .drop_duplicates().sort_values().reset_index(drop=True)
+    )
+
+
 def get_region_races(
         races: pd.DataFrame,
         departemental_committees: pd.DataFrame,
@@ -127,9 +150,7 @@ def get_region_races(
     Returns:
         The rows of the race table, with all its columns.
     """
-    region_departements = departemental_committees.loc[
-        departemental_committees["regional_committee_id"] == region_id, "departement_code"
-    ]
+    region_departements = get_region_departement_codes(departemental_committees, region_id)
     return races[
         (races["season"] == season) & races["departement_code"].isin(region_departements)
     ].reset_index(drop=True)

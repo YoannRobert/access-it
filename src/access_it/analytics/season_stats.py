@@ -37,8 +37,8 @@ from access_it.analytics.ranking_tools import (
     CATEGORIES, CATEGORY_COMBINATIONS, TOP_THRESHOLDS, add_category_on_race_date,
     add_shared_rank, add_value_on_race_date, check_at_least_one, check_categories,
     check_category_filter, check_race_categories, check_race_dates, count_wins_and_tops,
-    filter_results_by_categories, get_region_races, get_regional_committee_id, select_club,
-    to_datetime
+    filter_results_by_categories, get_region_departement_codes, get_region_races,
+    get_regional_committee_id, select_club, to_datetime
 )
 from access_it.common.regions import check_covered_region
 from access_it.common.seasons import check_season
@@ -182,9 +182,7 @@ def count_races_by_departement(
     """
     check_covered_region(region)
     region_id = get_regional_committee_id(regional_committees, region)
-    codes = departemental_committees.loc[
-        departemental_committees["regional_committee_id"] == region_id, "departement_code"
-    ].drop_duplicates().sort_values()
+    codes = get_region_departement_codes(departemental_committees, region_id)
     counts = season_results.groupby("departement_code")["race_id"].nunique()
     by_departement = pd.DataFrame({"departement_code": codes.to_numpy()}).merge(
         departements[["departement_code", "departement_name"]], on="departement_code", how="left"
