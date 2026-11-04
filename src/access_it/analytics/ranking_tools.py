@@ -10,8 +10,8 @@ places in a race, wins and tops of the riders (or other groups), points of a
 scale, ranking of the riders with its tie-breaks, shared rank of tied rows,
 filter on a category, labels of a category and of a club, checks of the race
 dates and start dates, checks of the category filter, of the requested
-categories and of the categories of the races, and filter of the results on
-the categories.
+categories and of the categories of the races, races having a requested
+category, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence
@@ -509,6 +509,19 @@ def check_race_categories(races: pd.DataFrame) -> None:
         raise ValueError(f"Races with non contiguous categories: {race_ids!r}")
 
 
+def has_requested_category(categories: pd.Series, requested: Sequence[str]) -> pd.Series:
+    """Whether each race has at least one of the requested categories.
+
+    Args:
+        categories: Categories of the races, as stored (e.g. "A1,A2").
+        requested: Requested categories, already checked (see check_categories).
+
+    Returns:
+        A boolean mask, with the index of `categories`.
+    """
+    return categories.map(lambda c: not set(c.split(",")).isdisjoint(requested)).astype(bool)
+
+
 def filter_results_by_categories(
         results: pd.DataFrame,
         rider_categories: pd.DataFrame,
@@ -541,9 +554,7 @@ def filter_results_by_categories(
     check_category_filter(category_filter)
     requested = check_categories(categories)
     if category_filter == "race":
-        is_kept = results["categories"].map(
-            lambda c: not set(c.split(",")).isdisjoint(requested)
-        ).astype(bool).to_numpy()
+        is_kept = has_requested_category(results["categories"], requested).to_numpy()
     else:
         # The categories on the race dates come back sorted by date: match them by position
         positions = pd.RangeIndex(len(results))

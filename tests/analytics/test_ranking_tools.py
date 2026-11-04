@@ -13,8 +13,8 @@ from access_it.analytics.ranking_tools import (
     check_race_dates, check_recent_form_arguments, check_rider, check_start_dates,
     compute_places, count_wins_and_tops, filter_results_by_categories, format_category,
     format_club, get_reference_date, get_region_club_ids, get_region_departement_codes,
-    get_region_races, get_regional_committee_id, get_rider_results, rank_scoring_riders,
-    scale_points, select_category, select_club, to_datetime, to_day
+    get_region_races, get_regional_committee_id, get_rider_results, has_requested_category,
+    rank_scoring_riders, scale_points, select_category, select_club, to_datetime, to_day
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
@@ -484,6 +484,13 @@ FILTER_RIDER_CATEGORIES = pd.DataFrame({
     "start_date": [f"{FIRST_SEASON}-01-01", f"{FIRST_SEASON}-05-01", f"{FIRST_SEASON}-01-01"],
     "rider_category": pd.array([3, 2, 1], dtype="Int64"),
 })
+
+
+def test_races_with_a_requested_category_keep_the_index():
+    categories = pd.Series(["A1,A2", "A3,A4", "A4", "A1"], index=[5, 7, 9, 11])
+    mask = has_requested_category(categories, ("A2", "A3"))
+    assert mask.tolist() == [True, True, False, False]
+    assert mask.index.tolist() == [5, 7, 9, 11]
 
 
 def test_results_filtered_on_the_categories_of_the_races_keep_order_and_index():
