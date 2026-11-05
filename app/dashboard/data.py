@@ -90,4 +90,4 @@ def watch_snapshots(snapshot_holder: SnapshotHolder) -> None:
         try:
             check_for_new_snapshot(snapshot_holder)
         except Exception:
-            logger.exception("Failed to load the snapshot")
+            logger.exception("Failed to check for a new snapshot")
