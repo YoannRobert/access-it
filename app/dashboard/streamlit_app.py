@@ -1,5 +1,6 @@
 """Entry point of the Access it! dashboard (minimal page to test the Docker image)."""
 
+import logging
 import pandas as pd
 import streamlit as st
 
@@ -8,6 +9,7 @@ from importlib.metadata import version
 from access_it.analytics.ranking_tools import get_reference_date
 from data import load_snapshot
 
+logging.basicConfig(level=logging.INFO)
 
 st.set_page_config(page_title="Access it!")
 
