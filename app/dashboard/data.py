@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from access_it.analytics.ranking_tools import get_reference_date
+from access_it.common.regions import PAYS_DE_LA_LOIRE
 from access_it.config import get_settings
 from access_it.etl.extract.cache import SNAPSHOTS_DIR
 from access_it.export.s3 import download_latest_snapshot, download_snapshot, list_snapshot_keys
@@ -17,6 +19,7 @@ from access_it.export.snapshot import read_snapshot_zip
 
 CHECK_HOURS = (0, 6, 12, 18)
 PARIS = ZoneInfo("Europe/Paris")
+DEFAULT_REGION = PAYS_DE_LA_LOIRE
 
 logger = logging.getLogger(__name__)
 
@@ -91,3 +94,9 @@ def watch_snapshots(snapshot_holder: SnapshotHolder) -> None:
             check_for_new_snapshot(snapshot_holder)
         except Exception:
             logger.exception("Failed to check for a new snapshot")
+
+
+@st.cache_data
+def get_snapshot_reference_date(snapshot_path: Path) -> datetime:
+    tables = get_snapshot_data(snapshot_path)
+    return get_reference_date(tables["races"])
