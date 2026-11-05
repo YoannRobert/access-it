@@ -97,6 +97,6 @@ def watch_snapshots(snapshot_holder: SnapshotHolder) -> None:
 
 
 @st.cache_data
-def get_snapshot_reference_date(snapshot_path: Path) -> datetime:
+def get_snapshot_reference_date(snapshot_path: Path) -> pd.Timestamp:
     tables = get_snapshot_data(snapshot_path)
     return get_reference_date(tables["races"])

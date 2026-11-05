@@ -86,7 +86,7 @@ def translate_values(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_column_config(df: pd.DataFrame) -> dict:
+def build_column_config(df: pd.DataFrame) -> dict[str, str | None]:
     return {
         col: COLUMN_LABELS.get(col, col) if col not in HIDDEN_COLUMNS else None
         for col in df.columns
