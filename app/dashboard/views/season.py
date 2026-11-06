@@ -3,16 +3,12 @@
 import streamlit as st
 
 from access_it.analytics.ranking_tools import CATEGORIES
-from access_it.common.regions import COVERED_REGIONS
-from access_it.common.seasons import FIRST_SEASON
 
 from charts import bar_chart
 from computations import get_category_changes, get_season_summary
-from data import DEFAULT_REGION, get_snapshot_reference_date, load_snapshot
-from translations import (
-    CATEGORY_FILTER_LABELS, MONTH_LABELS, REGION_LABELS,
-    build_column_config, translate_values
-)
+from data import get_snapshot_reference_date, load_snapshot
+from filters import select_category_filter, select_categories, select_max_count, select_region, select_season
+from translations import MONTH_LABELS, build_column_config, translate_values
 
 st.title("Saison")
 
@@ -21,38 +17,14 @@ reference_date = get_snapshot_reference_date(snapshot_path)
 default_season = reference_date.year
 
 col_season, col_region, col_categories, col_filter = st.columns(4)
-season = col_season.selectbox(
-    label="Saison",
-    options=range(default_season, FIRST_SEASON - 1, -1)
-)
-region = col_region.selectbox(
-    label="Région",
-    options=COVERED_REGIONS,
-    index=COVERED_REGIONS.index(DEFAULT_REGION),
-    format_func=REGION_LABELS.get
-)
-first, last = col_categories.select_slider(
-    label="Catégories (onglets Courses et Coureurs)",
-    options=CATEGORIES,
-    value=(CATEGORIES[0], CATEGORIES[-1])
-)
-categories = CATEGORIES[CATEGORIES.index(first):CATEGORIES.index(last) + 1]
-category_filter = col_filter.radio(
-    label="Filtre de catégorie appliqué",
-    options=["race", "rider"],
-    format_func=CATEGORY_FILTER_LABELS.get,
-    horizontal=True,
-    help='« à la course » pour filtrer sur les catégories des courses, '
-         '« au coureur » pour filtrer sur les catégories des coureurs aux dates des courses'
-)
+season = select_season(col_season, default_season)
+region = select_region(col_region)
+categories = select_categories(col_categories, "Catégories (onglets Courses et Coureurs)")
+category_filter = select_category_filter(col_filter)
 
 tab_races, tab_riders, tab_changes = st.tabs(["Courses", "Coureurs", "Changements de catégorie"])
 
-with tab_riders:
-    max_riders = st.slider(
-        label="Nombre de coureurs",
-        min_value=5, max_value=30, value=10, step=5
-    )
+max_riders = select_max_count(tab_riders, "Nombre de coureurs")
 summary = get_season_summary(snapshot_path, season, region, categories, category_filter, max_riders)
 
 with tab_races:
