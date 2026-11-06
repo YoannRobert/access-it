@@ -1,8 +1,12 @@
 import pandas as pd
+import streamlit as st
+
+from typing import Any
 
 from access_it.analytics.labels import (
     DEMOTION, FIRST_APPEARANCE, NOT_APPLICABLE, PROMOTION, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 )
+from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 
 
 TOP_N = 10
@@ -80,14 +84,28 @@ VALUE_LABELS = {
 
 HIDDEN_COLUMNS = ("rider_id", "opponent_id", "club_id", "race_id")
 
+MONTH_LABELS = {
+    1: "janv.", 2: "févr.", 3: "mars", 4: "avr.", 5: "mai", 6: "juin",
+    7: "juil.", 8: "août", 9: "sept.", 10: "oct.", 11: "nov.", 12: "déc.",
+}
+REGION_LABELS = {BRETAGNE: "Bretagne", PAYS_DE_LA_LOIRE: "Pays de la Loire"}
+CATEGORY_FILTER_LABELS = {"race": "à la course", "rider": "au coureur"}
+DATE_COLUMNS = ("race_date", "change_date", "start_date", "end_date")
+
 
 def translate_values(df: pd.DataFrame) -> pd.DataFrame:
     df = df.replace(VALUE_LABELS)
     return df
 
 
-def build_column_config(df: pd.DataFrame) -> dict[str, str | None]:
-    return {
-        col: COLUMN_LABELS.get(col, col) if col not in HIDDEN_COLUMNS else None
-        for col in df.columns
-    }
+def build_column_config(df: pd.DataFrame) -> dict[str, Any]:
+    config = {}
+    for col in df.columns:
+        label = COLUMN_LABELS.get(col, col)
+        if col in HIDDEN_COLUMNS:
+            config[col] = None
+        elif col in DATE_COLUMNS:
+            config[col] = st.column_config.DateColumn(label, format="DD/MM/YYYY")
+        else:
+            config[col] = label
+    return config
