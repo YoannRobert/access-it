@@ -3,15 +3,16 @@
 Used by the regional challenge (regional_rankings), the promotion points
 (promotion_points) and the other analytics modules: conversion of the dates
 and check of the reference date, default reference date, ID of a regional
-committee, departements, races and clubs of a region, category and club of a
-rider on the race date, results of a rider, check of a rider, check of an
-argument that must be at least 1, check of the arguments of the recent form,
-places in a race, wins and tops of the riders (or other groups), points of a
-scale, ranking of the riders with its tie-breaks, shared rank of tied rows,
-filter on a category, labels of a category and of a club, checks of the race
-dates and start dates, checks of the category filter, of the requested
-categories and of the categories of the races, races having a requested
-category, and filter of the results on the categories.
+committee, departements, races and clubs of a region, departement and
+regional committee of a club, category and club of a rider on the race date,
+results of a rider, check of a rider, check of an argument that must be at
+least 1, check of the arguments of the recent form, places in a race, wins
+and tops of the riders (or other groups), points of a scale, ranking of the
+riders with its tie-breaks, shared rank of tied rows, filter on a category,
+labels of a category and of a club, checks of the race dates and start dates,
+checks of the category filter, of the requested categories and of the
+categories of the races, races having a requested category, and filter of the
+results on the categories.
 """
 
 from collections.abc import Sequence
@@ -179,6 +180,47 @@ def get_region_club_ids(
         "departemental_committee_id"
     ]
     return clubs.loc[clubs["departemental_committee_id"].isin(region_committee_ids), "club_id"]
+
+
+def add_club_location(
+        df: pd.DataFrame,
+        clubs: pd.DataFrame,
+        departements: pd.DataFrame,
+        departemental_committees: pd.DataFrame
+    ) -> pd.DataFrame:
+    """Add the departement and the regional committee of the club of each row.
+
+    The club leads to its departemental committee, which gives the
+    departement and the regional committee.
+
+    Args:
+        df: Rows with club_id (missing allowed).
+        clubs: Club table.
+        departements: Departement table.
+        departemental_committees: Departemental committee table.
+
+    Returns:
+        The rows of `df` in the same order, with all their columns, then
+        departement_code, departement_name and regional_committee_id, each
+        missing if the club, its committee or the departement is unknown;
+        with the index reset.
+    """
+    return (
+        df.reset_index(drop=True)
+        .merge(clubs[["club_id", "departemental_committee_id"]], on="club_id", how="left")
+        .merge(
+            departemental_committees[
+                ["departemental_committee_id", "departement_code", "regional_committee_id"]
+            ],
+            on="departemental_committee_id", how="left"
+        )
+        .merge(
+            departements[["departement_code", "departement_name"]],
+            on="departement_code", how="left"
+        )
+        .drop(columns="departemental_committee_id")
+        [[*df.columns, "departement_code", "departement_name", "regional_committee_id"]]
+    )
 
 
 def check_race_dates(race_dates: pd.Series) -> None:

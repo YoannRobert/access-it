@@ -34,9 +34,10 @@ from typing import Literal
 import pandas as pd
 
 from access_it.analytics.ranking_tools import (
-    CATEGORIES, TOP_THRESHOLDS, add_shared_rank, add_value_on_race_date, check_at_least_one,
-    check_categories, check_category_filter, check_race_categories, count_wins_and_tops,
-    filter_results_by_categories, get_region_club_ids, get_regional_committee_id, to_datetime
+    CATEGORIES, TOP_THRESHOLDS, add_club_location, add_shared_rank, add_value_on_race_date,
+    check_at_least_one, check_categories, check_category_filter, check_race_categories,
+    count_wins_and_tops, filter_results_by_categories, get_region_club_ids,
+    get_regional_committee_id, to_datetime
 )
 from access_it.common.regions import check_covered_region
 from access_it.common.seasons import check_season
@@ -154,17 +155,9 @@ def rank_clubs(
     criteria = ["nb_wins", *[f"nb_top_{n}" for n in TOP_THRESHOLDS]]
     stats = count_wins_and_tops(counted, by=("club_id",)).set_index("club_id")
     nb_active_riders = results.groupby("club_id")["rider_id"].nunique()
-    ranking = (
-        ranked_clubs[["club_id", "name", "departemental_committee_id"]]
-        .rename(columns={"name": "club"})
-        .merge(
-            departemental_committees[["departemental_committee_id", "departement_code"]],
-            on="departemental_committee_id", how="left"
-        )
-        .merge(
-            departements[["departement_code", "departement_name"]],
-            on="departement_code", how="left"
-        )
+    ranking = add_club_location(
+        ranked_clubs[["club_id", "name"]].rename(columns={"name": "club"}),
+        clubs, departements, departemental_committees
     )
     for column in criteria:
         ranking[column] = ranking["club_id"].map(stats[column]).fillna(0).astype(int)

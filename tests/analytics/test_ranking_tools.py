@@ -8,13 +8,14 @@ import pytest
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
     RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
-    add_category_on_race_date, add_shared_rank, add_value_on_race_date, check_at_least_one,
-    check_categories, check_category, check_category_filter, check_race_categories,
-    check_race_dates, check_recent_form_arguments, check_rider, check_start_dates,
-    compute_places, count_wins_and_tops, filter_results_by_categories, format_category,
-    format_club, get_reference_date, get_region_club_ids, get_region_departement_codes,
-    get_region_races, get_regional_committee_id, get_rider_results, has_requested_category,
-    rank_scoring_riders, scale_points, select_category, select_club, to_datetime, to_day
+    add_category_on_race_date, add_club_location, add_shared_rank, add_value_on_race_date,
+    check_at_least_one, check_categories, check_category, check_category_filter,
+    check_race_categories, check_race_dates, check_recent_form_arguments, check_rider,
+    check_start_dates, compute_places, count_wins_and_tops, filter_results_by_categories,
+    format_category, format_club, get_reference_date, get_region_club_ids,
+    get_region_departement_codes, get_region_races, get_regional_committee_id,
+    get_rider_results, has_requested_category, rank_scoring_riders, scale_points,
+    select_category, select_club, to_datetime, to_day
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
@@ -239,6 +240,36 @@ def test_clubs_of_a_region_include_the_individual_pseudo_clubs():
     })
     club_ids = get_region_club_ids(clubs, departemental_committees, "52")
     assert club_ids.tolist() == ["5244001", "5285001", "5244800"]
+
+
+def test_club_location_keeps_the_rows_and_leaves_unknown_values_missing():
+    clubs = pd.DataFrame({
+        "club_id": ["5244001", "5285001", "5299001"],
+        "departemental_committee_id": ["5244", "5285", "5299"],
+    })
+    departemental_committees = pd.DataFrame({
+        "departemental_committee_id": ["5244", "5285"],
+        "departement_code": ["44", "85"],
+        "regional_committee_id": ["52", "52"],
+    })
+    departements = pd.DataFrame({"departement_code": ["44"], "departement_name": ["NAME_44"]})
+    df = pd.DataFrame(
+        {"rider_id": ["a", "b", "c", "d", "e"],
+         "club_id": ["5285001", "5244001", "5299001", "5200001", None]},
+        index=[10, 11, 12, 13, 14]
+    )
+    located = add_club_location(df, clubs, departements, departemental_committees)
+    assert located.columns.tolist() == [
+        "rider_id", "club_id", "departement_code", "departement_name", "regional_committee_id"
+    ]
+    assert located.index.tolist() == [0, 1, 2, 3, 4]
+    assert located["rider_id"].tolist() == ["a", "b", "c", "d", "e"]
+    assert located["departement_code"].tolist()[:2] == ["85", "44"]
+    assert located["departement_code"].iloc[2:].isna().all()
+    assert located["departement_name"].iloc[1] == "NAME_44"
+    assert located["departement_name"].drop(index=1).isna().all()
+    assert located["regional_committee_id"].tolist()[:2] == ["52", "52"]
+    assert located["regional_committee_id"].iloc[2:].isna().all()
 
 
 def test_departements_of_a_region_without_duplicates_and_sorted():
