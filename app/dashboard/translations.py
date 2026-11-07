@@ -7,9 +7,8 @@ from access_it.analytics.labels import (
     DEMOTION, FIRST_APPEARANCE, NOT_APPLICABLE, PROMOTION, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
+from settings import TOP_N
 
-
-TOP_N = 10
 
 COLUMN_LABELS = {
     "rank": "Rang",
@@ -29,6 +28,7 @@ COLUMN_LABELS = {
     "nb_races": "Courses",
     "nb_active_riders": "Coureurs actifs",
     "nb_ranked_riders": "Coureurs classés",
+    "departement": "Département",
     "departement_code": "N° dép.",
     "departement_name": "Département",
     "season": "Saison",
@@ -109,3 +109,12 @@ def build_column_config(df: pd.DataFrame) -> dict[str, Any]:
         else:
             config[col] = label
     return config
+
+
+def format_departement(code: str | None, name: str | None) -> str:
+    """Label "44 - Loire-Atlantique", the code alone if the name is missing, empty if the code is missing."""
+    if pd.isna(code):
+        return ""
+    if pd.isna(name):
+        return code
+    return f"{code} - {name}"

@@ -8,7 +8,7 @@ from charts import bar_chart
 from computations import get_category_changes, get_season_summary
 from data import get_snapshot_reference_date, load_snapshot
 from filters import select_category_filter, select_categories, select_max_count, select_region, select_season
-from translations import MONTH_LABELS, build_column_config, translate_values
+from translations import build_column_config, format_departement, MONTH_LABELS, translate_values
 
 st.title("Saison")
 
@@ -50,9 +50,13 @@ with tab_races:
     )
 
     races_by_departement = summary.races_by_departement.copy()
-    races_by_departement["label"] = (
-            races_by_departement["departement_code"] + " - " + races_by_departement["departement_name"]
-    ).where(races_by_departement["departement_name"].notna(), races_by_departement["departement_code"])
+    races_by_departement["label"] = [
+        format_departement(code, name)
+        for code, name in zip(
+            races_by_departement["departement_code"],
+            races_by_departement["departement_name"]
+        )
+    ]
     bar_chart(
         df=races_by_departement,
         title="Nombre de courses par département",
