@@ -5,8 +5,8 @@ de la catégorie **Access** (Access 1 à Access 4, Fédération française de cy
 pour les régions **Bretagne** et **Pays de la Loire**.
 
 Le projet couvre toute la chaîne d'un projet de données : collecte (scraping et API),
-ETL, base de données, puis, à venir, analyse exploratoire, modèles de machine learning,
-API et tableau de bord.
+ETL, base de données et tableau de bord, puis, à venir, analyse exploratoire, modèles de
+machine learning et API.
 
 ## État d'avancement
 
@@ -16,7 +16,8 @@ API et tableau de bord.
 | Base PostgreSQL et snapshots S3 | fonctionnel |
 | Exécution programmée de l'ETL | à venir |
 | Analyse exploratoire et modèles (scikit-learn, XGBoost, MLflow) | à venir |
-| API (FastAPI) et tableau de bord (Streamlit) sur Hugging Face Spaces | à venir |
+| Tableau de bord (Streamlit) sur Hugging Face Spaces | fonctionnel ([Space](https://huggingface.co/spaces/YoannRobert/access-it)) |
+| API (FastAPI) | à venir |
 
 ## Architecture
 
