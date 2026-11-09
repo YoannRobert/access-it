@@ -6,9 +6,9 @@ from access_it.common.seasons import FIRST_SEASON
 
 from computations import get_head_to_head
 from data import get_snapshot_reference_date, load_snapshot
+from navigation import navigable_dataframe
 from rider_search import find_rider, select_rider
-from tables import table_height
-from translations import build_column_config, translate_values
+from translations import build_column_config
 
 
 st.title("Confrontations")
@@ -96,9 +96,5 @@ else:
         config["opponent_category"] = f"Catégorie — {opponent_name}"
         config["rider_club"] = f"Club — {rider_name}"
         config["opponent_club"] = f"Club — {opponent_name}"
-        st.dataframe(
-            translate_values(h2h.races),
-            column_config=config,
-            hide_index=True,
-            height=table_height(h2h.races)
-        )
+        key = f"h2h_common_{rider_id}_{opponent_id}_{season}"
+        navigable_dataframe(h2h.races, id_column="race_id", key=key, column_config=config)

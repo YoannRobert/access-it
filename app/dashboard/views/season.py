@@ -8,8 +8,8 @@ from charts import bar_chart
 from computations import get_category_changes, get_season_summary
 from data import get_snapshot_reference_date, load_snapshot
 from filters import select_category_filter, select_categories, select_max_count, select_region, select_season
-from tables import table_height
-from translations import build_column_config, format_departement, MONTH_LABELS, translate_values
+from navigation import navigable_dataframe
+from translations import format_departement, MONTH_LABELS
 
 st.title("Saison")
 
@@ -85,12 +85,8 @@ with tab_riders:
     if df.empty:
         st.info("Aucun coureur classé dans les 20 premiers pour ces critères.")
     else:
-        st.dataframe(
-            translate_values(df),
-            column_config=build_column_config(df),
-            hide_index=True,
-            height=table_height(df)
-        )
+        key = f"season_riders_{season}_{region}_{categories}_{category_filter}_{max_riders}"
+        navigable_dataframe(df, id_column="rider_id", key=key)
 
 with tab_changes:
     category = st.selectbox(
@@ -101,9 +97,5 @@ with tab_changes:
     if df.empty:
         st.info("Aucun changement de catégorie pour ces critères.")
     else:
-        st.dataframe(
-            translate_values(df),
-            column_config=build_column_config(df),
-            hide_index=True,
-            height=table_height(df)
-        )
+        key = f"season_changes_{season}_{region}_{category}"
+        navigable_dataframe(df, id_column="rider_id", key=key)

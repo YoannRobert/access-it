@@ -4,6 +4,7 @@ import streamlit as st
 
 from computations import get_rider_profile
 from data import load_snapshot
+from navigation import navigable_dataframe
 from rider_search import find_rider, select_rider
 from settings import LAST_RACES, TOP_N, WINDOW_MONTHS
 from tables import table_height
@@ -54,12 +55,8 @@ else:
         if rider_profile.results.empty:
             st.info("Aucun résultat pour ce coureur.")
         else:
-            st.dataframe(
-                translate_values(rider_profile.results),
-                column_config=build_column_config(rider_profile.results),
-                hide_index=True,
-                height=table_height(rider_profile.results)
-            )
+            key = f"rider_result_{rider_id}"
+            navigable_dataframe(rider_profile.results, id_column="race_id", key=key)
     with tab_seasons:
         st.markdown("**Statistiques**")
         if rider_profile.season_stats.empty:

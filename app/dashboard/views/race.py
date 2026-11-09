@@ -10,6 +10,7 @@ from access_it.common.seasons import FIRST_SEASON
 from computations import get_race_list, get_race_summary, get_region_departements
 from data import get_snapshot_reference_date, load_snapshot
 from filters import select_categories, select_region
+from navigation import navigable_dataframe
 from tables import table_height
 from translations import build_column_config, format_departement, translate_values
 
@@ -115,9 +116,5 @@ else:
     if summary.ranking.empty:
         st.info("Aucun classé pour cette course.")
     else:
-        st.dataframe(
-            translate_values(summary.ranking),
-            column_config=build_column_config(summary.ranking),
-            hide_index=True,
-            height=table_height(summary.ranking)
-        )
+        key = f"race_ranking_{race_id}"
+        navigable_dataframe(summary.ranking, id_column="rider_id", key=key)
