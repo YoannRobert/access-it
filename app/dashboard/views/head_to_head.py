@@ -2,4 +2,103 @@
 
 import streamlit as st
 
+from access_it.common.seasons import FIRST_SEASON
+
+from computations import get_head_to_head
+from data import get_snapshot_reference_date, load_snapshot
+from rider_search import find_rider, select_rider
+from tables import table_height
+from translations import build_column_config, translate_values
+
+
 st.title("Confrontations")
+
+snapshot_path, _ = load_snapshot()
+reference_date = get_snapshot_reference_date(snapshot_path)
+
+tab_rider, tab_opponent = st.tabs(["Coureur", "Adversaire"])
+
+with tab_rider:
+    rider_id = select_rider(snapshot_path, "h2h_rider")
+    if rider_id is not None:
+        st.query_params["rider_id"] = rider_id
+
+with tab_opponent:
+    opponent_id = select_rider(snapshot_path, "h2h_opponent")
+    if opponent_id is not None:
+        st.query_params["opponent_id"] = opponent_id
+
+rider_id = st.query_params.get("rider_id")
+opponent_id = st.query_params.get("opponent_id")
+rider = find_rider(snapshot_path, rider_id)
+opponent = find_rider(snapshot_path, opponent_id)
+if (
+        (rider_id is not None and rider is None)
+        or (opponent_id is not None and opponent is None)
+):
+    st.error("Coureur introuvable.")
+elif rider is None or opponent is None:
+    st.info("Choisissez un coureur et un adversaire.")
+elif rider_id == opponent_id:
+    st.info("Choisissez deux coureurs différents.")
+else:
+    rider_full_name = f"{rider['first_name']} {rider['last_name']}"
+    opponent_full_name = f"{opponent['first_name']} {opponent['last_name']}"
+    st.subheader(f"{rider_full_name} vs {opponent_full_name}")
+    season_options: list[int | None] = [None, *range(reference_date.year, FIRST_SEASON - 1, -1)]
+    season = st.selectbox(
+        label="Saison",
+        options=season_options,
+        format_func=lambda year: "Toutes" if year is None else str(year),
+        key="h2h_season"
+    )
+    h2h = get_head_to_head(
+        snapshot_path=snapshot_path,
+        rider_id=rider["rider_id"],
+        opponent_id=opponent["rider_id"],
+        season=season
+    )
+
+    col_common, col_rider_ahead, col_opponent_ahead, col_ties = st.columns(4)
+    if rider["last_name"] == opponent["last_name"]:
+        rider_name = rider_full_name
+        opponent_name = opponent_full_name
+    else:
+        rider_name = rider['last_name']
+        opponent_name = opponent['last_name']
+    with col_common:
+        st.metric(
+            label="Courses communes",
+            value=int(h2h.summary["nb_common_races"].iloc[0])
+        )
+    with col_rider_ahead:
+        st.metric(
+            label=f"{rider_name} devant",
+            value=int(h2h.summary["nb_rider_ahead"].iloc[0])
+        )
+    with col_opponent_ahead:
+        st.metric(
+            label=f"{opponent_name} devant",
+            value=int(h2h.summary["nb_opponent_ahead"].iloc[0])
+        )
+    with col_ties:
+        st.metric(
+            label="Égalités",
+            value=int(h2h.summary["nb_ties"].iloc[0])
+        )
+    if h2h.races.empty:
+        st.info("Aucune course commune pour ces critères.")
+    else:
+        config = build_column_config(h2h.races)
+        config["rider_finish_rank"] = f"Place — {rider_name}"
+        config["opponent_finish_rank"] = f"Place — {opponent_name}"
+        config["rider_category"] = f"Catégorie — {rider_name}"
+        config["opponent_category"] = f"Catégorie — {opponent_name}"
+        config["rider_club"] = f"Club — {rider_name}"
+        config["opponent_club"] = f"Club — {opponent_name}"
+        st.dataframe(
+            translate_values(h2h.races),
+            column_config=config,
+            hide_index=True,
+            height=table_height(h2h.races)
+        )

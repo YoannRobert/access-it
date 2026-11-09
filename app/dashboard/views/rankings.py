@@ -10,7 +10,9 @@ from access_it.common.regions import PAYS_DE_LA_LOIRE
 from computations import get_club_rankings, get_promotion_rankings, get_regional_rankings
 from data import get_snapshot_reference_date, load_snapshot
 from filters import select_category_filter, select_categories, select_max_count, select_region, select_season
+from tables import table_height
 from translations import build_column_config, translate_values
+
 
 st.title("Classements")
 
@@ -34,7 +36,12 @@ with tab_challenge:
         if df.empty:
             st.info("Aucun classement régional pour ces critères.")
         else:
-            st.dataframe(translate_values(df), column_config=build_column_config(df), hide_index=True, height=740)
+            st.dataframe(
+                translate_values(df),
+                column_config=build_column_config(df),
+                hide_index=True,
+                height=table_height(df)
+            )
 
 with tab_promotion:
     category = st.radio(label="Catégorie", options=CATEGORIES, horizontal=True, key="promotion_category")
@@ -45,7 +52,12 @@ with tab_promotion:
     if df.empty:
         st.info("Aucun classement de montée pour ces critères.")
     else:
-        st.dataframe(translate_values(df), column_config=build_column_config(df), hide_index=True, height=740)
+        st.dataframe(
+            translate_values(df),
+            column_config=build_column_config(df),
+            hide_index=True,
+            height=table_height(df)
+        )
 
 with tab_clubs:
     col_categories, col_filter, col_max_clubs = st.columns(3)
@@ -62,4 +74,9 @@ with tab_clubs:
     if df.empty:
         st.info("Aucun classement de clubs pour ces critères.")
     else:
-        st.dataframe(translate_values(df), column_config=build_column_config(df), hide_index=True, height=740)
+        st.dataframe(
+            translate_values(df),
+            column_config=build_column_config(df),
+            hide_index=True,
+            height=table_height(df)
+        )

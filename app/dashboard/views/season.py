@@ -8,6 +8,7 @@ from charts import bar_chart
 from computations import get_category_changes, get_season_summary
 from data import get_snapshot_reference_date, load_snapshot
 from filters import select_category_filter, select_categories, select_max_count, select_region, select_season
+from tables import table_height
 from translations import build_column_config, format_departement, MONTH_LABELS, translate_values
 
 st.title("Saison")
@@ -84,7 +85,12 @@ with tab_riders:
     if df.empty:
         st.info("Aucun coureur classé dans les 20 premiers pour ces critères.")
     else:
-        st.dataframe(translate_values(df), column_config=build_column_config(df), hide_index=True)
+        st.dataframe(
+            translate_values(df),
+            column_config=build_column_config(df),
+            hide_index=True,
+            height=table_height(df)
+        )
 
 with tab_changes:
     category = st.selectbox(
@@ -95,4 +101,9 @@ with tab_changes:
     if df.empty:
         st.info("Aucun changement de catégorie pour ces critères.")
     else:
-        st.dataframe(translate_values(df), column_config=build_column_config(df), hide_index=True, height=740)
+        st.dataframe(
+            translate_values(df),
+            column_config=build_column_config(df),
+            hide_index=True,
+            height=table_height(df)
+        )

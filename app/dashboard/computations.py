@@ -6,6 +6,7 @@ from typing import Literal
 
 from access_it.analytics.category_changes import compute_category_changes
 from access_it.analytics.club_rankings import compute_club_rankings
+from access_it.analytics.head_to_head import HeadToHead, compute_head_to_head
 from access_it.analytics.promotion_points import compute_promotion_points, compute_promotion_rankings
 from access_it.analytics.regional_rankings import compute_challenge_points, compute_regional_rankings
 from access_it.analytics.rider_list import build_rider_list, filter_riders, get_filter_choices, RiderFilterChoices
@@ -221,4 +222,26 @@ def get_rider_profile(
         top_n=TOP_N,
         last_races=LAST_RACES,
         window_months=WINDOW_MONTHS
+    )
+
+
+@st.cache_data(max_entries=200)
+def get_head_to_head(
+    snapshot_path: Path,
+    rider_id: str,
+    opponent_id: str,
+    season: int | None
+) -> HeadToHead:
+    tables = get_snapshot_data(snapshot_path)
+    return compute_head_to_head(
+        races=tables["races"],
+        rankings=tables["rankings"],
+        riders=tables["riders"],
+        clubs=tables["clubs"],
+        affiliations=tables["affiliations"],
+        rider_categories=tables["rider_categories"],
+        rider_id=rider_id,
+        opponent_id=opponent_id,
+        reference_date=get_snapshot_reference_date(snapshot_path),
+        season=season
     )
