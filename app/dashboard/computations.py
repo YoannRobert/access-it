@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -8,6 +9,9 @@ from access_it.analytics.category_changes import compute_category_changes
 from access_it.analytics.club_rankings import compute_club_rankings
 from access_it.analytics.head_to_head import HeadToHead, compute_head_to_head
 from access_it.analytics.promotion_points import compute_promotion_points, compute_promotion_rankings
+from access_it.analytics.race_list import list_races
+from access_it.analytics.race_summary import compute_race_summary, RaceSummary
+from access_it.analytics.ranking_tools import get_region_departement_codes, get_regional_committee_id
 from access_it.analytics.regional_rankings import compute_challenge_points, compute_regional_rankings
 from access_it.analytics.rider_list import build_rider_list, filter_riders, get_filter_choices, RiderFilterChoices
 from access_it.analytics.rider_profile import compute_rider_profile, RiderProfile
@@ -244,4 +248,62 @@ def get_head_to_head(
         opponent_id=opponent_id,
         reference_date=get_snapshot_reference_date(snapshot_path),
         season=season
+    )
+
+
+@st.cache_data
+def get_region_departements(
+    snapshot_path: Path,
+    region: str
+) -> pd.DataFrame:
+    tables = get_snapshot_data(snapshot_path)
+    regional_committee_id = get_regional_committee_id(tables["regional_committees"], region)
+    departement_codes = get_region_departement_codes(tables["departemental_committees"], regional_committee_id)
+    departements = pd.DataFrame(departement_codes)
+    departements = (
+        departements
+        .merge(tables["departements"], on="departement_code")
+        [["departement_code", "departement_name"]]
+    )
+    return departements.sort_values(by="departement_code").reset_index(drop=True)
+
+
+@st.cache_data(max_entries=200)
+def get_race_list(
+    snapshot_path: Path,
+    start_date: date,
+    end_date: date,
+    region: str,
+    departement_codes: tuple[str, ...] | None,
+    categories: tuple[str, ...]
+) -> pd.DataFrame:
+    tables = get_snapshot_data(snapshot_path)
+    return list_races(
+        races=tables["races"],
+        rankings=tables["rankings"],
+        departements=tables["departements"],
+        departemental_committees=tables["departemental_committees"],
+        regional_committees=tables["regional_committees"],
+        start_date=pd.Timestamp(start_date),
+        end_date=pd.Timestamp(end_date),
+        region=region,
+        departement_codes=departement_codes,
+        categories=categories
+    )
+
+
+@st.cache_data(max_entries=200)
+def get_race_summary(snapshot_path: Path, race_id: str) -> RaceSummary:
+    tables = get_snapshot_data(snapshot_path)
+    return compute_race_summary(
+        races=tables["races"],
+        rankings=tables["rankings"],
+        riders=tables["riders"],
+        clubs=tables["clubs"],
+        departements=tables["departements"],
+        departemental_committees=tables["departemental_committees"],
+        regional_committees=tables["regional_committees"],
+        affiliations=tables["affiliations"],
+        rider_categories=tables["rider_categories"],
+        race_id=race_id
     )
