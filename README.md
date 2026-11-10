@@ -165,6 +165,9 @@ docker run --rm -p 7860:7860 --env-file .env \
 python -m pytest tests -q -m "not regression"
 ```
 
+Les tests du tableau de bord (`tests/dashboard`) demandent l'extra `dashboard` ; sans lui, ils
+ne sont pas collectés.
+
 Le test de non-régression du transform compare les sorties du code à une référence, à
 partir d'entrées figées (dossier `~/.access-it/regression`) :
 
