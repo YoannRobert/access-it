@@ -95,6 +95,12 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+Pour lancer le tableau de bord en local, installer aussi ses dépendances :
+
+```bash
+pip install -e ".[dashboard]"
+```
+
 ## Configuration
 
 Les variables d'environnement sont lues dans un fichier `.env` à la racine du dépôt (jamais
@@ -135,11 +141,23 @@ Toutes les commandes se lancent depuis la racine du dépôt.
 | `python scripts/check_startlist_matches.py` | contrôle des identifications de secours des listes d'engagés (lecture seule) |
 | `python scripts/prune_stale_rows.py` | simulation du nettoyage des coureurs obsolètes ; `--apply` pour supprimer |
 | `python -m access_it.etl.load.schema {create,drop,reset}` | création, suppression ou réinitialisation des tables |
+| `streamlit run app/dashboard/streamlit_app.py` | tableau de bord en local, sans Docker |
+| `docker build -f app/dashboard/Dockerfile -t access-it-dashboard .` | construction de l'image du tableau de bord, celle du Space |
+| `docker run --rm -p 7860:7860 --env-file .env access-it-dashboard` | tableau de bord dans son image, sur http://localhost:7860 |
 
 Ne lancez pas le load après un extract seul : l'extract remplace les fichiers Parquet des
 clubs et des référentiels, que seul le transform complète. La
 [procédure d'exploitation](docs/exploitation.md) décrit les messages de l'ETL, les contrôles
-bloquants et le nettoyage de la base.
+bloquants, le nettoyage de la base et l'exploitation du tableau de bord.
+
+Pour le développement du tableau de bord, la commande suivante monte son code dans le
+conteneur et recharge la page à chaque modification :
+
+```bash
+docker run --rm -p 7860:7860 --env-file .env \
+  -v "$PWD/app/dashboard:/home/user/app/app/dashboard" \
+  access-it-dashboard --server.runOnSave=true --server.fileWatcherType=poll
+```
 
 ## Tests et lint
 
