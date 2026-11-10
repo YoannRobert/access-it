@@ -1,9 +1,16 @@
 """Entry point of the Access it! dashboard: configuration and navigation between the pages."""
 
-import logging
 import streamlit as st
 
-logging.basicConfig(level=logging.INFO)
+from access_it.common.log import setup_logging
+
+
+@st.cache_resource
+def configure_logging() -> None:
+    setup_logging()
+
+
+configure_logging()
 
 st.set_page_config(page_title="Access it!")
 

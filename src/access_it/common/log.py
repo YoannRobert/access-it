@@ -1,4 +1,4 @@
-"""Logging of the ETL: one logger per module, configured once by the scripts.
+"""Logging of the ETL and the dashboard: one logger per module, configured once by the scripts.
 
 Modules get their logger with logging.getLogger(__name__); the scripts call
 setup_logging() once, before running a step. Messages go to the standard
