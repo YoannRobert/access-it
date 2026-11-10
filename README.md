@@ -16,7 +16,7 @@ machine learning et API.
 | Base PostgreSQL et snapshots S3 | fonctionnel |
 | Exécution programmée de l'ETL | à venir |
 | Analyse exploratoire et modèles (scikit-learn, XGBoost, MLflow) | à venir |
-| Tableau de bord (Streamlit) sur Hugging Face Spaces | fonctionnel ([Space](https://huggingface.co/spaces/YoannRobert/access-it)) |
+| Tableau de bord (Streamlit) sur Hugging Face Spaces | fonctionnel ([ouvrir le tableau de bord](https://yoannrobert-access-it.hf.space/)) |
 | API (FastAPI) | à venir |
 
 ## Architecture
