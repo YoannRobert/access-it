@@ -19,6 +19,15 @@ from translations import build_column_config, format_departement, translate_valu
 
 st.title("Course")
 
+with st.expander("Comment lire cette page"):
+    st.markdown(
+        """
+- Choisissez la période, les départements (aucun choix = tous) et les catégories. Cliquez
+  ensuite sur une course de la liste.
+- Le classement est la place dans la course, toutes catégories confondues.
+"""
+    )
+
 snapshot_path, tables = load_snapshot()
 reference_date = get_snapshot_reference_date(snapshot_path)
 year = reference_date.year

@@ -53,8 +53,8 @@ def select_category_filter(container: DeltaGenerator) -> Literal["race", "rider"
         format_func=CATEGORY_FILTER_LABELS.get,
         horizontal=True,
         help=(
-            '« à la course » pour filtrer sur les catégories des courses, '
-            '« au coureur » pour filtrer sur les catégories des coureurs aux dates des courses'
+            "« À la course » : courses ouvertes à l'une des catégories choisies, avec tous leurs "
+            "classés. « Au coureur » : résultats des coureurs de ces catégories le jour de la course."
         )
     )
 

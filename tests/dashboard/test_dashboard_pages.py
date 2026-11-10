@@ -8,6 +8,7 @@ RIDER_PAGE = "views/rider.py"
 HEAD_TO_HEAD_PAGE = "views/head_to_head.py"
 RACE_PAGE = "views/race.py"
 RANKINGS_PAGE = "views/rankings.py"
+ABOUT_PAGE = "views/about.py"
 
 
 def by_label(elements, label: str):
@@ -38,6 +39,21 @@ def open_selected_row(app, key_prefix: str, row: int):
     app.run()
     app.button(key=f"{key}_button").click().run()
     return app
+
+
+# Sidebar and About page
+
+def test_sidebar_shows_the_date_of_the_last_race(open_page):
+    app = open_page()
+    assert not app.exception
+    assert "Dernière course enregistrée : 20/09/2026." in values(app.sidebar.markdown)
+
+
+def test_about_page_shows_the_contact_address(open_page):
+    app = open_page(ABOUT_PAGE)
+    assert not app.exception
+    assert values(app.title) == ["À propos"]
+    assert any("accessit.dashboard@gmail.com" in text for text in values(app.markdown))
 
 
 # Season page

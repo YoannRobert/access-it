@@ -16,6 +16,15 @@ from translations import build_column_config
 
 st.title("Confrontations")
 
+with st.expander("Comment lire cette page"):
+    st.markdown(
+        """
+- Choisissez un coureur dans chaque onglet.
+- Une course commune est une course où les deux coureurs sont classés. Le coureur devant est
+  celui qui a la meilleure place. Deux coureurs à la même place sont à égalité.
+"""
+    )
+
 snapshot_path, _ = load_snapshot()
 reference_date = get_snapshot_reference_date(snapshot_path)
 

@@ -79,6 +79,14 @@ COLUMN_LABELS = {
     "regional_committee": "Comité régional",
 }
 
+COLUMN_HELP = {
+    "nb_scoring_races": "Courses où le coureur a marqué des points dans cette catégorie",
+    "nb_active_riders": (
+        "Coureurs du club classés au moins une fois dans la saison, quelles que soient les "
+        "catégories choisies"
+    ),
+}
+
 VALUE_LABELS = {
     UNKNOWN_CATEGORY: "catégorie inconnue",
     UNKNOWN_CLUB: "club inconnu",
@@ -107,7 +115,7 @@ def translate_values(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_column_config(df: pd.DataFrame) -> dict[str, Any]:
     """Configuration of the columns of st.dataframe: ids hidden, French headers, dates as
-    DD/MM/YYYY.
+    DD/MM/YYYY, tooltips of the columns of COLUMN_HELP.
     """
     config = {}
     for col in df.columns:
@@ -116,6 +124,8 @@ def build_column_config(df: pd.DataFrame) -> dict[str, Any]:
             config[col] = None
         elif col in DATE_COLUMNS:
             config[col] = st.column_config.DateColumn(label, format="DD/MM/YYYY")
+        elif col in COLUMN_HELP:
+            config[col] = st.column_config.Column(label, help=COLUMN_HELP[col])
         else:
             config[col] = label
     return config

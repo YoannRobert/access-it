@@ -17,6 +17,22 @@ from translations import format_departement, MONTH_LABELS
 
 st.title("Saison")
 
+with st.expander("Comment lire cette page"):
+    st.markdown(
+        """
+- Les courses sont celles disputées dans la région choisie, quelle que soit la région des
+  coureurs.
+- Filtre de catégorie « à la course » : garde les courses ouvertes à l'une des catégories
+  choisies, avec tous leurs classés. « Au coureur » : garde les résultats des coureurs de ces
+  catégories, d'après leur catégorie le jour de la course.
+- Coureurs les plus titrés : classés par victoires, puis par nombre de podiums, de top 5, de
+  top 10 et de top 20. Une victoire compte aussi dans chaque top.
+- Changements de catégorie : une montée ou une descente est la nouvelle catégorie comparée à la
+  précédente connue. Une première apparition est la première catégorie connue du coureur. Ces
+  changements dépendent de l'heuristique des catégories.
+"""
+    )
+
 snapshot_path, _ = load_snapshot()
 reference_date = get_snapshot_reference_date(snapshot_path)
 default_season = reference_date.year

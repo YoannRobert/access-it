@@ -5,7 +5,7 @@ import pytest
 
 from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from tables import ROW_HEIGHT, table_height
-from translations import COLUMN_LABELS, build_column_config, format_departement, translate_values
+from translations import COLUMN_HELP, COLUMN_LABELS, build_column_config, format_departement, translate_values
 
 
 @pytest.mark.parametrize("code, name, expected", [
@@ -42,6 +42,14 @@ def test_column_config_hides_ids_formats_dates_and_translates_labels():
     assert config["unknown_column"] == "unknown_column"
     assert config["race_date"]["label"] == COLUMN_LABELS["race_date"]
     assert config["race_date"]["type_config"]["format"] == "DD/MM/YYYY"
+
+
+def test_column_config_adds_the_tooltips():
+    df = pd.DataFrame(columns=["nb_scoring_races", "points"])
+    config = build_column_config(df)
+    assert config["nb_scoring_races"]["label"] == COLUMN_LABELS["nb_scoring_races"]
+    assert config["nb_scoring_races"]["help"] == COLUMN_HELP["nb_scoring_races"]
+    assert config["points"] == COLUMN_LABELS["points"]
 
 
 def test_values_are_translated_and_the_others_kept():

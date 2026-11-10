@@ -20,6 +20,23 @@ from translations import build_column_config, translate_values
 
 st.title("Classements")
 
+with st.expander("Comment lire cette page"):
+    st.markdown(
+        """
+- Challenge régional (Pays de la Loire seulement) : ne comptent que les coureurs dont le club
+  appartient à la région. Leur place est recalculée entre eux, toutes catégories de la course
+  confondues. Les 20 premières places rapportent de 30 à 1 point, dans la catégorie du coureur
+  le jour de la course.
+- Points de montée : les 5 premières places de chaque course rapportent 6, 4, 3, 2 et 1 points,
+  dans la catégorie du coureur le jour de la course. Un coureur qui change de catégorie a un
+  total par catégorie. Seules les courses de Bretagne et des Pays de la Loire sont comptées. Le
+  classement montre les coureurs de la région choisie, classés entre eux.
+- Clubs : classés par victoires, puis par nombre de podiums et de tops de leurs coureurs, toutes
+  régions de course confondues. Les coureurs actifs sont ceux classés au moins une fois dans la
+  saison.
+"""
+    )
+
 snapshot_path, tables = load_snapshot()
 reference_date = get_snapshot_reference_date(snapshot_path)
 default_season = reference_date.year

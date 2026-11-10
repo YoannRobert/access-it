@@ -18,6 +18,18 @@ snapshot_path, _ = load_snapshot()
 
 st.title("Coureur")
 
+with st.expander("Comment lire cette page"):
+    st.markdown(
+        f"""
+- Recherche : saisissez une partie du nom (sans tenir compte des majuscules ni des accents),
+  puis affinez avec les filtres. Le club n'est proposé qu'une fois un département choisi. 20
+  coureurs au plus sont affichés.
+- La catégorie et le club affichés sont les derniers connus.
+- Forme récente : les {LAST_RACES} dernières courses du coureur dans les {WINDOW_MONTHS} mois
+  précédents, nombre de top {TOP_N} et taux de top {TOP_N}.
+"""
+    )
+
 rider_id = select_rider(snapshot_path, "rider")
 if rider_id is not None:
     st.query_params["rider_id"] = rider_id
@@ -48,10 +60,12 @@ else:
     col_nb_tops.metric(
         label=f"Nombre de Top {TOP_N}",
         value=nb_tops,
+        help=f"Courses prises en compte finies dans les {TOP_N} premiers, toutes catégories confondues"
     )
     col_top_rate.metric(
         label=f"Taux de Top {TOP_N}",
         value=f"{top_rate:.0%}" if nb_races_used > 0 else "—",
+        help=f"Part des courses prises en compte finies dans les {TOP_N} premiers"
     )
     tab_results, tab_seasons, tab_history = st.tabs(["Résultats", "Saisons", "Parcours"])
     with tab_results:
