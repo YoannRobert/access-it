@@ -1,4 +1,7 @@
-"""Race page of the dashboard."""
+"""Race page of the dashboard.
+
+Races of a period, then the header and the ranking of the race of the URL (race_id).
+"""
 
 import pandas as pd
 import streamlit as st

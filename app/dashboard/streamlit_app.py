@@ -7,6 +7,7 @@ from access_it.common.log import setup_logging
 
 @st.cache_resource
 def configure_logging() -> None:
+    """Configure the logs once per process (see setup_logging)."""
     setup_logging()
 
 

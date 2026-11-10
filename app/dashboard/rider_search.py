@@ -1,3 +1,10 @@
+"""Rider search shared by the Rider and Head-to-head pages.
+
+The search shows a name with a filter button, four faceted filters (first name, regions,
+departement, club) and a table of at most 20 riders. Its session state keys start with a
+prefix, so that several searches, on one page or on several pages, stay independent.
+"""
+
 import pandas as pd
 import streamlit as st
 
@@ -11,11 +18,12 @@ FILTER_KEYS = ("first_name", "departement_code", "club_id")
 
 
 def _key(prefix: str, name: str) -> str:
+    """Session state key of a search."""
     return f"{prefix}_{name}"
 
 
 def apply_name(prefix: str) -> None:
-    """Start a new search with the typed name."""
+    """Start a new search with the typed name, the other filters reset (callback of the button)."""
     st.session_state[_key(prefix, "applied_name")] = st.session_state[_key(prefix, "name_input")].strip()
     for key in FILTER_KEYS:
         st.session_state[_key(prefix, key)] = None
@@ -23,15 +31,18 @@ def apply_name(prefix: str) -> None:
 
 
 def reset_departement_and_club(prefix: str) -> None:
+    """Reset the departement and the club when the regions change (callback)."""
     st.session_state[_key(prefix, "departement_code")] = None
     st.session_state[_key(prefix, "club_id")] = None
 
 
 def reset_club(prefix: str) -> None:
+    """Reset the club when the departement changes (callback)."""
     st.session_state[_key(prefix, "club_id")] = None
 
 
 def find_rider(snapshot_path: Path, rider_id: str | None) -> pd.Series | None:
+    """Row of a rider in the rider list, or None if rider_id is None or unknown."""
     if rider_id is None:
         return None
     rider_list = get_rider_list(snapshot_path)
@@ -40,7 +51,12 @@ def find_rider(snapshot_path: Path, rider_id: str | None) -> pd.Series | None:
 
 
 def select_rider(snapshot_path: Path, prefix: str) -> str | None:
-    """Show the rider search (name, filters, table) and return the selected rider_id, or None."""
+    """Show the rider search (name, filters, table) and return the selected rider_id, or None.
+
+    Args:
+        snapshot_path: Path of the snapshot shown.
+        prefix: Prefix of the session state keys of this search.
+    """
     for key in ("applied_name", *FILTER_KEYS):
         st.session_state.setdefault(_key(prefix, key), None)
     st.session_state.setdefault(_key(prefix, "regions"), [])

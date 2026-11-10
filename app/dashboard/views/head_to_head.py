@@ -1,4 +1,7 @@
-"""Head-to-head page of the dashboard."""
+"""Head-to-head page of the dashboard.
+
+Search of two riders, then their common races (rider_id and opponent_id of the URL).
+"""
 
 import streamlit as st
 

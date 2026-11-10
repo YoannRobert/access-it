@@ -1,3 +1,5 @@
+"""Altair charts of the dashboard."""
+
 import altair as alt
 import pandas as pd
 import streamlit as st
@@ -12,6 +14,17 @@ def bar_chart(
         yaxis_title: str,
         xaxis_label_angle: int = 0,
 ) -> None:
+    """Show a bar chart, the bars in the order of the rows of df.
+
+    Args:
+        df: Data of the chart.
+        title: Title of the chart.
+        x_field: Column of the categories (x axis).
+        y_field: Column of the values (y axis).
+        xaxis_title: Title of the x axis, also used in the tooltip.
+        yaxis_title: Title of the y axis, also used in the tooltip.
+        xaxis_label_angle: Angle of the labels of the x axis, in degrees.
+    """
     x_name = f"{x_field}:N"
     y_name = f"{y_field}:Q"
     chart = alt.Chart(df, title=title).mark_bar().encode(

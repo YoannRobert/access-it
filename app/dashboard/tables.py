@@ -1,3 +1,5 @@
+"""Display helpers of the tables of the dashboard."""
+
 import pandas as pd
 
 

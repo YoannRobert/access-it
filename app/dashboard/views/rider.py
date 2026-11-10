@@ -1,4 +1,7 @@
-"""Rider page of the dashboard."""
+"""Rider page of the dashboard.
+
+Rider search, then the profile of the rider of the URL (rider_id).
+"""
 
 import streamlit as st
 

@@ -1,4 +1,7 @@
-"""Rankings page of the dashboard."""
+"""Rankings page of the dashboard.
+
+Regional challenge, promotion points and clubs of a season.
+"""
 
 import streamlit as st
 

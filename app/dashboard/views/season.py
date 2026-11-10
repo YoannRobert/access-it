@@ -1,4 +1,8 @@
-"""Season page of the dashboard."""
+"""Season page of the dashboard.
+
+Races of a season (by month, departement and categories), most titled riders and category
+changes.
+"""
 
 import streamlit as st
 

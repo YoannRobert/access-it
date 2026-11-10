@@ -1,3 +1,10 @@
+"""Cached computations of the dashboard: the analytics functions run on the tables of a snapshot.
+
+Each function takes the path of the snapshot as first argument: Streamlit caches its result
+for this snapshot (st.cache_data), so that a new snapshot is computed again without clearing
+the cache. See the analytics functions for the rules and the columns.
+"""
+
 import pandas as pd
 import streamlit as st
 
@@ -32,6 +39,7 @@ def get_season_summary(
     category_filter: Literal["race", "rider"],
     max_riders: int
 ) -> SeasonSummary:
+    """Statistics of a season (see compute_season_summary)."""
     tables = get_snapshot_data(snapshot_path)
     return compute_season_summary(
         races=tables["races"], rankings=tables["rankings"], riders=tables["riders"],
@@ -52,6 +60,7 @@ def get_category_changes(
     region: str | None,
     category: str | None
 ) -> pd.DataFrame:
+    """Category changes of a season (see compute_category_changes)."""
     tables = get_snapshot_data(snapshot_path)
     return compute_category_changes(
         rider_categories=tables["rider_categories"], riders=tables["riders"],
@@ -68,6 +77,7 @@ def get_regional_rankings(
     season: int,
     region: str
 ) -> pd.DataFrame:
+    """Regional challenge rankings of a season, all categories (see compute_regional_rankings)."""
     tables = get_snapshot_data(snapshot_path)
     return compute_regional_rankings(
         races=tables["races"], rankings=tables["rankings"], riders=tables["riders"],
@@ -82,6 +92,7 @@ def get_promotion_rankings(
     snapshot_path: Path,
     season: int
 ) -> pd.DataFrame:
+    """National promotion rankings of a season, all categories (see compute_promotion_rankings)."""
     tables = get_snapshot_data(snapshot_path)
     return compute_promotion_rankings(
         races=tables["races"], rankings=tables["rankings"], riders=tables["riders"],
@@ -102,6 +113,7 @@ def get_club_rankings(
     category_filter: Literal["race", "rider"],
     max_clubs: int
 ) -> pd.DataFrame:
+    """Club ranking of a season (see compute_club_rankings)."""
     tables = get_snapshot_data(snapshot_path)
     return compute_club_rankings(
         races=tables["races"], rankings=tables["rankings"],
@@ -117,6 +129,7 @@ def get_club_rankings(
 
 @st.cache_data
 def get_rider_list(snapshot_path: Path) -> pd.DataFrame:
+    """Riders on the reference date of the snapshot (see build_rider_list)."""
     reference_date = get_snapshot_reference_date(snapshot_path)
     tables = get_snapshot_data(snapshot_path)
     return build_rider_list(
@@ -133,6 +146,9 @@ def get_rider_list(snapshot_path: Path) -> pd.DataFrame:
 
 @st.cache_data
 def get_all_promotion_points(snapshot_path: Path) -> pd.DataFrame:
+    """Promotion points, race by race, of every season from FIRST_SEASON to the year of the
+    reference date (see compute_promotion_points).
+    """
     tables = get_snapshot_data(snapshot_path)
     reference_date = get_snapshot_reference_date(snapshot_path)
     return pd.concat(
@@ -152,6 +168,9 @@ def get_all_promotion_points(snapshot_path: Path) -> pd.DataFrame:
 
 @st.cache_data
 def get_all_challenge_points(snapshot_path: Path) -> pd.DataFrame:
+    """Points of the challenge of the Pays de la Loire, race by race, of every season from
+    FIRST_SEASON to the year of the reference date (see compute_challenge_points).
+    """
     tables = get_snapshot_data(snapshot_path)
     reference_date = get_snapshot_reference_date(snapshot_path)
     return pd.concat(
@@ -182,6 +201,9 @@ def search_riders(
     departement_code: str | None,
     club_id: str | None
 ) -> tuple[pd.DataFrame, RiderFilterChoices]:
+    """Riders kept by the filters, and the choices of each filter (see filter_riders and
+    get_filter_choices); regions is a tuple, empty for no region filter.
+    """
     rider_list = get_rider_list(snapshot_path)
     return (
         filter_riders(
@@ -208,6 +230,9 @@ def get_rider_profile(
     snapshot_path: Path,
     rider_id: str
 ) -> RiderProfile:
+    """Profile of a rider, with the challenge of the Pays de la Loire and the recent form of
+    settings.py (see compute_rider_profile).
+    """
     tables = get_snapshot_data(snapshot_path)
     return compute_rider_profile(
         races=tables["races"],
@@ -236,6 +261,9 @@ def get_head_to_head(
     opponent_id: str,
     season: int | None
 ) -> HeadToHead:
+    """Head to head of two riders, on one season or on all of them if season is None
+    (see compute_head_to_head).
+    """
     tables = get_snapshot_data(snapshot_path)
     return compute_head_to_head(
         races=tables["races"],
@@ -256,6 +284,7 @@ def get_region_departements(
     snapshot_path: Path,
     region: str
 ) -> pd.DataFrame:
+    """Departements of a region: departement_code and departement_name, sorted by code."""
     tables = get_snapshot_data(snapshot_path)
     regional_committee_id = get_regional_committee_id(tables["regional_committees"], region)
     departement_codes = get_region_departement_codes(tables["departemental_committees"], regional_committee_id)
@@ -277,6 +306,9 @@ def get_race_list(
     departement_codes: tuple[str, ...] | None,
     categories: tuple[str, ...]
 ) -> pd.DataFrame:
+    """Races of a region over a period, both dates included (see list_races); departement_codes
+    is None for every departement of the region.
+    """
     tables = get_snapshot_data(snapshot_path)
     return list_races(
         races=tables["races"],
@@ -294,6 +326,7 @@ def get_race_list(
 
 @st.cache_data(max_entries=200)
 def get_race_summary(snapshot_path: Path, race_id: str) -> RaceSummary:
+    """Header and ranking of a race (see compute_race_summary)."""
     tables = get_snapshot_data(snapshot_path)
     return compute_race_summary(
         races=tables["races"],

@@ -1,3 +1,9 @@
+"""French labels of the dashboard: column headers, values of the analytics, months, regions.
+
+The DataFrames keep their English column names; the labels are applied when displaying
+(translate_values, build_column_config).
+"""
+
 import pandas as pd
 import streamlit as st
 
@@ -94,11 +100,15 @@ DATE_COLUMNS = ("race_date", "change_date", "start_date", "end_date")
 
 
 def translate_values(df: pd.DataFrame) -> pd.DataFrame:
+    """Values of the analytics (labels.py) replaced by their French labels."""
     df = df.replace(VALUE_LABELS)
     return df
 
 
 def build_column_config(df: pd.DataFrame) -> dict[str, Any]:
+    """Configuration of the columns of st.dataframe: ids hidden, French headers, dates as
+    DD/MM/YYYY.
+    """
     config = {}
     for col in df.columns:
         label = COLUMN_LABELS.get(col, col)
