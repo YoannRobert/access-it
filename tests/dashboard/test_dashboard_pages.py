@@ -255,3 +255,54 @@ def test_ranked_rider_opens_the_rider_page(open_page):
     assert not app.exception
     assert values(app.title) == ["Coureur"]
     assert app.query_params["rider_id"] == "r2"
+
+
+# Search expanders
+
+def test_rider_search_is_open_without_rider_and_closed_with_one(open_page):
+    assert open_page(RIDER_PAGE).session_state["rider_search"] is True
+    assert open_page(RIDER_PAGE, rider_id="r1").session_state["rider_search"] is False
+
+
+def test_selected_rider_of_the_search_closes_the_search(open_page):
+    app = open_page(RIDER_PAGE)
+    key = table(app, "rider_table_").key
+    app.session_state[key] = {"selection": {"rows": [0], "columns": [], "cells": []}}
+    app.run()
+    assert not app.exception
+    assert app.session_state["rider_search"] is False
+    assert len(app.subheader) == 1  # profile of the selected rider
+
+
+def test_closed_rider_search_can_be_opened_again(open_page):
+    app = open_page(RIDER_PAGE, rider_id="r1")
+    app.session_state["rider_search"] = True
+    app.run()
+    assert app.session_state["rider_search"] is True
+
+
+def test_link_to_a_rider_closes_the_search_of_the_rider_page(open_page):
+    app = open_page(RACE_PAGE, race_id="c3")
+    open_selected_row(app, "race_ranking_", 0)
+    assert app.session_state["rider_search"] is False
+
+
+def test_head_to_head_search_is_closed_only_with_both_riders(open_page):
+    assert open_page(HEAD_TO_HEAD_PAGE, rider_id="r1").session_state["h2h_search"] is True
+    app = open_page(HEAD_TO_HEAD_PAGE, rider_id="r1", opponent_id="r2")
+    assert app.session_state["h2h_search"] is False
+
+
+def test_race_search_is_open_without_race_and_closed_with_one(open_page):
+    assert open_page(RACE_PAGE).session_state["race_search"] is True
+    assert open_page(RACE_PAGE, race_id="c3").session_state["race_search"] is False
+
+
+def test_selected_race_of_the_list_closes_the_search(open_page):
+    app = open_page(RACE_PAGE)
+    key = table(app, "race_table_").key
+    app.session_state[key] = {"selection": {"rows": [0], "columns": [], "cells": []}}
+    app.run()
+    assert not app.exception
+    assert app.query_params["race_id"] == "c6"
+    assert app.session_state["race_search"] is False

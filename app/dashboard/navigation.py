@@ -1,8 +1,13 @@
-"""Navigation from a table to the page of a rider or a race (selected row, then button)."""
+"""Navigation between the pages of the dashboard.
+
+Navigation from a table to the page of a rider or a race (selected row, then button), and
+expander of the search block of a page, closed once its profile is chosen.
+"""
 
 import pandas as pd
 import streamlit as st
 
+from streamlit.delta_generator import DeltaGenerator
 from typing import Any
 
 from tables import table_height
@@ -45,3 +50,27 @@ def navigable_dataframe(
     rows = event.selection.rows
     if st.button(label, disabled=not rows, key=f"{key}_button"):
         st.switch_page(page, query_params={id_column: str(df.iloc[rows[0]][id_column])})
+
+
+def search_expander(label: str, key: str, selected_ids: tuple[str | None, ...]) -> DeltaGenerator:
+    """Expander of the search block of a page, open while its profile is not chosen.
+
+    The expander is open while one of the ids of the URL is missing, and closed when they are
+    all given. This state is imposed only when the ids change (link from another page, shared
+    URL, selection in the search), so that the visitor can open the expander again for a new
+    search.
+
+    Args:
+        label: Label of the expander.
+        key: Key of the expander; key + "_ids" keeps the ids seen at the last run.
+        selected_ids: Ids of the URL that the search chooses (None when missing).
+
+    Returns:
+        The expander, to be used with the with notation.
+    """
+    expanded = None in selected_ids
+    ids_key = f"{key}_ids"
+    if st.session_state.get(ids_key) != selected_ids:
+        st.session_state[key] = expanded
+        st.session_state[ids_key] = selected_ids
+    return st.expander(label, expanded=expanded, key=key, on_change="rerun")

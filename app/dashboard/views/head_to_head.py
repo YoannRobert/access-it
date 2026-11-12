@@ -9,7 +9,7 @@ from access_it.common.seasons import FIRST_SEASON
 
 from computations import get_head_to_head
 from data import get_snapshot_reference_date, load_snapshot
-from navigation import navigable_dataframe
+from navigation import navigable_dataframe, search_expander
 from rider_search import find_rider, select_rider
 from translations import build_column_config
 
@@ -28,20 +28,27 @@ with st.expander("Comment lire cette page"):
 snapshot_path, _ = load_snapshot()
 reference_date = get_snapshot_reference_date(snapshot_path)
 
-tab_rider, tab_opponent = st.tabs(["Coureur", "Adversaire"])
-
-with tab_rider:
-    rider_id = select_rider(snapshot_path, "h2h_rider")
-    if rider_id is not None:
-        st.query_params["rider_id"] = rider_id
-
-with tab_opponent:
-    opponent_id = select_rider(snapshot_path, "h2h_opponent")
-    if opponent_id is not None:
-        st.query_params["opponent_id"] = opponent_id
-
 rider_id = st.query_params.get("rider_id")
 opponent_id = st.query_params.get("opponent_id")
+with search_expander("Choisir les coureurs", "h2h_search", (rider_id, opponent_id)):
+    tab_rider, tab_opponent = st.tabs(["Coureur", "Adversaire"])
+    with tab_rider:
+        selected_rider_id = select_rider(snapshot_path, "h2h_rider")
+    with tab_opponent:
+        selected_opponent_id = select_rider(snapshot_path, "h2h_opponent")
+
+new_ids = {
+    name: selected_id
+    for name, selected_id, url_id in [
+        ("rider_id", selected_rider_id, rider_id),
+        ("opponent_id", selected_opponent_id, opponent_id),
+    ]
+    if selected_id is not None and selected_id != url_id
+}
+if new_ids:
+    st.query_params.update(new_ids)
+    st.rerun()  # closes the search expander once both riders are chosen
+
 rider = find_rider(snapshot_path, rider_id)
 opponent = find_rider(snapshot_path, opponent_id)
 if (

@@ -7,7 +7,7 @@ import streamlit as st
 
 from computations import get_rider_profile
 from data import load_snapshot
-from navigation import navigable_dataframe
+from navigation import navigable_dataframe, search_expander
 from rider_search import find_rider, select_rider
 from settings import LAST_RACES, TOP_N, WINDOW_MONTHS
 from tables import table_height
@@ -30,10 +30,12 @@ with st.expander("Comment lire cette page"):
 """
     )
 
-rider_id = select_rider(snapshot_path, "rider")
-if rider_id is not None:
-    st.query_params["rider_id"] = rider_id
 rider_id = st.query_params.get("rider_id")
+with search_expander("Rechercher un coureur", "rider_search", (rider_id,)):
+    selected_id = select_rider(snapshot_path, "rider")
+if selected_id is not None and selected_id != rider_id:
+    st.query_params["rider_id"] = selected_id
+    st.rerun()  # closes the search expander
 rider = find_rider(snapshot_path, rider_id)
 if rider_id is None:
     st.info("Cliquez sur un coureur du tableau pour afficher sa fiche.")
