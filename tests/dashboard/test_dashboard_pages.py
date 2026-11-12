@@ -4,6 +4,7 @@ from datetime import date
 
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 
+SEASON_PAGE = "views/season.py"
 RIDER_PAGE = "views/rider.py"
 HEAD_TO_HEAD_PAGE = "views/head_to_head.py"
 RACE_PAGE = "views/race.py"
@@ -41,7 +42,15 @@ def open_selected_row(app, key_prefix: str, row: int):
     return app
 
 
-# Sidebar and About page
+# Home page, sidebar and About page
+
+def test_home_page_is_the_default_page_and_links_to_every_page(open_page):
+    app = open_page()
+    assert not app.exception
+    assert values(app.title) == ["Access it!"]
+    linked_pages = {link.proto.page for link in app.get("page_link")}
+    assert linked_pages == {"season", "rankings", "rider", "head-to-head", "race", "about"}
+
 
 def test_sidebar_shows_the_date_of_the_last_race(open_page):
     app = open_page()
@@ -59,28 +68,28 @@ def test_about_page_shows_the_contact_address(open_page):
 # Season page
 
 def test_season_page_counts_the_races_of_the_default_season_and_region(open_page):
-    app = open_page()
+    app = open_page(SEASON_PAGE)
     assert not app.exception
     assert values(app.title) == ["Saison"]
     assert metric(app, "Courses") == "3"  # c3, c4 and c6 in Pays de la Loire in 2026
 
 
 def test_season_page_in_bretagne(open_page):
-    app = open_page()
+    app = open_page(SEASON_PAGE)
     by_label(app.selectbox, "Région").set_value(BRETAGNE).run()
     assert not app.exception
     assert metric(app, "Courses") == "1"
 
 
 def test_season_page_shows_the_category_changes(open_page):
-    app = open_page()
+    app = open_page(SEASON_PAGE)
     changes = table(app, "season_changes_").value
     assert changes["last_name"].tolist() == ["PETIT"]
     assert changes["change_type"].tolist() == ["montée"]
 
 
 def test_most_titled_rider_opens_the_rider_page(open_page):
-    app = open_page()
+    app = open_page(SEASON_PAGE)
     rider_id = table(app, "season_riders_").value["rider_id"].iloc[0]
     open_selected_row(app, "season_riders_", 0)
     assert not app.exception

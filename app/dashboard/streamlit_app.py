@@ -20,7 +20,8 @@ st.set_page_config(page_title="Access it!")
 
 about_page = st.Page("views/about.py", title="À propos", url_path="about")
 pages = [
-    st.Page("views/season.py", title="Saison", url_path="season", default=True),
+    st.Page("views/home.py", title="Accueil", url_path="home", default=True),
+    st.Page("views/season.py", title="Saison", url_path="season"),
     st.Page("views/rankings.py", title="Classements", url_path="rankings"),
     st.Page("views/rider.py", title="Coureur", url_path="rider"),
     st.Page("views/head_to_head.py", title="Confrontations", url_path="head-to-head"),
