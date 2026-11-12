@@ -1,11 +1,13 @@
-"""Unit tests of the snapshot functions of the S3 storage, with a fake S3 client."""
+"""Unit tests of the functions of the S3 storage, with a fake S3 client."""
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from access_it.export.s3 import (
-    download_latest_snapshot, download_snapshot, snapshot_key_from_name
+    KeyPattern, delete_old_keys, download_latest, download_latest_snapshot, download_snapshot,
+    list_keys, snapshot_key_from_name
 )
 
 OLD_KEY = "snapshots/snapshot_20260901T080000Z.zip"
@@ -34,6 +36,11 @@ class FakeS3Client:
     def download_file(self, Bucket: str, Key: str, Filename: str) -> None:
         self.downloaded.append(Key)
         Path(Filename).write_text(Key)
+
+    def delete_objects(self, Bucket: str, Delete: dict) -> dict:
+        deleted = {obj["Key"] for obj in Delete["Objects"]}
+        self.keys = [key for key in self.keys if key not in deleted]
+        return {}
 
 
 @pytest.fixture
@@ -72,3 +79,64 @@ def test_download_the_latest_snapshot(client, tmp_path):
 def test_download_the_latest_snapshot_of_an_empty_bucket_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         download_latest_snapshot("bucket", tmp_path, client=FakeS3Client([]))
+
+
+ARCHIVE_KEYS = KeyPattern(prefix="archives", stem="archive", suffix=".tar.gz")
+ARCHIVE_KEYS_IN_BUCKET = [
+    "archives/archive_20261001T080000Z.tar.gz",
+    "archives/archive_20261003T080000Z.tar.gz",
+    "archives/archive_20261002T080000Z.tar.gz",
+]
+
+
+@pytest.fixture
+def mixed_client() -> FakeS3Client:
+    """Bucket holding snapshots, archives and an unrelated object."""
+    return FakeS3Client([OLD_KEY, *ARCHIVE_KEYS_IN_BUCKET, "archives/other.tar.gz", NEW_KEY])
+
+
+def test_key_pattern_builds_and_parses_its_keys():
+    timestamp = datetime(2026, 11, 12, 15, 0, 0, tzinfo=timezone.utc)
+    key = ARCHIVE_KEYS.build_key(timestamp)
+    assert key == "archives/archive_20261112T150000Z.tar.gz"
+    assert ARCHIVE_KEYS.parse_timestamp(key) == timestamp
+
+
+@pytest.mark.parametrize("key", [
+    "archives/archive_20261112T150000Z.zip",
+    "archives/archive_20261112T150000Z.tar.gz.bak",
+    "snapshots/archive_20261112T150000Z.tar.gz",
+    "archives/other_20261112T150000Z.tar.gz",
+])
+def test_key_pattern_rejects_other_keys(key):
+    assert ARCHIVE_KEYS.parse_timestamp(key) is None
+
+
+def test_list_keys_keeps_the_matching_keys_from_most_recent_to_oldest(mixed_client):
+    assert list_keys("bucket", ARCHIVE_KEYS, client=mixed_client) == [
+        "archives/archive_20261003T080000Z.tar.gz",
+        "archives/archive_20261002T080000Z.tar.gz",
+        "archives/archive_20261001T080000Z.tar.gz",
+    ]
+
+
+def test_delete_old_keys_keeps_the_most_recent_ones_only(mixed_client):
+    deleted = delete_old_keys("bucket", ARCHIVE_KEYS, keep=1, client=mixed_client)
+    assert deleted == [
+        "archives/archive_20261002T080000Z.tar.gz",
+        "archives/archive_20261001T080000Z.tar.gz",
+    ]
+    assert mixed_client.keys == [
+        OLD_KEY, "archives/archive_20261003T080000Z.tar.gz", "archives/other.tar.gz", NEW_KEY
+    ]
+
+
+def test_delete_old_keys_rejects_keeping_nothing(mixed_client):
+    with pytest.raises(ValueError):
+        delete_old_keys("bucket", ARCHIVE_KEYS, keep=0, client=mixed_client)
+
+
+def test_download_the_latest_object_of_a_pattern(mixed_client, tmp_path):
+    path = download_latest("bucket", ARCHIVE_KEYS, tmp_path, client=mixed_client)
+    assert path == tmp_path / "archive_20261003T080000Z.tar.gz"
+    assert path.read_text() == "archives/archive_20261003T080000Z.tar.gz"
