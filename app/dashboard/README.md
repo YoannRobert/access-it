@@ -20,6 +20,7 @@ française de cyclisme (FFC).
 
 ## Pages
 
+- **Accueil** : présentation du projet et liens vers les pages.
 - **Saison** : courses par mois, par département et par catégories, coureurs les plus titrés,
   changements de catégorie.
 - **Classements** : challenge régional des Pays de la Loire, points de montée, clubs.
@@ -28,6 +29,7 @@ française de cyclisme (FFC).
 - **Confrontations** : courses communes de deux coureurs et qui a fini devant l'autre.
 - **Course** : liste des courses filtrée par période, région, départements et catégories,
   puis classement.
+- **À propos** : données, limites, avertissement, contact et licence.
 
 Dans les tableaux, sélectionnez une ligne puis cliquez sur « Voir la fiche » pour ouvrir
 la fiche du coureur ou de la course.
