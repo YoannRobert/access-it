@@ -131,7 +131,7 @@ Toutes les commandes se lancent depuis la racine du dépôt.
 
 | Commande | Effet |
 |---|---|
-| `python scripts/etl.py` | ETL complet : extract, transform, puis load |
+| `python scripts/etl.py` | ETL complet : récupération du cache, extract, transform, load, envoi du cache, puis snapshot de la base (`--no-cache-sync`, `--no-snapshot-export`) |
 | `python scripts/extract.py` | téléchargement des pages et des référentiels |
 | `python scripts/transform.py` | construction des tables (fichiers Parquet) |
 | `python scripts/load.py` | contrôles, puis écriture dans la base |
