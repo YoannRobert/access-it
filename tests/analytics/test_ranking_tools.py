@@ -7,15 +7,16 @@ import pytest
 
 from access_it.analytics.labels import UNKNOWN_CATEGORY, UNKNOWN_CLUB
 from access_it.analytics.ranking_tools import (
-    RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS, add_category_and_club_on_race_date,
-    add_category_on_race_date, add_club_location, add_shared_rank, add_value_on_race_date,
-    check_at_least_one, check_categories, check_category, check_category_filter,
-    check_race_categories, check_race_dates, check_recent_form_arguments, check_rider,
-    check_start_dates, compute_places, count_wins_and_tops, filter_results_by_categories,
-    format_category, format_club, get_reference_date, get_region_club_ids,
-    get_region_departement_codes, get_region_races, get_regional_committee_id,
-    get_rider_results, has_requested_category, rank_scoring_riders, scale_points,
-    select_category, select_club, select_recent_results, to_datetime, to_day
+    RECENT_FORM_COLUMNS, RIDER_RESULT_COLUMNS, SEASON_STATS_COLUMNS,
+    add_category_and_club_on_race_date, add_category_on_race_date, add_club_location,
+    add_shared_rank, add_value_on_race_date, check_at_least_one, check_categories,
+    check_category, check_category_filter, check_race_categories, check_race_dates,
+    check_recent_form_arguments, check_rider, check_start_dates, check_top_n, compute_places,
+    count_wins_and_tops, filter_results_by_categories, format_category, format_club,
+    get_reference_date, get_region_club_ids, get_region_departement_codes, get_region_races,
+    get_regional_committee_id, get_rider_results, has_requested_category, rank_scoring_riders,
+    scale_points, select_category, select_club, select_recent_results, summarize_top_n,
+    to_datetime, to_day
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
@@ -125,6 +126,14 @@ def test_check_at_least_one_accepts_one_and_raises_below():
     check_at_least_one(1, "max_riders")
     with pytest.raises(ValueError, match="max_riders must be at least 1, not 0"):
         check_at_least_one(0, "max_riders")
+
+
+def test_check_top_n_accepts_the_bounds_and_raises_outside():
+    check_top_n(1)
+    check_top_n(20)
+    for top_n in (0, 21):
+        with pytest.raises(ValueError, match=f"top_n must be between 1 and 20, not {top_n}"):
+            check_top_n(top_n)
 
 
 VALID_RECENT_FORM_ARGUMENTS = {"top_n": 20, "last_races": 10, "window_months": 6}
@@ -238,6 +247,43 @@ def test_recent_results_raise_in_order(kwargs, message):
     kwargs = {"reference_date": "2026-07-01", **kwargs}
     with pytest.raises(ValueError, match=message):
         select_recent_results(races, rankings, ["a"], **kwargs)
+
+
+def test_top_n_summary_counts_the_races_and_the_tops():
+    recent = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3"], "rider_id": ["a"] * 3, "finish_rank": [1, 20, 21]
+    })
+    summary = summarize_top_n(recent, ["a"], top_n=20)
+    assert summary[["nb_races_used", "nb_top_n", "top_n_rate"]].values.tolist() == [[3, 2, 2 / 3]]
+
+
+def test_top_n_summary_counts_tied_riders():
+    recent = pd.DataFrame({
+        "race_id": ["r1"] * 3, "rider_id": ["a", "b", "c"], "finish_rank": [3, 3, 4]
+    })
+    summary = summarize_top_n(recent, ["a", "b", "c"], top_n=3)
+    assert summary["nb_top_n"].tolist() == [1, 1, 0]
+
+
+def test_top_n_summary_of_a_rider_without_result_is_null():
+    recent = pd.DataFrame({"race_id": ["r1"], "rider_id": ["a"], "finish_rank": [1]})
+    summary = summarize_top_n(recent, ["z"], top_n=20)
+    assert summary[["nb_races_used", "nb_top_n", "top_n_rate"]].values.tolist() == [[0, 0, 0.0]]
+
+
+def test_top_n_summary_follows_the_order_of_rider_ids():
+    recent = pd.DataFrame({
+        "race_id": ["r1", "r1"], "rider_id": ["a", "b"], "finish_rank": [1, 2]
+    })
+    summary = summarize_top_n(recent, ["b", "z", "a"], top_n=20)
+    assert summary.columns.tolist() == RECENT_FORM_COLUMNS
+    assert summary["rider_id"].tolist() == ["b", "z", "a"]
+
+
+def test_top_n_summary_with_an_invalid_top_n_raises():
+    recent = pd.DataFrame({"race_id": ["r1"], "rider_id": ["a"], "finish_rank": [1]})
+    with pytest.raises(ValueError, match="top_n must be between 1 and 20, not 21"):
+        summarize_top_n(recent, ["a"], top_n=21)
 
 
 def test_regional_committee_id_of_a_known_region_and_raises_otherwise():

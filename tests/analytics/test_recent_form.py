@@ -5,7 +5,8 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from access_it.analytics.recent_form import COLUMNS, compute_recent_form
+from access_it.analytics.ranking_tools import RECENT_FORM_COLUMNS
+from access_it.analytics.recent_form import compute_recent_form
 
 REFERENCE_DATE = "2026-07-01"
 
@@ -81,7 +82,7 @@ def test_foreign_rider_is_kept_and_nobody_moves_up():
 def test_output_follows_the_order_of_rider_ids():
     races, rankings = make_tables([("r1", "2026-06-01", "a", 1), ("r1", "2026-06-01", "b", 2)])
     form = compute_recent_form(races, rankings, ["b", "z", "a"], REFERENCE_DATE)
-    assert form.columns.tolist() == COLUMNS
+    assert form.columns.tolist() == RECENT_FORM_COLUMNS
     assert form["rider_id"].tolist() == ["b", "z", "a"]
 
 

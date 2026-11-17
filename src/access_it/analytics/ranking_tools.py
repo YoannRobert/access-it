@@ -6,8 +6,9 @@ and check of the reference date, default reference date, ID of a regional
 committee, departements, races and clubs of a region, departement and
 regional committee of a club, category and club of a rider on the race date,
 results of a rider, check of a rider, check of an argument that must be at
-least 1, check of the arguments of the recent form, results used by the
-recent form, places in a race, wins and tops of the riders (or other groups),
+least 1, check of the top N, check of the arguments of the recent form,
+results used by the recent form, recent form of the riders from these
+results, places in a race, wins and tops of the riders (or other groups),
 points of a scale, ranking of the riders with its tie-breaks, shared rank of
 tied rows, filter on a category, labels of a category and of a club, checks
 of the race dates and start dates, checks of the category filter, of the
@@ -39,6 +40,7 @@ SEASON_STATS_COLUMNS = [
 RIDER_RESULT_COLUMNS = [
     "rider_id", "race_date", "season", "race_id", "title", "finish_rank", "category", "club"
 ]
+RECENT_FORM_COLUMNS = ["rider_id", "nb_races_used", "nb_top_n", "top_n_rate"]
 
 
 def to_datetime(s: pd.Series) -> pd.Series:
@@ -475,6 +477,19 @@ def check_at_least_one(value: int, name: str) -> None:
         raise ValueError(f"{name} must be at least 1, not {value}")
 
 
+def check_top_n(top_n: int) -> None:
+    """Check that the last finish rank counting as a top N is between 1 and MAX_TOP_N.
+
+    Args:
+        top_n: Last finish rank counting as a top N.
+
+    Raises:
+        ValueError: If top_n is not between 1 and MAX_TOP_N.
+    """
+    if not 1 <= top_n <= MAX_TOP_N:
+        raise ValueError(f"top_n must be between 1 and {MAX_TOP_N}, not {top_n}")
+
+
 def check_recent_form_arguments(top_n: int, last_races: int, window_months: int) -> None:
     """Check the arguments of the recent form.
 
@@ -487,8 +502,7 @@ def check_recent_form_arguments(top_n: int, last_races: int, window_months: int)
         ValueError: If top_n is not between 1 and MAX_TOP_N, then if
             last_races is lower than 1, then if window_months is lower than 1.
     """
-    if not 1 <= top_n <= MAX_TOP_N:
-        raise ValueError(f"top_n must be between 1 and {MAX_TOP_N}, not {top_n}")
+    check_top_n(top_n)
     if last_races < 1:
         raise ValueError(f"last_races must be at least 1, not {last_races}")
     if window_months < 1:
@@ -558,6 +572,45 @@ def select_recent_results(
         .head(last_races)
         .reset_index(drop=True)
     )
+
+
+def summarize_top_n(
+        recent: pd.DataFrame,
+        rider_ids: Sequence[str],
+        top_n: int
+    ) -> pd.DataFrame:
+    """Number of races, number of top N and share of top N of each rider in his recent results.
+
+    The rank is the absolute finish rank: a top N is finish_rank <= top_n, and
+    tied riders all count. A rider without result has 0 race, 0 top N and a
+    share of 0.
+
+    Args:
+        recent: Results kept by select_recent_results (race_id, rider_id and
+            finish_rank are used).
+        rider_ids: Riders to summarize, chosen by the caller.
+        top_n: Last finish rank counting as a top N, from 1 to MAX_TOP_N.
+
+    Returns:
+        One row per rider of rider_ids, in the same order, with the
+        RECENT_FORM_COLUMNS: rider_id, nb_races_used, nb_top_n and top_n_rate
+        (nb_top_n / nb_races_used, 0 for a rider without result).
+
+    Raises:
+        ValueError: If top_n is not between 1 and MAX_TOP_N.
+    """
+    check_top_n(top_n)
+    form = (
+        recent.assign(is_top_n=recent["finish_rank"] <= top_n)
+        .groupby("rider_id")
+        .agg(nb_races_used=("race_id", "size"), nb_top_n=("is_top_n", "sum"))
+        .reindex(rider_ids, fill_value=0)
+        .astype(int)
+        .rename_axis("rider_id")
+        .reset_index()
+    )
+    form["top_n_rate"] = (form["nb_top_n"] / form["nb_races_used"]).fillna(0.0)
+    return form[RECENT_FORM_COLUMNS]
 
 
 def check_category_filter(category_filter: str) -> None:

@@ -7,8 +7,9 @@ top 5, top 10 and top 20 probabilities). Rules:
   (races strictly before the reference date, window of window_months, last
   races of each rider, order of the races of the same day): see its
   docstring for the rules of the selection;
-- the rank is the absolute finish rank: a top N is finish_rank <= top_n, and
-  tied riders all count; foreign riders are kept, nobody moves up;
+- the tops are counted by summarize_top_n of ranking_tools: the rank is the
+  absolute finish rank, a top N is finish_rank <= top_n, and tied riders all
+  count; foreign riders are kept, nobody moves up;
 - top_n is between 1 and MAX_TOP_N (tops at most 20), last_races and
   window_months are at least 1 (checked by check_recent_form_arguments of
   ranking_tools).
@@ -22,9 +23,9 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from access_it.analytics.ranking_tools import check_recent_form_arguments, select_recent_results
-
-COLUMNS = ["rider_id", "nb_races_used", "nb_top_n", "top_n_rate"]
+from access_it.analytics.ranking_tools import (
+    check_recent_form_arguments, select_recent_results, summarize_top_n
+)
 
 
 def compute_recent_form(
@@ -65,14 +66,4 @@ def compute_recent_form(
     recent = select_recent_results(
         races, rankings, rider_ids, reference_date, last_races, window_months
     )
-    form = (
-        recent.assign(is_top_n=recent["finish_rank"] <= top_n)
-        .groupby("rider_id")
-        .agg(nb_races_used=("race_id", "size"), nb_top_n=("is_top_n", "sum"))
-        .reindex(rider_ids, fill_value=0)
-        .astype(int)
-        .rename_axis("rider_id")
-        .reset_index()
-    )
-    form["top_n_rate"] = (form["nb_top_n"] / form["nb_races_used"]).fillna(0.0)
-    return form[COLUMNS]
+    return summarize_top_n(recent, rider_ids, top_n)
