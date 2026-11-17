@@ -7,13 +7,12 @@ committee, departements, races and clubs of a region, departement and
 regional committee of a club, category and club of a rider on the race date,
 results of a rider, check of a rider, check of an argument that must be at
 least 1, check of the arguments of the recent form, results used by the
-recent form, places in a race, wins
-and tops of the riders (or other groups), points of a scale, ranking of the
-riders with its tie-breaks, shared rank of tied rows, filter on a category,
-labels of a category and of a club, checks of the race dates and start dates,
-checks of the category filter, of the requested categories and of the
-categories of the races, races having a requested category, and filter of the
-results on the categories.
+recent form, places in a race, wins and tops of the riders (or other groups),
+points of a scale, ranking of the riders with its tie-breaks, shared rank of
+tied rows, filter on a category, labels of a category and of a club, checks
+of the race dates and start dates, checks of the category filter, of the
+requested categories and of the categories of the races, races having a
+requested category, and filter of the results on the categories.
 """
 
 from collections.abc import Sequence

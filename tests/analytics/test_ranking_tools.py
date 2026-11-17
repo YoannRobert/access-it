@@ -178,7 +178,9 @@ def test_recent_results_keep_the_last_races_of_each_rider():
         "finish_rank": [1, 2, 3, 4],
     })
     recent = select_recent_results(races, rankings, ["a", "b"], "2026-07-01", last_races=2)
-    assert recent[["race_id", "rider_id"]].values.tolist() == [["r3", "a"], ["r2", "a"], ["r1", "b"]]
+    assert recent[["race_id", "rider_id"]].values.tolist() == [
+        ["r3", "a"], ["r2", "a"], ["r1", "b"]
+    ]
 
 
 def test_recent_results_of_the_same_day_keep_the_best_place_first_then_race_id():
@@ -195,14 +197,18 @@ def test_recent_results_of_the_same_day_keep_the_best_place_first_then_race_id()
 
 def test_recent_results_only_of_the_requested_riders():
     races = pd.DataFrame({"race_id": ["r1"], "race_date": ["2026-06-01"]})
-    rankings = pd.DataFrame({"race_id": ["r1", "r1"], "rider_id": ["a", "b"], "finish_rank": [1, 2]})
+    rankings = pd.DataFrame({
+        "race_id": ["r1", "r1"], "rider_id": ["a", "b"], "finish_rank": [1, 2]
+    })
     recent = select_recent_results(races, rankings, ["b", "z"], "2026-07-01")
     assert recent["rider_id"].tolist() == ["b"]
 
 
 def test_recent_results_columns_and_index_reset():
     races = pd.DataFrame({"race_id": ["r1", "r2"], "race_date": ["2026-06-01", "2026-06-02"]})
-    rankings = pd.DataFrame({"race_id": ["r1", "r2"], "rider_id": ["a", "a"], "finish_rank": [1, 2]})
+    rankings = pd.DataFrame({
+        "race_id": ["r1", "r2"], "rider_id": ["a", "a"], "finish_rank": [1, 2]
+    })
     recent = select_recent_results(races, rankings, ["a"], "2026-07-01")
     assert recent.columns.tolist() == ["race_id", "rider_id", "finish_rank", "race_date"]
     assert recent.index.tolist() == [0, 1]
