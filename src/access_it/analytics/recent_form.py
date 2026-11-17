@@ -3,18 +3,12 @@
 Shown in the dashboard, then reused as a feature of the models (win, podium,
 top 5, top 10 and top 20 probabilities). Rules:
 
-- only the races strictly before the reference date count, so that no
-  future result leaks into a feature; the reference date is brought back to
-  its day, and checked, by to_day of ranking_tools;
-- the races of the window count, from reference_date minus window_months
-  (included); for each rider, his last_races most recent ones are used; two
-  races of the same day are ordered by finish rank (best place kept first),
-  then by race_id;
-- every race counts, whatever its number of ranked riders;
+- the results used are selected by select_recent_results of ranking_tools
+  (races strictly before the reference date, window of window_months, last
+  races of each rider, order of the races of the same day): see its
+  docstring for the rules of the selection;
 - the rank is the absolute finish rank: a top N is finish_rank <= top_n, and
   tied riders all count; foreign riders are kept, nobody moves up;
-- a race where the rider is not ranked (did not finish or start) is absent
-  from the rankings, so it is not counted;
 - top_n is between 1 and MAX_TOP_N (tops at most 20), last_races and
   window_months are at least 1 (checked by check_recent_form_arguments of
   ranking_tools).
@@ -28,7 +22,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from access_it.analytics.ranking_tools import check_recent_form_arguments, to_datetime, to_day
+from access_it.analytics.ranking_tools import check_recent_form_arguments, select_recent_results
 
 COLUMNS = ["rider_id", "nb_races_used", "nb_top_n", "top_n_rate"]
 
@@ -68,22 +62,8 @@ def compute_recent_form(
             then if the reference date is missing.
     """
     check_recent_form_arguments(top_n, last_races, window_months)
-    end = to_day(reference_date)
-    start = end - pd.DateOffset(months=window_months)
-    race_dates = races[["race_id", "race_date"]].assign(
-        race_date=lambda df: to_datetime(df["race_date"])
-    )
-    results = rankings[["race_id", "rider_id", "finish_rank"]].merge(race_dates, on="race_id")
-    in_window = (
-        results["rider_id"].isin(rider_ids)
-        & (results["race_date"] >= start)
-        & (results["race_date"] < end)
-    )
-    recent = (
-        results[in_window]
-        .sort_values(["race_date", "finish_rank", "race_id"], ascending=[False, True, False])
-        .groupby("rider_id")
-        .head(last_races)
+    recent = select_recent_results(
+        races, rankings, rider_ids, reference_date, last_races, window_months
     )
     form = (
         recent.assign(is_top_n=recent["finish_rank"] <= top_n)

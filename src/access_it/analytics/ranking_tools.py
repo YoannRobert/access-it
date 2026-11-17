@@ -6,7 +6,8 @@ and check of the reference date, default reference date, ID of a regional
 committee, departements, races and clubs of a region, departement and
 regional committee of a club, category and club of a rider on the race date,
 results of a rider, check of a rider, check of an argument that must be at
-least 1, check of the arguments of the recent form, places in a race, wins
+least 1, check of the arguments of the recent form, results used by the
+recent form, places in a race, wins
 and tops of the riders (or other groups), points of a scale, ranking of the
 riders with its tie-breaks, shared rank of tied rows, filter on a category,
 labels of a category and of a club, checks of the race dates and start dates,
@@ -493,6 +494,71 @@ def check_recent_form_arguments(top_n: int, last_races: int, window_months: int)
         raise ValueError(f"last_races must be at least 1, not {last_races}")
     if window_months < 1:
         raise ValueError(f"window_months must be at least 1, not {window_months}")
+
+
+def select_recent_results(
+        races: pd.DataFrame,
+        rankings: pd.DataFrame,
+        rider_ids: Sequence[str],
+        reference_date: str | pd.Timestamp,
+        last_races: int = 10,
+        window_months: int = 6
+    ) -> pd.DataFrame:
+    """Results of the riders in their last races before a date, used by the recent form.
+
+    Rules:
+
+    - only the races strictly before the reference date count, so that no
+      future result leaks into a feature; the reference date is brought back
+      to its day, and checked, by to_day;
+    - the races of the window count, from reference_date minus window_months
+      (included); for each rider, his last_races most recent ones are kept;
+      two races of the same day are ordered by finish rank (best place kept
+      first), then by race_id;
+    - every race counts, whatever its number of ranked riders;
+    - a race where the rider is not ranked (did not finish or start) is
+      absent from the rankings, so it is not kept.
+
+    Args:
+        races: Race table.
+        rankings: Ranking table.
+        rider_ids: Riders to select, chosen by the caller.
+        reference_date: Day of the forecast, as "YYYY-MM-DD" or a date (the
+            time of day is ignored); its races are excluded.
+        last_races: Maximum number of races kept per rider, at least 1.
+        window_months: Length of the window before the reference date, at
+            least 1.
+
+    Returns:
+        One row per result kept: race_id, rider_id, finish_rank and
+        race_date (datetime64[ns]), from the most recent race to the oldest
+        one (same day: best finish rank first, then race_id in descending
+        order), with the index reset.
+
+    Raises:
+        ValueError: If last_races is lower than 1, then if window_months is
+            lower than 1, then if the reference date is missing.
+    """
+    check_at_least_one(last_races, "last_races")
+    check_at_least_one(window_months, "window_months")
+    end = to_day(reference_date)
+    start = end - pd.DateOffset(months=window_months)
+    race_dates = races[["race_id", "race_date"]].assign(
+        race_date=lambda df: to_datetime(df["race_date"])
+    )
+    results = rankings[["race_id", "rider_id", "finish_rank"]].merge(race_dates, on="race_id")
+    in_window = (
+        results["rider_id"].isin(rider_ids)
+        & (results["race_date"] >= start)
+        & (results["race_date"] < end)
+    )
+    return (
+        results[in_window]
+        .sort_values(["race_date", "finish_rank", "race_id"], ascending=[False, True, False])
+        .groupby("rider_id")
+        .head(last_races)
+        .reset_index(drop=True)
+    )
 
 
 def check_category_filter(category_filter: str) -> None:

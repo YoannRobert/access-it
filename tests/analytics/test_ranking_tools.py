@@ -15,7 +15,7 @@ from access_it.analytics.ranking_tools import (
     format_category, format_club, get_reference_date, get_region_club_ids,
     get_region_departement_codes, get_region_races, get_regional_committee_id,
     get_rider_results, has_requested_category, rank_scoring_riders, scale_points,
-    select_category, select_club, to_datetime, to_day
+    select_category, select_club, select_recent_results, to_datetime, to_day
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
@@ -154,6 +154,84 @@ def test_check_recent_form_arguments_raises(kwargs, message):
 def test_check_recent_form_arguments_raises_in_order(kwargs, message):
     with pytest.raises(ValueError, match=message):
         check_recent_form_arguments(**{**VALID_RECENT_FORM_ARGUMENTS, **kwargs})
+
+
+def test_recent_results_in_the_window_and_strictly_before_the_reference_date():
+    races = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3", "r4"],
+        "race_date": ["2025-12-31", "2026-01-01", "2026-06-30", "2026-07-01"],
+    })
+    rankings = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3", "r4"], "rider_id": ["a"] * 4, "finish_rank": [1, 2, 3, 4]
+    })
+    recent = select_recent_results(races, rankings, ["a"], pd.Timestamp("2026-07-01 18:00"))
+    assert recent["race_id"].tolist() == ["r3", "r2"]
+
+
+def test_recent_results_keep_the_last_races_of_each_rider():
+    races = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3"], "race_date": ["2026-06-01", "2026-06-02", "2026-06-03"]
+    })
+    rankings = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3", "r1"],
+        "rider_id": ["a", "a", "a", "b"],
+        "finish_rank": [1, 2, 3, 4],
+    })
+    recent = select_recent_results(races, rankings, ["a", "b"], "2026-07-01", last_races=2)
+    assert recent[["race_id", "rider_id"]].values.tolist() == [["r3", "a"], ["r2", "a"], ["r1", "b"]]
+
+
+def test_recent_results_of_the_same_day_keep_the_best_place_first_then_race_id():
+    races = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3", "r4"],
+        "race_date": ["2026-06-01", "2026-06-01", "2026-06-01", "2026-06-02"],
+    })
+    rankings = pd.DataFrame({
+        "race_id": ["r1", "r2", "r3", "r4"], "rider_id": ["a"] * 4, "finish_rank": [5, 5, 1, 9]
+    })
+    recent = select_recent_results(races, rankings, ["a"], "2026-07-01", last_races=3)
+    assert recent["race_id"].tolist() == ["r4", "r3", "r2"]
+
+
+def test_recent_results_only_of_the_requested_riders():
+    races = pd.DataFrame({"race_id": ["r1"], "race_date": ["2026-06-01"]})
+    rankings = pd.DataFrame({"race_id": ["r1", "r1"], "rider_id": ["a", "b"], "finish_rank": [1, 2]})
+    recent = select_recent_results(races, rankings, ["b", "z"], "2026-07-01")
+    assert recent["rider_id"].tolist() == ["b"]
+
+
+def test_recent_results_columns_and_index_reset():
+    races = pd.DataFrame({"race_id": ["r1", "r2"], "race_date": ["2026-06-01", "2026-06-02"]})
+    rankings = pd.DataFrame({"race_id": ["r1", "r2"], "rider_id": ["a", "a"], "finish_rank": [1, 2]})
+    recent = select_recent_results(races, rankings, ["a"], "2026-07-01")
+    assert recent.columns.tolist() == ["race_id", "rider_id", "finish_rank", "race_date"]
+    assert recent.index.tolist() == [0, 1]
+    assert recent["race_date"].dtype == "datetime64[ns]"
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"last_races": 0}, "last_races must be at least 1, not 0"),
+    ({"window_months": 0}, "window_months must be at least 1, not 0"),
+    ({"reference_date": None}, "Missing reference date: None"),
+])
+def test_recent_results_raise(kwargs, message):
+    races = pd.DataFrame({"race_id": ["r1"], "race_date": ["2026-06-01"]})
+    rankings = pd.DataFrame({"race_id": ["r1"], "rider_id": ["a"], "finish_rank": [1]})
+    kwargs = {"reference_date": "2026-07-01", **kwargs}
+    with pytest.raises(ValueError, match=message):
+        select_recent_results(races, rankings, ["a"], **kwargs)
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"last_races": 0, "window_months": 0}, "last_races must be at least 1"),
+    ({"window_months": 0, "reference_date": None}, "window_months must be at least 1"),
+])
+def test_recent_results_raise_in_order(kwargs, message):
+    races = pd.DataFrame({"race_id": ["r1"], "race_date": ["2026-06-01"]})
+    rankings = pd.DataFrame({"race_id": ["r1"], "rider_id": ["a"], "finish_rank": [1]})
+    kwargs = {"reference_date": "2026-07-01", **kwargs}
+    with pytest.raises(ValueError, match=message):
+        select_recent_results(races, rankings, ["a"], **kwargs)
 
 
 def test_regional_committee_id_of_a_known_region_and_raises_otherwise():
