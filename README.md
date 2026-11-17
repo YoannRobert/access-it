@@ -5,8 +5,8 @@ de la catégorie **Access** (Access 1 à Access 4, Fédération française de cy
 pour les régions **Bretagne** et **Pays de la Loire**.
 
 Le projet couvre toute la chaîne d'un projet de données : collecte (scraping et API),
-ETL, base de données et tableau de bord, puis, à venir, analyse exploratoire, modèles de
-machine learning et API.
+ETL exécuté automatiquement, base de données et tableau de bord, puis, à venir, analyse
+exploratoire, modèles de machine learning et API.
 
 ## État d'avancement
 
@@ -14,7 +14,7 @@ machine learning et API.
 |---|---|
 | Collecte des données et ETL (extract, transform, load) | fonctionnel |
 | Base PostgreSQL et snapshots S3 | fonctionnel |
-| Exécution programmée de l'ETL | à venir |
+| Exécution programmée de l'ETL (GitHub Actions, lundi, mercredi et vendredi soir) | fonctionnel |
 | Analyse exploratoire et modèles (scikit-learn, XGBoost, MLflow) | à venir |
 | Tableau de bord (Streamlit) sur Hugging Face Spaces | fonctionnel ([ouvrir le tableau de bord](https://yoannrobert-access-it.hf.space/)) |
 | API (FastAPI) | à venir |
@@ -32,7 +32,14 @@ flowchart LR
     P --> L[Load<br/>contrôles puis écriture]
     L --> DB[(PostgreSQL)]
     DB --> S[Export] --> S3[(Snapshots S3)]
+    AR[(Archives du cache S3)] -- récupération --> C
+    C -- envoi --> AR
 ```
+
+L'ETL complet (`scripts/etl.py`) récupère d'abord les pages du cache archivées sur S3, puis
+enchaîne l'extract, le transform et le load, renvoie le cache sur S3 et exporte un snapshot
+de la base. Il s'exécute automatiquement sur GitHub Actions les lundis, mercredis et
+vendredis, le soir.
 
 ### Sources
 
@@ -109,11 +116,11 @@ versionné). Toutes sont obligatoires.
 | Variable | Rôle |
 |---|---|
 | `DATABASE_URL` | URL SQLAlchemy de la base PostgreSQL (`postgresql+psycopg://...`) |
-| `AWS_ENDPOINT_URL_S3` | adresse du stockage S3 des snapshots |
+| `AWS_ENDPOINT_URL_S3` | adresse du stockage S3 des snapshots et des archives du cache |
 | `AWS_ACCESS_KEY_ID` | clé d'accès du stockage S3 |
 | `AWS_SECRET_ACCESS_KEY` | clé secrète du stockage S3 |
 | `AWS_REGION` | région du stockage S3 |
-| `S3_BUCKET` | bucket des snapshots |
+| `S3_BUCKET` | bucket des snapshots et des archives du cache |
 | `STARTLISTS_URL` | adresse du site des listes d'engagés |
 | `SQL_INFO` | facultative : `true` pour afficher les requêtes SQL |
 | `ACCESS_IT_CACHE` | facultative : dossier du cache (par défaut `~/.access-it/cache`) |
@@ -148,8 +155,9 @@ Toutes les commandes se lancent depuis la racine du dépôt.
 
 Ne lancez pas le load après un extract seul : l'extract remplace les fichiers Parquet des
 clubs et des référentiels, que seul le transform complète. La
-[procédure d'exploitation](docs/exploitation.md) décrit les messages de l'ETL, les contrôles
-bloquants, le nettoyage de la base et l'exploitation du tableau de bord.
+[procédure d'exploitation](docs/exploitation.md) décrit l'exécution sur GitHub Actions, les
+messages de l'ETL, les contrôles bloquants, le nettoyage de la base et l'exploitation du
+tableau de bord.
 
 Pour le développement du tableau de bord, la commande suivante monte son code dans le
 conteneur et recharge la page à chaque modification :
