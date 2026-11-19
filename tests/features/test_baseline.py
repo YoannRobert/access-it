@@ -8,26 +8,14 @@ from access_it.features.baseline import COLUMNS, rank_by_recent_form
 FIRST_RACE_DATE = "2023-04-01"
 
 
-def make_tables(results: list[tuple]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Race and ranking tables from (race_id, race_date, rider_id, finish_rank) tuples."""
-    df = pd.DataFrame(results, columns=["race_id", "race_date", "rider_id", "finish_rank"])
-    races = df[["race_id", "race_date"]].drop_duplicates().assign(
-        season=lambda d: pd.to_datetime(d["race_date"]).dt.year
-    )
-    return races, df[["race_id", "rider_id", "finish_rank"]]
-
-
-def forecast_of(results: list[tuple], **kwargs) -> pd.DataFrame:
+@pytest.fixture
+def forecast_of(make_tables):
     """Baseline from FIRST_RACE_DATE to the season 2026 (unless given in kwargs)."""
-    races, rankings = make_tables(results)
-    kwargs = {"last_season": 2026, "first_race_date": FIRST_RACE_DATE, **kwargs}
-    return rank_by_recent_form(races, rankings, **kwargs)
-
-
-def with_undated_race(races: pd.DataFrame) -> pd.DataFrame:
-    """Race table with a race of 2023 without date added."""
-    undated = pd.DataFrame({"race_id": ["r0"], "race_date": [None], "season": [2023]})
-    return pd.concat([races, undated], ignore_index=True)
+    def compute(results: list[tuple], **kwargs) -> pd.DataFrame:
+        races, rankings = make_tables(results)
+        kwargs = {"last_season": 2026, "first_race_date": FIRST_RACE_DATE, **kwargs}
+        return rank_by_recent_form(races, rankings, **kwargs)
+    return compute
 
 
 def ranked_riders(forecast: pd.DataFrame, race_id: str) -> list[str]:
@@ -35,7 +23,7 @@ def ranked_riders(forecast: pd.DataFrame, race_id: str) -> list[str]:
     return forecast.loc[forecast["race_id"] == race_id, "rider_id"].tolist()
 
 
-def test_races_forecast_from_the_first_race_date_to_the_last_season():
+def test_races_forecast_from_the_first_race_date_to_the_last_season(forecast_of):
     forecast = forecast_of(
         [
             ("r1", "2023-03-31", "a", 1), ("r2", "2023-04-01", "a", 1),
@@ -46,7 +34,7 @@ def test_races_forecast_from_the_first_race_date_to_the_last_season():
     assert forecast["race_id"].tolist() == ["r2", "r3"]
 
 
-def test_start_list_is_made_of_the_ranked_riders():
+def test_start_list_is_made_of_the_ranked_riders(forecast_of):
     forecast = forecast_of([
         ("r1", "2023-03-01", "a", 1), ("r1", "2023-03-01", "b", 2),
         ("r2", "2023-05-01", "b", 1), ("r2", "2023-05-01", "c", 2),
@@ -54,7 +42,7 @@ def test_start_list_is_made_of_the_ranked_riders():
     assert ranked_riders(forecast, "r2") == ["b", "c"]
 
 
-def test_recent_form_is_computed_on_the_eve_of_the_race():
+def test_recent_form_is_computed_on_the_eve_of_the_race(forecast_of):
     forecast = forecast_of([
         ("r1", "2023-05-01", "a", 30), ("r2", "2023-05-01", "a", 1),
         ("r3", "2023-05-02", "a", 1),
@@ -63,7 +51,7 @@ def test_recent_form_is_computed_on_the_eve_of_the_race():
     assert forecast.loc[forecast["race_id"] == "r3", "nb_races_used"].tolist() == [2]
 
 
-def test_riders_ranked_by_share_of_top_n():
+def test_riders_ranked_by_share_of_top_n(forecast_of):
     forecast = forecast_of([
         ("r1", "2023-03-01", "a", 30), ("r1", "2023-03-01", "b", 1),
         ("r2", "2023-05-01", "a", 1), ("r2", "2023-05-01", "b", 2),
@@ -71,7 +59,7 @@ def test_riders_ranked_by_share_of_top_n():
     assert ranked_riders(forecast, "r2") == ["b", "a"]
 
 
-def test_tie_broken_by_the_best_places_one_after_the_other():
+def test_tie_broken_by_the_best_places_one_after_the_other(forecast_of):
     forecast = forecast_of([
         ("r1", "2023-03-01", "a", 12), ("r1", "2023-03-01", "b", 8),
         ("r2", "2023-03-02", "a", 8), ("r2", "2023-03-02", "b", 12),
@@ -81,7 +69,7 @@ def test_tie_broken_by_the_best_places_one_after_the_other():
     assert ranked_riders(forecast, "r4") == ["b", "a"]
 
 
-def test_missing_place_is_worse_than_any_place():
+def test_missing_place_is_worse_than_any_place(forecast_of):
     forecast = forecast_of([
         ("r1", "2023-03-01", "a", 50), ("r1", "2023-03-01", "b", 50),
         ("r2", "2023-03-02", "b", 90),
@@ -90,7 +78,7 @@ def test_missing_place_is_worse_than_any_place():
     assert ranked_riders(forecast, "r3") == ["b", "a"]
 
 
-def test_last_tie_broken_by_rider_id_with_a_unique_rank():
+def test_last_tie_broken_by_rider_id_with_a_unique_rank(forecast_of):
     forecast = forecast_of([
         ("r1", "2023-03-01", "b", 5), ("r1", "2023-03-01", "a", 5),
         ("r2", "2023-05-01", "b", 1), ("r2", "2023-05-01", "a", 2),
@@ -99,13 +87,13 @@ def test_last_tie_broken_by_rider_id_with_a_unique_rank():
     assert forecast["predicted_rank"].tolist() == [1, 2]
 
 
-def test_race_without_recent_form_is_kept_and_ranked_by_rider_id():
+def test_race_without_recent_form_is_kept_and_ranked_by_rider_id(forecast_of):
     forecast = forecast_of([("r1", "2023-05-01", "b", 1), ("r1", "2023-05-01", "a", 2)])
     assert ranked_riders(forecast, "r1") == ["a", "b"]
     assert forecast["nb_races_used"].tolist() == [0, 0]
 
 
-def test_output_columns_order_and_index():
+def test_output_columns_order_and_index(forecast_of):
     forecast = forecast_of([
         ("r2", "2023-05-01", "a", 2), ("r2", "2023-05-01", "b", 1),
         ("r1", "2023-05-01", "a", 1), ("r3", "2023-04-15", "c", 1),
@@ -129,12 +117,12 @@ def test_output_columns_order_and_index():
     ({"first_race_date": "2027-04-01"}, "First race date 2027-04-01 is not in the seasons"),
     ({"first_race_date": "2023-06-01"}, "No race to forecast from 2023-06-01 to the season 2026"),
 ])
-def test_invalid_arguments_raise(kwargs, message):
+def test_invalid_arguments_raise(kwargs, message, forecast_of):
     with pytest.raises(ValueError, match=message):
         forecast_of([("r1", "2023-05-01", "a", 1)], **kwargs)
 
 
-def test_missing_race_date_raises():
+def test_missing_race_date_raises(make_tables, with_undated_race):
     races, rankings = make_tables([("r1", "2023-05-01", "a", 1)])
     with pytest.raises(ValueError, match="Missing race dates"):
         rank_by_recent_form(with_undated_race(races), rankings, 2026, FIRST_RACE_DATE)
@@ -147,7 +135,7 @@ def test_missing_race_date_raises():
     (True, {"first_race_date": "2027-04-01"}, "First race date 2027-04-01 is not in"),
     (True, {"first_race_date": "2023-06-01"}, "Missing race dates"),
 ])
-def test_errors_raise_in_order(undated, kwargs, message):
+def test_errors_raise_in_order(undated, kwargs, message, make_tables, with_undated_race):
     races, rankings = make_tables([("r1", "2023-05-01", "a", 1)])
     if undated:
         races = with_undated_race(races)

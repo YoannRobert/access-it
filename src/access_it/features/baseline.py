@@ -2,12 +2,10 @@
 
 Each past race is forecast with the results of the previous days only. Rules:
 
-- the races forecast are those of the seasons FIRST_SEASON to last_season
-  held from first_race_date on, with at least one ranked rider; the races
-  before first_race_date are not forecast, but their results count in the
-  recent form of the next races;
-- the start list of a race is made of its ranked riders (riders who did not
-  finish are absent, an accepted limit);
+- the races forecast and their start lists (their ranked riders) are
+  selected by select_forecast_entries of the entries module (see its
+  docstring); the races before first_race_date are not forecast, but their
+  results count in the recent form of the next races;
 - the recent form of a rider is computed on the eve of the race: the results
   are selected by select_recent_results of ranking_tools with the race date
   as reference date (its races are excluded), and the tops are counted by
@@ -28,10 +26,9 @@ The computation is free of any Streamlit dependency.
 import pandas as pd
 
 from access_it.analytics.ranking_tools import (
-    check_race_dates, check_recent_form_arguments, select_recent_results, summarize_top_n,
-    to_datetime, to_day
+    check_recent_form_arguments, select_recent_results, summarize_top_n
 )
-from access_it.common.seasons import FIRST_SEASON, check_season
+from access_it.features.entries import select_forecast_entries
 
 COLUMNS = [
     "race_id", "race_date", "rider_id", "finish_rank",
@@ -81,24 +78,7 @@ def rank_by_recent_form(
             first_race_date to the end of last_season.
     """
     check_recent_form_arguments(top_n, last_races, window_months)
-    check_season(last_season)
-    first_day = to_day(first_race_date, "first race date")
-    if not FIRST_SEASON <= first_day.year <= last_season:
-        raise ValueError(
-            f"First race date {first_day.date()} is not in the seasons "
-            f"{FIRST_SEASON} to {last_season}"
-        )
-    season_races = races.loc[
-        races["season"].between(FIRST_SEASON, last_season), ["race_id", "race_date"]
-    ].assign(race_date=lambda df: to_datetime(df["race_date"]))
-    check_race_dates(season_races["race_date"])
-    entries = season_races[season_races["race_date"] >= first_day].merge(
-        rankings[["race_id", "rider_id", "finish_rank"]], on="race_id"
-    )
-    if entries.empty:
-        raise ValueError(
-            f"No race to forecast from {first_day.date()} to the season {last_season}"
-        )
+    entries = select_forecast_entries(races, rankings, last_season, first_race_date)
     place_columns = [f"place_{i}" for i in range(1, last_races + 1)]
     forecasts = []
     for race_date, day_entries in entries.groupby("race_date"):
