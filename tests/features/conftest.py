@@ -25,3 +25,11 @@ def with_undated_race() -> Callable[[pd.DataFrame], pd.DataFrame]:
         undated = pd.DataFrame({"race_id": ["r0"], "race_date": [None], "season": [2023]})
         return pd.concat([races, undated], ignore_index=True)
     return add
+
+
+@pytest.fixture
+def make_entries() -> Callable[[list[tuple]], pd.DataFrame]:
+    """Builder of a table of entries from (race_id, race_date, rider_id)."""
+    def build(entries: list[tuple]) -> pd.DataFrame:
+        return pd.DataFrame(entries, columns=["race_id", "race_date", "rider_id"])
+    return build

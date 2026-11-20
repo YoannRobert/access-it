@@ -3,7 +3,10 @@
 import pandas as pd
 import pytest
 
-from access_it.features.ratings import COLUMNS, rate_riders_on_race_eve
+from access_it.features.entries import select_forecast_entries
+from access_it.features.ratings import (
+    COLUMNS, check_rating_arguments, rate_entries_on_race_eve, rate_riders_on_race_eve
+)
 
 FIRST_RACE_DATE = "2023-04-01"
 
@@ -144,3 +147,107 @@ def test_errors_raise_in_order(undated, kwargs, message, make_tables, with_undat
     kwargs = {"last_season": 2026, "first_race_date": FIRST_RACE_DATE, **kwargs}
     with pytest.raises(ValueError, match=message):
         rate_riders_on_race_eve(races, rankings, **kwargs)
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"sigma": 0.0}, "sigma must be greater than 0, not 0.0"),
+    ({"beta": -1.0}, "beta must be greater than 0, not -1.0"),
+    ({"tau": -0.1}, "tau must not be negative, not -0.1"),
+    ({"sigma_growth_per_day": -1.0}, "sigma_growth_per_day must not be negative, not -1.0"),
+    ({"tau": 0.0, "sigma_growth_per_day": 0.0}, None),
+])
+def test_invalid_rating_arguments_raise(kwargs, message):
+    kwargs = {
+        "sigma": 25 / 3, "beta": 25 / 6, "tau": 25 / 300, "sigma_growth_per_day": 0.0, **kwargs
+    }
+    if message is None:
+        check_rating_arguments(**kwargs)
+    else:
+        with pytest.raises(ValueError, match=message):
+            check_rating_arguments(**kwargs)
+
+
+def test_entries_of_past_races_give_the_ratings_of_the_ranked_riders(make_tables):
+    races, rankings = make_tables([
+        ("r1", "2023-03-01", "a", 1), ("r1", "2023-03-01", "b", 2),
+        ("r2", "2023-04-15", "b", 1), ("r2", "2023-04-15", "a", 2), ("r2", "2023-04-15", "c", 3),
+        ("r3", "2023-05-01", "c", 1), ("r3", "2023-05-01", "a", 2),
+    ])
+    entries = select_forecast_entries(races, rankings, 2026, FIRST_RACE_DATE)
+    pd.testing.assert_frame_equal(
+        rate_entries_on_race_eve(races, rankings, entries)[COLUMNS],
+        rate_riders_on_race_eve(races, rankings, 2026, FIRST_RACE_DATE),
+    )
+
+
+def test_entry_of_a_coming_race_gets_the_rating_on_its_eve(make_tables, make_entries):
+    races, rankings = make_tables([("r1", "2023-05-01", "a", 1), ("r1", "2023-05-01", "b", 2)])
+    ratings = rate_entries_on_race_eve(
+        races, rankings, make_entries([("f1", "2023-06-01", "a"), ("f1", "2023-06-01", "z")])
+    )
+    assert rating_of(ratings, "f1", "a")[0] > 25.0
+    assert rating_of(ratings, "f1", "z") == (25.0, 25 / 3)
+
+
+def test_output_keeps_the_columns_of_the_entries(make_tables, make_entries):
+    races, rankings = make_tables([("r1", "2023-05-01", "a", 1), ("r1", "2023-05-01", "b", 2)])
+    entries = make_entries([
+        ("f2", "2023-06-01", "b"), ("f1", "2023-06-01", "b"), ("f1", "2023-06-01", "a"),
+    ]).assign(category="A1")
+    ratings = rate_entries_on_race_eve(races, rankings, entries)
+    assert ratings.columns.tolist() == [
+        "race_id", "race_date", "rider_id", "category", "mu", "sigma"
+    ]
+    assert ratings[["race_id", "rider_id"]].values.tolist() == [
+        ["f1", "a"], ["f1", "b"], ["f2", "b"]
+    ]
+    assert ratings.index.tolist() == [0, 1, 2]
+    assert ratings["race_date"].dtype == "datetime64[ns]"
+
+
+def test_entry_without_result_does_not_count_as_a_last_race(make_tables, make_entries):
+    races, rankings = make_tables([
+        ("r1", "2023-03-01", "a", 1), ("r1", "2023-03-01", "b", 2),
+        ("r2", "2023-05-01", "a", 1), ("r2", "2023-05-01", "b", 2),
+    ])
+    entries = make_entries([("r2", "2023-05-01", "a"), ("r2", "2023-05-01", "b")])
+    with_unranked_entry = pd.concat(
+        [entries, make_entries([("f1", "2023-04-01", "a")])], ignore_index=True
+    )
+    sigma_without = rating_of(
+        rate_entries_on_race_eve(races, rankings, entries, sigma_growth_per_day=0.01), "r2", "a"
+    )[1]
+    sigma_with = rating_of(
+        rate_entries_on_race_eve(races, rankings, with_unranked_entry, sigma_growth_per_day=0.01),
+        "r2", "a"
+    )[1]
+    assert sigma_with == sigma_without
+
+
+def test_race_dates_checked_up_to_the_season_of_the_last_entry(
+        make_tables, make_entries, with_undated_race
+    ):
+    races, rankings = make_tables([("r1", "2023-05-01", "a", 1), ("r1", "2023-05-01", "b", 2)])
+    entries = make_entries([("f1", "2023-06-01", "a")])
+    with pytest.raises(ValueError, match="Missing race dates in the results"):
+        rate_entries_on_race_eve(with_undated_race(races), rankings, entries)
+    undated_2025 = pd.DataFrame({"race_id": ["r0"], "race_date": [None], "season": [2025]})
+    rate_entries_on_race_eve(pd.concat([races, undated_2025], ignore_index=True), rankings, entries)
+
+
+@pytest.mark.parametrize("rows, undated, kwargs, message", [
+    ([], False, {"sigma": 0.0}, "sigma must be greater than 0"),
+    ([], True, {}, "No entries"),
+    (
+        [("f1", "2023-06-01", "a"), ("f1", "2023-06-01", "a")], True, {},
+        "Riders entered twice in a race",
+    ),
+])
+def test_entry_errors_raise_in_order(
+        rows, undated, kwargs, message, make_tables, make_entries, with_undated_race
+    ):
+    races, rankings = make_tables([("r1", "2023-05-01", "a", 1)])
+    if undated:
+        races = with_undated_race(races)
+    with pytest.raises(ValueError, match=message):
+        rate_entries_on_race_eve(races, rankings, make_entries(rows), **kwargs)

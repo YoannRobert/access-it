@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from access_it.features.entries import COLUMNS, select_forecast_entries
+from access_it.features.entries import COLUMNS, check_entries, select_forecast_entries
 
 FIRST_RACE_DATE = "2023-04-01"
 
@@ -75,3 +75,31 @@ def test_errors_raise_in_order(undated, kwargs, message, make_tables, with_undat
     kwargs = {"last_season": 2026, "first_race_date": FIRST_RACE_DATE, **kwargs}
     with pytest.raises(ValueError, match=message):
         select_forecast_entries(races, rankings, **kwargs)
+
+
+def test_valid_entries_pass(make_entries):
+    entries = make_entries([("r1", "2026-05-01", "a"), ("r1", "2026-05-01", "b")])
+    check_entries(entries.assign(category="A1"))
+
+
+@pytest.mark.parametrize("rows, message", [
+    ([], "No entries"),
+    ([("r1", None, "a"), ("r1", "2026-05-01", "b")], "Missing race dates in the entries"),
+    (
+        [
+            ("r2", "2026-05-01", "b"), ("r2", "2026-05-01", "b"),
+            ("r1", "2026-05-01", "a"), ("r1", "2026-05-01", "a"), ("r1", "2026-05-01", "a"),
+            ("r1", "2026-05-01", "c"),
+        ],
+        r"Riders entered twice in a race: \[\('r1', 'a'\), \('r2', 'b'\)\]",
+    ),
+])
+def test_invalid_entries_raise(rows, message, make_entries):
+    with pytest.raises(ValueError, match=message):
+        check_entries(make_entries(rows))
+
+
+def test_missing_race_date_raises_before_duplicates(make_entries):
+    entries = make_entries([("r1", None, "a"), ("r1", None, "a")])
+    with pytest.raises(ValueError, match="Missing race dates in the entries"):
+        check_entries(entries)

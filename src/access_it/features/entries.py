@@ -10,6 +10,11 @@ same start lists, so that their evaluations can be compared. Rules:
 - the arguments are checked first, then the race dates of these seasons, then
   the presence of a race to forecast.
 
+A table of entries given by the caller (the ranked riders of past races, or
+the riders entered in coming races) is checked by check_entries: it must not
+be empty, every race date must be given, and a rider must not be entered twice
+in a race.
+
 The computation is free of any Streamlit dependency.
 """
 
@@ -70,3 +75,28 @@ def select_forecast_entries(
             f"No race to forecast from {first_day.date()} to the season {last_season}"
         )
     return entries[COLUMNS]
+
+
+def check_entries(entries: pd.DataFrame) -> None:
+    """Check a table of entries given to a forecast method.
+
+    See the module docstring for the rules.
+
+    Args:
+        entries: One row per race and rider entered, with race_id, race_date
+            and rider_id.
+
+    Raises:
+        ValueError: If there is no entry, then if a race date is missing,
+            then if a rider is entered twice in a race (the pairs race_id,
+            rider_id are given in the message).
+    """
+    if entries.empty:
+        raise ValueError("No entries")
+    if entries["race_date"].isna().any():
+        raise ValueError("Missing race dates in the entries")
+    keys = entries[["race_id", "rider_id"]]
+    duplicates = keys[keys.duplicated()].drop_duplicates().sort_values(["race_id", "rider_id"])
+    if not duplicates.empty:
+        pairs = list(duplicates.itertuples(index=False, name=None))
+        raise ValueError(f"Riders entered twice in a race: {pairs!r}")
