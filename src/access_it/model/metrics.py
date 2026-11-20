@@ -17,10 +17,13 @@ model turns its own score into such a rank before the evaluation. Rules:
   for a perfect forecast); it is missing with fewer than 2 ranked riders or if
   all of them are tied;
 - the mean of a metric is not weighted and ignores the races where the metric
-  is missing.
+  is missing; summarize_metrics also averages other metrics computed race by
+  race (the lists of the target_metrics module).
 
 The computation is free of any Streamlit dependency.
 """
+
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -105,19 +108,28 @@ def compute_race_metrics(forecasts: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def summarize_metrics(race_metrics: pd.DataFrame) -> pd.DataFrame:
+def summarize_metrics(
+        race_metrics: pd.DataFrame,
+        metrics: Sequence[str] = tuple(METRICS)
+    ) -> pd.DataFrame:
     """Mean of each metric over the races where it is defined.
 
     Args:
         race_metrics: Metrics of each race, as returned by
-            compute_race_metrics.
+            compute_race_metrics (or compute_list_metrics of the
+            target_metrics module).
+        metrics: Columns of the metrics to average, in the output order.
 
     Returns:
-        One row per metric, in the order of METRICS, with the
+        One row per metric, in the order of metrics, with the
         SUMMARY_COLUMNS: metric, mean (missing if no race has the metric) and
         nb_races (number of races where the metric is defined).
     """
-    values = race_metrics[METRICS]
+    values = race_metrics[list(metrics)]
     return pd.DataFrame(
-        {"metric": METRICS, "mean": values.mean().to_numpy(), "nb_races": values.count().to_numpy()}
+        {
+            "metric": list(metrics),
+            "mean": values.mean().to_numpy(),
+            "nb_races": values.count().to_numpy(),
+        }
     )[SUMMARY_COLUMNS]

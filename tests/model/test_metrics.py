@@ -8,6 +8,7 @@ import pytest
 from access_it.model.metrics import (
     METRICS, RACE_METRICS_COLUMNS, SUMMARY_COLUMNS, compute_race_metrics, summarize_metrics
 )
+from access_it.model.target_metrics import LIST_METRICS
 
 
 def race_of(race_id: str, finish_ranks: list[int], race_date: str = "2024-05-01") -> pd.DataFrame:
@@ -122,3 +123,16 @@ def test_summary_of_an_empty_forecast():
     summary = summarize_metrics(compute_race_metrics(race_of("r1", [1]).iloc[0:0]))
     assert summary["mean"].isna().all()
     assert summary["nb_races"].tolist() == [0, 0, 0]
+
+
+def test_summary_of_the_given_metrics():
+    list_metrics = pd.DataFrame({
+        "race_id": ["r1", "r2"],
+        **{metric: [1.0, 0.5] for metric in LIST_METRICS},
+        "win_rr_at_10": [0.25, None],
+    })
+    summary = summarize_metrics(list_metrics, LIST_METRICS)
+    assert summary.columns.tolist() == SUMMARY_COLUMNS
+    assert summary["metric"].tolist() == LIST_METRICS
+    assert summary.set_index("metric").loc["win_rr_at_10"].tolist() == [0.25, 1]
+    assert summary.set_index("metric").loc["top5_recall_at_10"].tolist() == [0.75, 2]
