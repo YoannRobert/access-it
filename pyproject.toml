@@ -26,7 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # ruff: upper bound on the minor version, since its 0.x minor releases may change the rules
-dev = ["pytest>=9.1,<10", "ruff>=0.16,<0.17", "jupyter", "boto3-stubs[s3]>=1.43,<2"]
+dev = ["pytest>=9.1,<10", "ruff>=0.16,<0.17", "jupyter", "plotly>=7.1,<8", "kaleido>=1.5,<2", "boto3-stubs[s3]>=1.43,<2"]
 api = ["fastapi", "uvicorn"]
 dashboard = ["streamlit>=1.66,<2", "altair>=6.3,<7"]
 ml = ["scikit-learn>=1.9,<2", "xgboost>=3.4,<4", "mlflow", "openskill>=6.2,<7"]
