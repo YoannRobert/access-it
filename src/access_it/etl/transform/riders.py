@@ -5,6 +5,7 @@ import hashlib
 import pandas as pd
 
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from typing import Literal
 
 from access_it.common.text import normalize_string_and_fold_case
@@ -655,19 +656,23 @@ class AffiliationLookup:
 def get_rider_id_using_affiliations(
         rider_ids: list[str],
         affiliations: pd.DataFrame | AffiliationLookup,
-        club_id: str,
+        club_id: str | Sequence[str],
         on_date: pd.Timestamp | None = None
     ) -> str:
     """Return the only rider among `rider_ids` affiliated with `club_id` on the date.
 
-    Without date, any affiliation period with the club is accepted. For
-    repeated calls, pass an AffiliationLookup built once instead of the DataFrame.
+    `club_id` is a club or a list of clubs: with a list, a rider affiliated
+    with any of these clubs is a candidate. Without date, any affiliation
+    period with the club is accepted. For repeated calls, pass an
+    AffiliationLookup built once instead of the DataFrame.
     """
     if len(rider_ids) == 0:
         raise ValueError("No rider IDs provided")
     if isinstance(affiliations, pd.DataFrame):
         affiliations = AffiliationLookup(affiliations)
-    rider_ids_out = list(set(rider_ids) & affiliations.riders_of_club(club_id, on_date))
+    club_ids = [club_id] if isinstance(club_id, str) else club_id
+    club_riders = set().union(*(affiliations.riders_of_club(c, on_date) for c in club_ids))
+    rider_ids_out = list(set(rider_ids) & club_riders)
     n = len(rider_ids_out)
     if n == 0:
         raise ValueError(f"No rider ID found for club ID {club_id}")

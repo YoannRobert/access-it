@@ -161,6 +161,13 @@ def test_homonyms_are_separated_by_the_club_at_the_race_date():
         get_rider_id_using_affiliations(["r1", "r2"], AFFILIATIONS, "A")
 
 
+def test_rider_found_in_one_of_several_clubs():
+    on_date = pd.Timestamp("2025-08-01")
+    assert get_rider_id_using_affiliations(["r1"], AFFILIATIONS, ["A", "B"], on_date) == "r1"
+    with pytest.raises(ValueError, match="Multiple rider IDs"):
+        get_rider_id_using_affiliations(["r1", "r2"], AFFILIATIONS, ["A", "B"], on_date)
+
+
 # ---------------------------------------------------------------- create_affiliation_clubs_riders
 
 def test_results_without_identified_club_are_ignored_for_affiliations(caplog):

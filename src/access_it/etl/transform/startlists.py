@@ -14,7 +14,7 @@ from access_it.common.access_categories import (
 )
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.text import normalize_string_and_fold_case, collapse_spaces
-from access_it.etl.extract.clubs import individual_club_id_mask
+from access_it.etl.extract.clubs import individual_club_id_mask, is_individual_club_id
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID
 from access_it.etl.transform.clubs import ClubLookup, identify_clubs
 from access_it.etl.transform.parse import get_startlists_html_files, parse_startlists_from_organization_page
@@ -125,7 +125,8 @@ def identify_riders_on_startlist(
         df: pd.DataFrame,
         riders: pd.DataFrame | RiderLookup,
         affiliations: pd.DataFrame | AffiliationLookup,
-        on_date: pd.Timestamp | None = None
+        on_date: pd.Timestamp | None = None,
+        search_individuals: bool = False
     ) -> pd.DataFrame:
     """Identify the riders of a startlist from their full name and club.
 
@@ -134,13 +135,19 @@ def identify_riders_on_startlist(
     are searched in this order: exact full name, red-list name (last name and
     initial of the first name), then broader search (names contained in the
     rider names). The match_method column gives the search that identified
-    the rider ("exact", "red list" or "broader"), None if none did.
+    the rider ("exact", "red list" or "broader"), None if none did. With
+    `search_individuals`, a rider whose club is that of an individual licensee
+    (see is_individual_club_id) is searched among the riders affiliated with
+    any pseudo-club of individual licensees.
     """
     # Indexes built once for all rows (no-op if already built by the caller)
     if not isinstance(riders, RiderLookup):
         riders = RiderLookup(riders)
     if isinstance(affiliations, pd.DataFrame):
         affiliations = AffiliationLookup(affiliations)
+    individual_club_ids = sorted(
+        club_id for club_id in affiliations.periods_by_club if is_individual_club_id(club_id)
+    )
     df = df.copy()
     rider_ids, match_methods = [], []
     for row in df.itertuples():
@@ -151,6 +158,11 @@ def identify_riders_on_startlist(
         rider_id_out = None
         if not isinstance(full_name, str) or not isinstance(club_id, str):
             raise TypeError("'rider_full_name' and 'club_id' must be strings")
+        searched_clubs = (
+            individual_club_ids
+            if search_individuals and is_individual_club_id(club_id)
+            else club_id
+        )
 
         # Classical research
         try:
@@ -164,7 +176,7 @@ def identify_riders_on_startlist(
             rider_id_out = get_rider_id_using_affiliations(
                 rider_ids=rider_id_possibilities,
                 affiliations=affiliations,
-                club_id=club_id,
+                club_id=searched_clubs,
                 on_date=on_date
             )
             found_rider_id = True
@@ -193,7 +205,7 @@ def identify_riders_on_startlist(
                 rider_id_out = get_rider_id_using_affiliations(
                     rider_ids=rider_id_possibilities,
                     affiliations=affiliations,
-                    club_id=club_id,
+                    club_id=searched_clubs,
                     on_date=on_date
                 )
                 found_rider_id = True
@@ -220,7 +232,7 @@ def identify_riders_on_startlist(
                 rider_id_out = get_rider_id_using_affiliations(
                     rider_ids=rider_id_possibilities,
                     affiliations=affiliations,
-                    club_id=club_id,
+                    club_id=searched_clubs,
                     on_date=on_date
                 )
                 found_rider_id = True
