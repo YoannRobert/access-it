@@ -53,6 +53,25 @@ def test_title_without_day_uses_the_publication_date():
     assert data["date"] == "2026-05-26"
 
 
+
+def test_cells_missing_from_a_short_row_are_none():
+    table = (
+        "<h3>ACCESS</h3><table>"
+        "<tr><td>DUPONT</td><td>Jean</td><td>VC NANTAIS</td></tr>"
+        "<tr><td colspan='3'>Second group</td></tr>"
+        "</table>"
+    )
+    page = startlist_page("Vallet 22 novembre 2026", "18/11/2026").replace(
+        "<div id='article'></div>",
+        "<div id='article'><div class='simpleText'><div class='structured_text_semantique_text'>"
+        f"<div class='code_html'>{table}</div></div></div></div>",
+    )
+    data = parse_startlists_from_organization_page(page)
+    assert data["startlists"]["ACCESS"] == [
+        {"col0": "DUPONT", "col1": "Jean", "col2": "VC NANTAIS"},
+        {"col0": "Second group", "col1": None, "col2": None},
+    ]
+
 def test_rows_without_numeric_rank_are_left_out():
     rows = [
         {"RANG": 1, "NOM": "A", "PRENOM": "a", "UCIID": "", "CLUB": "X"},

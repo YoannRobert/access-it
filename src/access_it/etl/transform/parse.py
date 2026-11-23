@@ -116,7 +116,9 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
     The name and the race date are read in the title and checked against the
     publication date of the page (see parse_startlist_title). Each table
     preceded by a heading is a startlist; cell values are cleaned, and the
-    labels of riders without club are replaced by "Individuel".
+    labels of riders without club are replaced by "Individuel". A table has
+    the columns of its first row: the cells missing from a shorter row are
+    None.
 
     Args:
         html: HTML of the startlist page.
@@ -170,6 +172,11 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
                         cols = row.find_all(name="td")
                         i_col = 0
                         while i_col < nb_cols:
+                            # Row shorter than the first one: the missing cells are empty
+                            if i_col >= len(cols):
+                                row_data[f"col{i_col}"] = None
+                                i_col += 1
+                                continue
                             col_content = cols[i_col]
                             all_p = col_content.find_all(name="p")
                             if all_p:
