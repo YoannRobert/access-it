@@ -36,10 +36,9 @@ import pandas as pd
 from access_it.analytics.ranking_tools import (
     CATEGORIES, TOP_THRESHOLDS, add_club_location, add_shared_rank, add_value_on_race_date,
     check_at_least_one, check_categories, check_category_filter, check_race_categories,
-    count_wins_and_tops, filter_results_by_categories, get_region_club_ids,
-    get_regional_committee_id, to_datetime
+    count_wins_and_tops, filter_results_by_categories, get_region_club_ids, to_datetime
 )
-from access_it.common.regions import check_covered_region
+from access_it.common.regions import check_covered_region, get_regional_committee_id
 from access_it.common.seasons import check_season
 from access_it.etl.extract.clubs import individual_club_id_mask
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID

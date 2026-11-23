@@ -45,9 +45,9 @@ import pandas as pd
 from access_it.analytics.labels import DEMOTION, FIRST_APPEARANCE, PROMOTION
 from access_it.analytics.ranking_tools import (
     add_value_on_race_date, check_category, check_start_dates, format_category, format_club,
-    get_region_club_ids, get_regional_committee_id, to_datetime
+    get_region_club_ids, to_datetime
 )
-from access_it.common.regions import check_covered_region
+from access_it.common.regions import check_covered_region, get_regional_committee_id
 from access_it.common.seasons import FIRST_SEASON, check_season
 
 CATEGORY_CHANGE_COLUMNS = [

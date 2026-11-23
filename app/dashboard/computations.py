@@ -18,12 +18,13 @@ from access_it.analytics.head_to_head import HeadToHead, compute_head_to_head
 from access_it.analytics.promotion_points import compute_promotion_points, compute_promotion_rankings
 from access_it.analytics.race_list import list_races
 from access_it.analytics.race_summary import compute_race_summary, RaceSummary
-from access_it.analytics.ranking_tools import get_region_departement_codes, get_regional_committee_id
 from access_it.analytics.regional_rankings import compute_challenge_points, compute_regional_rankings
 from access_it.analytics.rider_list import build_rider_list, filter_riders, get_filter_choices, RiderFilterChoices
 from access_it.analytics.rider_profile import compute_rider_profile, RiderProfile
 from access_it.analytics.season_stats import compute_season_summary, SeasonSummary
-from access_it.common.regions import PAYS_DE_LA_LOIRE
+from access_it.common.regions import (
+    PAYS_DE_LA_LOIRE, get_region_departement_codes, get_regional_committee_id
+)
 from access_it.common.seasons import FIRST_SEASON
 
 from data import get_snapshot_data, get_snapshot_reference_date

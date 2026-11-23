@@ -13,12 +13,10 @@ from access_it.analytics.ranking_tools import (
     check_category, check_category_filter, check_race_categories, check_race_dates,
     check_recent_form_arguments, check_rider, check_start_dates, check_top_n, compute_places,
     count_wins_and_tops, filter_results_by_categories, format_category, format_club,
-    get_reference_date, get_region_club_ids, get_region_departement_codes, get_region_races,
-    get_regional_committee_id, get_rider_results, has_requested_category, rank_scoring_riders,
-    scale_points, select_category, select_club, select_recent_results, summarize_top_n,
-    to_datetime, to_day
+    get_reference_date, get_region_club_ids, get_region_races, get_rider_results,
+    has_requested_category, rank_scoring_riders, scale_points, select_category, select_club,
+    select_recent_results, summarize_top_n, to_datetime, to_day
 )
-from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 from access_it.common.seasons import FIRST_SEASON
 from access_it.etl.extract.constants import INDIVIDUAL_CLUB_ID
 
@@ -286,15 +284,6 @@ def test_top_n_summary_with_an_invalid_top_n_raises():
         summarize_top_n(recent, ["a"], top_n=21)
 
 
-def test_regional_committee_id_of_a_known_region_and_raises_otherwise():
-    regional_committees = pd.DataFrame({
-        "regional_committee_id": ["52", "53"], "name": [PAYS_DE_LA_LOIRE, BRETAGNE]
-    })
-    assert get_regional_committee_id(regional_committees, BRETAGNE) == "53"
-    with pytest.raises(ValueError, match="Unknown region"):
-        get_regional_committee_id(regional_committees[:1], BRETAGNE)
-
-
 def test_check_race_dates_accepts_dates_and_raises_on_a_missing_one():
     check_race_dates(to_datetime(pd.Series([f"{FIRST_SEASON}-06-01"])))
     with pytest.raises(ValueError, match="Missing race dates in the results"):
@@ -400,16 +389,6 @@ def test_club_location_keeps_the_rows_and_leaves_unknown_values_missing():
     assert located["departement_name"].drop(index=1).isna().all()
     assert located["regional_committee_id"].tolist()[:2] == ["52", "52"]
     assert located["regional_committee_id"].iloc[2:].isna().all()
-
-
-def test_departements_of_a_region_without_duplicates_and_sorted():
-    departemental_committees = pd.DataFrame({
-        "regional_committee_id": ["52", "53", "52", "52"],
-        "departement_code": ["85", "56", "44", "85"],
-    })
-    codes = get_region_departement_codes(departemental_committees, "52")
-    assert codes.tolist() == ["44", "85"]
-    assert codes.index.tolist() == [0, 1]
 
 
 def test_races_of_a_region_are_those_of_the_season_in_its_departements():

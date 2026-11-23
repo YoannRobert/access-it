@@ -23,10 +23,11 @@ import pandas as pd
 
 from access_it.analytics.ranking_tools import (
     CATEGORIES, check_categories, check_race_categories, check_race_dates,
-    get_region_departement_codes, get_regional_committee_id, has_requested_category,
-    to_datetime, to_day
+    has_requested_category, to_datetime, to_day
 )
-from access_it.common.regions import check_covered_region
+from access_it.common.regions import (
+    check_covered_region, get_region_departement_codes, get_regional_committee_id
+)
 from access_it.common.seasons import check_season
 
 RACE_LIST_COLUMNS = [

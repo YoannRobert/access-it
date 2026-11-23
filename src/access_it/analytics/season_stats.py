@@ -37,10 +37,11 @@ from access_it.analytics.ranking_tools import (
     CATEGORIES, CATEGORY_COMBINATIONS, TOP_THRESHOLDS, add_category_on_race_date,
     add_shared_rank, add_value_on_race_date, check_at_least_one, check_categories,
     check_category_filter, check_race_categories, check_race_dates, count_wins_and_tops,
-    filter_results_by_categories, get_region_departement_codes, get_region_races,
-    get_regional_committee_id, select_club, to_datetime
+    filter_results_by_categories, get_region_races, select_club, to_datetime
 )
-from access_it.common.regions import check_covered_region
+from access_it.common.regions import (
+    check_covered_region, get_region_departement_codes, get_regional_committee_id
+)
 from access_it.common.seasons import check_season
 
 SEASON_RESULT_COLUMNS = [

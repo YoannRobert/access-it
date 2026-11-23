@@ -29,9 +29,10 @@ compute_promotion_rankings (one call computes the four categories).
 import pandas as pd
 
 from access_it.analytics.ranking_tools import (
-    add_category_on_race_date, add_value_on_race_date, compute_places,
-    get_regional_committee_id, rank_scoring_riders, scale_points, select_category, to_datetime
+    add_category_on_race_date, add_value_on_race_date, compute_places, rank_scoring_riders,
+    scale_points, select_category, to_datetime
 )
+from access_it.common.regions import get_regional_committee_id
 from access_it.etl.extract.constants import FOREIGN_CLUB_ID, INDIVIDUAL_CLUB_ID
 
 PROMOTION_SCALE = (6, 4, 3, 2, 1)

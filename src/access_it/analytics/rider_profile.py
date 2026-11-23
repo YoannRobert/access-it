@@ -33,11 +33,11 @@ from access_it.analytics.labels import NOT_APPLICABLE, UNKNOWN_CATEGORY
 from access_it.analytics.ranking_tools import (
     CATEGORIES, add_value_on_race_date, check_recent_form_arguments, check_rider,
     check_start_dates, count_wins_and_tops, format_category, format_club, get_region_club_ids,
-    get_regional_committee_id, get_rider_results, to_datetime, to_day
+    get_rider_results, to_datetime, to_day
 )
 from access_it.analytics.recent_form import compute_recent_form
 from access_it.analytics.regional_rankings import POINTS_SCALES
-from access_it.common.regions import PAYS_DE_LA_LOIRE
+from access_it.common.regions import PAYS_DE_LA_LOIRE, get_regional_committee_id
 from access_it.common.seasons import FIRST_SEASON
 
 SEASON_POINTS_COLUMNS = [

@@ -27,10 +27,10 @@ import pandas as pd
 
 from access_it.analytics.ranking_tools import (
     CATEGORIES, add_category_on_race_date, add_value_on_race_date, compute_places,
-    get_region_club_ids, get_region_races, get_regional_committee_id, rank_scoring_riders,
-    scale_points, select_category, to_datetime
+    get_region_club_ids, get_region_races, rank_scoring_riders, scale_points, select_category,
+    to_datetime
 )
-from access_it.common.regions import PAYS_DE_LA_LOIRE
+from access_it.common.regions import PAYS_DE_LA_LOIRE, get_regional_committee_id
 
 # Points of the places 1 to 20: 30, 26, 24, 22, 20, then 15 down to 1
 POINTS_SCALES = {
