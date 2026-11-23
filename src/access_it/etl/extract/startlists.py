@@ -7,6 +7,7 @@ import logging
 import httpx
 
 from bs4 import BeautifulSoup
+from dataclasses import dataclass
 
 from access_it.config import get_settings
 from access_it.etl.extract.cache import (
@@ -19,8 +20,9 @@ from access_it.common.html import get_text_safe
 logger = logging.getLogger(__name__)
 
 
-STARTLISTS_URL = get_settings().startlists_url
-ROAD_STARTLISTS_URL = f"{STARTLISTS_URL}/route/engages/"
+def road_startlists_url() -> str:
+    """Address of the listing of the road startlists, read from the STARTLISTS_URL setting."""
+    return f"{get_settings().startlists_url}/route/engages/"
 
 
 def extract_startlists_from_organization_page(
@@ -89,6 +91,73 @@ def extract_startlists_from_organization_page(
     logger.info(f"{org_ref}: cached")
 
 
+@dataclass(frozen=True)
+class ListedStartlist:
+    """A startlist page listed by the startlists website.
+
+    Attributes:
+        page_id: ID of the page on the website (e.g. "38949").
+        publication_date: Publication date of the page ('YYYY-MM-DD').
+        url: Absolute address of the page.
+        title: Title of the page as listed, None if missing.
+    """
+    page_id: str
+    publication_date: str
+    url: str
+    title: str | None
+
+
+def parse_startlists_listing_page(
+        html: str,
+        base_url: str
+    ) -> tuple[list[ListedStartlist], str | None]:
+    """Read the startlist pages listed by a listing page and the address of the next one.
+
+    An entry without ID, publication date or link is left out. The relative
+    links of the page are completed with `base_url`.
+
+    Args:
+        html: HTML of the listing page.
+        base_url: Address of the listing (see road_startlists_url).
+
+    Returns:
+        The listed startlist pages, in the order of the listing page, and the
+        address of the next listing page, None if there is none (no listing,
+        no entry or no usable "next" link).
+    """
+    soup = BeautifulSoup(html, features="html.parser")
+    results = soup.find(name="div", id="newsList")
+    if results is None:
+        return [], None
+    organizations = results.find_all(name="section", class_="newsResume")
+    if len(organizations) == 0:
+        return [], None
+    listed = []
+    for organization in organizations:
+        organization_id = organization.get("id")
+        organization_date = get_text_safe(organization.find(name="li", class_="date"))
+        organization_relative_url = organization.find_all(name="a")[0].get("href")
+        if (
+                not isinstance(organization_id, str)
+                or not isinstance(organization_date, str)
+                or not isinstance(organization_relative_url, str)
+        ):
+            continue
+        listed.append(ListedStartlist(
+            page_id=organization_id.replace("actus", ""),
+            publication_date="-".join(list(reversed(organization_date.split("/")))),
+            url=base_url + organization_relative_url,
+            title=get_text_safe(organization.find(name="h2")),
+        ))
+    pagerNext = soup.find(name="a", class_="pagerNext")
+    if pagerNext is None:
+        return listed, None
+    relative_url_next_page = pagerNext.get("href")
+    if not isinstance(relative_url_next_page, str):
+        return listed, None
+    return listed, base_url + relative_url_next_page
+
+
 def extract_startlists_pages_from_search_url(
         client: httpx.Client,
         max_pages: int = -1
@@ -103,46 +172,22 @@ def extract_startlists_pages_from_search_url(
         max_pages: Maximum number of listing pages (-1: no limit).
     """
     page = 1
-    organization_count = 0
-    search_url = ROAD_STARTLISTS_URL
+    base_url = road_startlists_url()
+    search_url = base_url
     while True and (max_pages == -1 or page <= max_pages):
         page_response = try_get(client=client, url=search_url)
         if not isinstance(page_response, httpx.Response):
             logger.warning(f"Startlists listing stopped at page {page} (request failed)")
             break
-        html = page_response.text
-        soup = BeautifulSoup(html, features="html.parser")
-        results = soup.find(name="div", id="newsList")
-        if results is None:
-            break
-        organizations = results.find_all(name="section", class_="newsResume")
-        if len(organizations) == 0:
-            break
-        for organization in organizations:
-            organization_count += 1
-            organization_id = organization.get("id")
-            organization_date = get_text_safe(organization.find(name="li", class_="date"))
-            tmp = organization.find_all(name="a")[0]
-            organization_relative_url = tmp.get("href")
-            if (
-                    not isinstance(organization_id, str)
-                    or not isinstance(organization_date, str)
-                    or not isinstance(organization_relative_url, str)
-            ):
-                continue
-            organization_id = organization_id.replace("actus", "")
-            organization_date = "-".join(list(reversed(organization_date.split("/"))))
+        listed, next_url = parse_startlists_listing_page(page_response.text, base_url)
+        for startlist in listed:
             extract_startlists_from_organization_page(
                 client=client,
-                season=int(organization_date.split("-")[0]),
-                code=organization_id,
-                url=ROAD_STARTLISTS_URL + organization_relative_url
+                season=int(startlist.publication_date.split("-")[0]),
+                code=startlist.page_id,
+                url=startlist.url
             )
-        pagerNext = soup.find(name="a", class_="pagerNext")
-        if pagerNext is None:
+        if next_url is None:
             break
-        relative_url_next_page = pagerNext.get("href")
-        if not isinstance(relative_url_next_page, str):
-            break
-        search_url = ROAD_STARTLISTS_URL + relative_url_next_page
+        search_url = next_url
         page += 1
