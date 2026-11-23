@@ -5,25 +5,41 @@ is a race. The Access races are recognized by their heading, then the club
 column and the name columns of their table by their content.
 """
 
+import logging
 import re
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import pandas as pd
 
 from access_it.common.access_categories import is_women_only_name
+from access_it.common.regions import (
+    COVERED_REGIONS, get_region_departement_codes, get_regional_committee_id
+)
 from access_it.common.text import normalize_string_and_fold_case
 from access_it.etl.extract.clubs import is_individual_club_id
-from access_it.etl.extract.constants import FOREIGN_CLUB_ID
+from access_it.etl.extract.constants import FOREIGN_CLUB_ID, INDIVIDUAL_CLUB_ID
+from access_it.etl.extract.upcoming_startlists import UpcomingStartlistPage
 from access_it.etl.transform.clubs import ClubLookup, identify_clubs
+from access_it.etl.transform.parse import parse_startlists_from_organization_page
+from access_it.etl.transform.riders import AffiliationLookup, RiderLookup
 from access_it.etl.transform.startlists import (
-    has_enough_france_values, is_gender_col, is_main_category_column, is_nationality_column
+    has_enough_france_values, identify_riders_on_startlist, is_gender_col,
+    is_main_category_column, is_nationality_column
 )
+
+logger = logging.getLogger(__name__)
 
 
 CLUB_COLUMN_MIN_RATE = 0.5
 NAME_PART_MIN_RATE = 0.9
 CATEGORY_COLUMN_MIN_RATE = 0.5
+MIN_IDENTIFIED_RIDERS = 10
+
+ENTRIES_COLUMNS = [
+    "race_id", "race_date", "rider_id", "page_id", "page_title", "startlist_heading"
+]
 
 EXCLUDED_HEADING_PATTERN = re.compile(r"open|elite")
 ACCESS_HEADING_PATTERN = re.compile(r"acc?ess?|\ba\s?[1-4]\b")
@@ -242,3 +258,134 @@ def find_access_startlists(
             club_column=club_column,
         ))
     return access_startlists
+
+
+def get_covered_departement_codes(
+        departemental_committees: pd.DataFrame,
+        regional_committees: pd.DataFrame
+    ) -> set[str]:
+    """Codes of the departements of the covered regions (see COVERED_REGIONS)."""
+    return {
+        code
+        for region in COVERED_REGIONS
+        for code in get_region_departement_codes(
+            departemental_committees, get_regional_committee_id(regional_committees, region)
+        )
+    }
+
+
+def identify_startlist_riders(
+        startlist: AccessStartlist,
+        race_date: pd.Timestamp,
+        clubs: ClubLookup,
+        riders: RiderLookup,
+        affiliations: AffiliationLookup
+    ) -> list[str]:
+    """Identify the riders of an Access race from their name and club.
+
+    The name is the name column, or the two name columns joined by a space;
+    a row without name is left out. An empty club cell is that of an
+    individual licensee (INDIVIDUAL_CLUB_ID), searched among all the
+    pseudo-clubs of individual licensees; a row whose club is not identified
+    is left out.
+
+    Args:
+        startlist: Access race of a startlist page.
+        race_date: Race date.
+        clubs: Clubs table.
+        riders: Riders table.
+        affiliations: Affiliations table.
+
+    Returns:
+        The IDs of the identified riders, without duplicates, in the order of
+        the table.
+    """
+    table = startlist.table
+    names = table[list(startlist.name_columns)].apply(
+        lambda row: " ".join(v.strip() for v in row if isinstance(v, str) and v.strip()),
+        axis=1,
+    )
+    club_texts = table[startlist.club_column]
+    club_ids = identify_clubs(club_texts.where(club_texts.notna(), None), clubs)
+    club_ids = club_ids.where(club_texts.notna(), INDIVIDUAL_CLUB_ID)
+    rows = pd.DataFrame({"full_name": names, "club_id": club_ids})
+    rows = rows[(rows["full_name"] != "") & rows["club_id"].notna()]
+    if rows.empty:
+        return []
+    rows = identify_riders_on_startlist(
+        rows, riders, affiliations, on_date=race_date, search_individuals=True
+    )
+    return list(dict.fromkeys(rows["rider_id"].dropna()))
+
+
+def build_upcoming_entries(
+        pages: Sequence[UpcomingStartlistPage],
+        clubs: pd.DataFrame,
+        riders: pd.DataFrame,
+        affiliations: pd.DataFrame,
+        departements: pd.DataFrame,
+        departemental_committees: pd.DataFrame,
+        regional_committees: pd.DataFrame
+    ) -> pd.DataFrame:
+    """Build the entries of the upcoming races from their startlist pages.
+
+    A page that cannot be read is skipped with a warning. A page whose
+    departement is found outside the covered regions is left out; a page
+    whose departement is not found is kept. Each Access race of a kept page
+    (see find_access_startlists) gives its identified riders (see
+    identify_startlist_riders), and is kept if it has at least
+    MIN_IDENTIFIED_RIDERS of them.
+
+    Args:
+        pages: Startlist pages of the upcoming races.
+        clubs: Clubs table.
+        riders: Riders table.
+        affiliations: Affiliations table.
+        departements: Departements table.
+        departemental_committees: Departemental committees table.
+        regional_committees: Regional committees table.
+
+    Returns:
+        One row per race and identified rider, with race_id
+        ("vpc-<page ID>-<rank of the table>"), race_date (datetime64[ns]),
+        rider_id, page_id, page_title (title of the page as listed) and
+        startlist_heading, in the order of the pages and of their tables.
+    """
+    covered_codes = get_covered_departement_codes(departemental_committees, regional_committees)
+    club_lookup = ClubLookup(clubs)
+    rider_lookup = RiderLookup(riders)
+    affiliation_lookup = AffiliationLookup(affiliations)
+    records = []
+    for page in pages:
+        try:
+            data = parse_startlists_from_organization_page(page.html)
+        except ValueError as error:
+            logger.warning(f"Startlist page {page.page_id} skipped (unreadable: {error})")
+            continue
+        if not data:
+            logger.warning(f"Startlist page {page.page_id} skipped (no article)")
+            continue
+        departement_code = find_departement_code(data["description"], departements)
+        if departement_code is not None and departement_code not in covered_codes:
+            continue
+        race_date = pd.Timestamp(page.race_date)
+        for startlist in find_access_startlists(data["startlists"], club_lookup):
+            rider_ids = identify_startlist_riders(
+                startlist, race_date, club_lookup, rider_lookup, affiliation_lookup
+            )
+            if len(rider_ids) < MIN_IDENTIFIED_RIDERS:
+                continue
+            records.extend(
+                {
+                    "race_id": f"vpc-{page.page_id}-{startlist.rank}",
+                    "race_date": race_date,
+                    "rider_id": rider_id,
+                    "page_id": page.page_id,
+                    "page_title": page.title,
+                    "startlist_heading": startlist.heading,
+                }
+                for rider_id in rider_ids
+            )
+    entries = pd.DataFrame(records, columns=ENTRIES_COLUMNS)
+    entries["race_date"] = pd.to_datetime(entries["race_date"]).astype("datetime64[ns]")
+    return entries

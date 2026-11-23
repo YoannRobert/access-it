@@ -3,10 +3,11 @@
 import pandas as pd
 import pytest
 
+from access_it.etl.extract.upcoming_startlists import UpcomingStartlistPage
 from access_it.etl.transform.clubs import ClubLookup
 from access_it.etl.transform.upcoming_entries import (
-    AccessStartlist, find_access_startlists, find_club_column, find_departement_code,
-    find_name_columns, is_access_startlist_heading
+    ENTRIES_COLUMNS, AccessStartlist, build_upcoming_entries, find_access_startlists,
+    find_club_column, find_departement_code, find_name_columns, is_access_startlist_heading
 )
 
 CLUBS = ClubLookup(pd.DataFrame({
@@ -131,3 +132,125 @@ def test_access_startlists_of_a_page():
     ]
     assert isinstance(result[0], AccessStartlist)
     pd.testing.assert_frame_equal(result[0].table, pd.DataFrame(rows))
+
+
+# ------------------------------------------------------------- build_upcoming_entries
+
+LAST_NAMES = [
+    "ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT",
+    "GOLF", "HOTEL", "INDIA", "JULIETT", "KILO", "LIMA",
+]
+REFERENCE_CLUBS = pd.DataFrame({
+    "club_id": ["5244001", "5244800"],
+    "name": ["VC NANTAIS", "Individuel 44"],
+    "departemental_committee_id": ["5244", "5244"],
+    "min_year": 2025,
+    "max_year": 2026,
+    "alternative_names": "",
+})
+RIDERS = pd.DataFrame({
+    "rider_id": [f"r{i}" for i in range(len(LAST_NAMES))],
+    "uci_id": [f"100000000{i:02d}" for i in range(len(LAST_NAMES))],
+    "last_name": LAST_NAMES,
+    "first_name": "Jean",
+})
+AFFILIATIONS = pd.DataFrame({
+    "rider_id": RIDERS["rider_id"],
+    "start_date": pd.to_datetime(["2025-01-01"] * len(LAST_NAMES)),
+    "club_id": ["5244800"] + ["5244001"] * (len(LAST_NAMES) - 1),
+})
+DEPARTEMENTAL_COMMITTEES = pd.DataFrame({
+    "departemental_committee_id": ["5244", "5253", "4335", "4250"],
+    "name": ["CD 44", "CD 53", "CD 35", "CD 50"],
+    "regional_committee_id": ["52", "52", "43", "42"],
+    "departement_code": ["44", "53", "35", "50"],
+})
+REGIONAL_COMMITTEES = pd.DataFrame({
+    "regional_committee_id": ["42", "43", "52"],
+    "name": ["NORMANDIE", "BRETAGNE", "PAYS DE LA LOIRE"],
+})
+
+
+def startlist_page_html(description: str, tables: dict[str, list[list[str]]]) -> str:
+    """HTML of a startlist page with the given description and tables by heading."""
+    tables_html = "".join(
+        f"<h3>{heading}</h3><table>"
+        + "".join("<tr>" + "".join(f"<td>{c}</td>" for c in row) + "</tr>" for row in rows)
+        + "</table>"
+        for heading, rows in tables.items()
+    )
+    return (
+        "<h1>Vallet 22 novembre 2026 engagés</h1>"
+        f'<div class="date">18/11/2026</div><div class="description">{description}</div>'
+        '<div id="article"><div class="simpleText"><div class="structured_text_semantique_text">'
+        f'<div class="code_html">{tables_html}</div></div></div></div>'
+    )
+
+
+def page(page_id: str, html: str) -> UpcomingStartlistPage:
+    """Upcoming startlist page with the given HTML."""
+    return UpcomingStartlistPage(
+        page_id, "2026-11-18", "2026-11-22", f"Vallet {page_id}", f"https://x/{page_id}.html", html
+    )
+
+
+def build(pages: list[UpcomingStartlistPage]) -> pd.DataFrame:
+    """Entries of the pages with the reference tables of the tests."""
+    return build_upcoming_entries(
+        pages, REFERENCE_CLUBS, RIDERS, AFFILIATIONS, DEPARTEMENTS,
+        DEPARTEMENTAL_COMMITTEES, REGIONAL_COMMITTEES,
+    )
+
+
+def rows(count: int) -> list[list[str]]:
+    """Rows of the first `count` riders (the first one with an empty club cell)."""
+    return [
+        [name, "Jean", "" if i == 0 else "VC NANTAIS"]
+        for i, name in enumerate(LAST_NAMES[:count])
+    ]
+
+
+def test_entries_of_the_identified_riders():
+    tables = {
+        "U17": rows(12),
+        "ACCESS 3.4": rows(11) + [["INCONNU", "Paul", "VC NANTAIS"], ["ALPHA", "Jean", ""]],
+    }
+    entries = build([page("38949", startlist_page_html("A Vallet (44)", tables))])
+    assert list(entries.columns) == ENTRIES_COLUMNS
+    assert entries["race_date"].dtype == "datetime64[ns]"
+    assert entries["rider_id"].tolist() == [f"r{i}" for i in range(11)]
+    first = entries.iloc[0]
+    assert (first["race_id"], first["race_date"], first["page_id"]) == (
+        "vpc-38949-2", pd.Timestamp("2026-11-22"), "38949"
+    )
+    assert (first["page_title"], first["startlist_heading"]) == ("Vallet 38949", "ACCESS 3.4")
+
+
+def test_race_below_the_minimum_of_identified_riders_is_left_out():
+    tables = {"ACCESS": rows(9) + [["INCONNU", "Paul", "VC NANTAIS"]] * 3}
+    assert build([page("1", startlist_page_html("A Vallet (44)", tables))]).empty
+
+
+@pytest.mark.parametrize("description, kept", [
+    ("A Laval (53)", True),
+    ("A Granville (50)", False),
+    ("A Vallet", True),
+])
+def test_pages_outside_the_covered_regions_are_left_out(description, kept):
+    entries = build([page("1", startlist_page_html(description, {"ACCESS": rows(12)}))])
+    assert (not entries.empty) is kept
+
+
+def test_unreadable_page_is_skipped(caplog):
+    entries = build([
+        page("1", "<html><body></body></html>"),
+        page("2", startlist_page_html("A Vallet (44)", {"ACCESS": rows(10)})),
+    ])
+    assert entries["page_id"].unique().tolist() == ["2"]
+    assert "Startlist page 1 skipped" in caplog.text
+
+
+def test_no_entries():
+    entries = build([])
+    assert list(entries.columns) == ENTRIES_COLUMNS
+    assert entries.empty
