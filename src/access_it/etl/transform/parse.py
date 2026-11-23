@@ -154,14 +154,76 @@ def correct_startlist_date(title_date: str, publication_date: str) -> str:
     return publication_date
 
 
+def parse_startlist_title(title: str, publication_date: str) -> tuple[str, str, str]:
+    """Read the name and the race date in the title of a startlist page.
+
+    The title reads "<name> <day> <month> <year> ...". The day is the first
+    one of "<day> et <day>", otherwise the earliest of the numbers (1 to 31)
+    preceding the month, so that a departement code ("Adainville 78 31 mai") is
+    not taken as the day. The year follows the month, or the second month of
+    "<month> et <day> <month> <year>". Without a month, or if the day or the
+    year is not a number, the date read is the publication date. The date read
+    is then checked against the publication date (see correct_startlist_date).
+
+    Args:
+        title: Title of the page.
+        publication_date: Publication date of the page ('YYYY-MM-DD').
+
+    Returns:
+        The name (the title up to the day, or the whole title without date),
+        the date read in the title and the race date after correction, both
+        as 'YYYY-MM-DD' strings.
+    """
+    months_org = [m for m in list(MONTH_CONVERT.keys())]
+    months = [normalize_string_and_fold_case(m) for m in months_org]
+    words_org = collapse_spaces(title).split()
+    words = [normalize_string_and_fold_case(w.replace(",", "")) for w in words_org]
+    i = 0
+    month = ""
+    name = title
+    while i < len(words):
+        word = words[i]
+        if word in months:
+            month = MONTH_CONVERT[months_org[months.index(word)]]
+            break
+        i += 1
+    if month == "":
+        date = publication_date
+    else:
+        if words[i - 2] == "et":
+            day = words[i - 3].replace("1er", "1").zfill(2)
+            name = " ".join(words_org[: i - 3])
+        else:
+            # Walk back over the numbers preceding the month that can be days (1 to 31),
+            # so that a number like a departement code ("Adainville 78 31 mai") is not
+            # taken as the day; the earliest of them is the day ("1 2 mars": 1)
+            j = 0
+            while i - j - 1 >= 0 and is_day_number(words[i - j - 1]):
+                j += 1
+            # j == 0: no day before the month, words[i] is the month and int(day) fails below
+            day = words[i - j].replace("1er", "1").zfill(2)
+            name = " ".join(words_org[: i - j])
+        if words[i + 1] == "et":
+            year = words[i + 4]
+        else:
+            year = words[i + 1]
+        try:
+            int(year)
+            int(day)
+            date = f"{year:4s}-{month:2s}-{day:2s}"
+        except ValueError:
+            date = publication_date
+
+    return name, date, correct_startlist_date(date, publication_date)
+
+
 def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
     """Parse a startlist page: race date, name and startlist tables.
 
-    The race date is read in the title ("<name> <day> <month> <year> ...") and
-    checked against the publication date of the page (see
-    correct_startlist_date); without date in the title, the publication date
-    is used. Each table preceded by a heading is a startlist; cell values are
-    cleaned, and the labels of riders without club are replaced by "Individuel".
+    The name and the race date are read in the title and checked against the
+    publication date of the page (see parse_startlist_title). Each table
+    preceded by a heading is a startlist; cell values are cleaned, and the
+    labels of riders without club are replaced by "Individuel".
 
     Args:
         html: HTML of the startlist page.
@@ -189,48 +251,7 @@ def parse_startlists_from_organization_page(html: str) -> dict[str, Any]:
     description = collapse_spaces(description.replace("\n", " "))
     fallback_date = "-".join(list(reversed(fallback_date.split("/"))))
 
-    months_org = [m for m in list(MONTH_CONVERT.keys())]
-    months = [normalize_string_and_fold_case(m) for m in months_org]
-    words_org = collapse_spaces(title).split()
-    words = [normalize_string_and_fold_case(w.replace(",", "")) for w in words_org]
-    i = 0
-    month = ""
-    name = title
-    while i < len(words):
-        word = words[i]
-        if word in months:
-            month = MONTH_CONVERT[months_org[months.index(word)]]
-            break
-        i += 1
-    if month == "":
-        date = fallback_date
-    else:
-        if words[i - 2] == "et":
-            day = words[i - 3].replace("1er", "1").zfill(2)
-            name = " ".join(words_org[: i - 3])
-        else:
-            # Walk back over the numbers preceding the month that can be days (1 to 31),
-            # so that a number like a departement code ("Adainville 78 31 mai") is not
-            # taken as the day; the earliest of them is the day ("1 2 mars": 1)
-            j = 0
-            while i - j - 1 >= 0 and is_day_number(words[i - j - 1]):
-                j += 1
-            # j == 0: no day before the month, words[i] is the month and int(day) fails below
-            day = words[i - j].replace("1er", "1").zfill(2)
-            name = " ".join(words_org[: i - j])
-        if words[i + 1] == "et":
-            year = words[i + 4]
-        else:
-            year = words[i + 1]
-        try:
-            int(year)
-            int(day)
-            date = f"{year:4s}-{month:2s}-{day:2s}"
-        except ValueError:
-            date = fallback_date
-
-    title_date = date
-    date = correct_startlist_date(title_date, fallback_date)
+    name, title_date, date = parse_startlist_title(title, fallback_date)
 
     startlists = {}
     article = bs.find(name="div", id="article")
