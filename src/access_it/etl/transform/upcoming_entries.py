@@ -357,6 +357,7 @@ def build_upcoming_entries(
     affiliation_lookup = AffiliationLookup(affiliations)
     records = []
     for page in pages:
+        logger.info(f"Reading startlist page {page.page_id}: {page.title}")
         try:
             data = parse_startlists_from_organization_page(page.html)
         except ValueError as error:

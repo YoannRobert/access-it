@@ -250,6 +250,12 @@ def test_unreadable_page_is_skipped(caplog):
     assert "Startlist page 1 skipped" in caplog.text
 
 
+def test_each_page_read_is_logged(caplog):
+    caplog.set_level("INFO")
+    build([page("1", "<html><body></body></html>")])
+    assert "Reading startlist page 1: Vallet 1" in caplog.text
+
+
 def test_no_entries():
     entries = build([])
     assert list(entries.columns) == ENTRIES_COLUMNS
