@@ -26,11 +26,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install the package
-        run: pip install .
+      - name: Install the package with the ml option
+        run: pip install ".[ml]"
 
       - name: Run the ETL
-        env:
+        # Anchor reused (*etl_env) by the steps reading the settings
+        env: &etl_env
           PYTHONUNBUFFERED: '1'
           DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${{ secrets.POSTGRES_ENDPOINT }}/${{ secrets.POSTGRES_DB }}
           AWS_ENDPOINT_URL_S3: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
@@ -40,3 +41,24 @@ jobs:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
           STARTLISTS_URL: ${{ secrets.STARTLISTS_URL }}
         run: python scripts/etl.py
+
+      - name: Extract the entries of the upcoming races
+        env: *etl_env
+        run: |
+          python scripts/extract_upcoming_entries.py \
+            --output "${{ runner.temp }}/entries.parquet"
+
+      - name: Forecast the upcoming races
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          python scripts/forecast_upcoming_races.py \
+            --entries "${{ runner.temp }}/entries.parquet" \
+            --output "${{ runner.temp }}/forecasts.parquet"
+
+      - name: Export the entries and forecasts to the S3 bucket
+        env: *etl_env
+        run: |
+          python scripts/export_upcoming_entries_and_forecasts_to_s3_bucket.py \
+            --entries "${{ runner.temp }}/entries.parquet" \
+            --forecasts "${{ runner.temp }}/forecasts.parquet"
