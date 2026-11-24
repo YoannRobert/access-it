@@ -1,4 +1,4 @@
-name: ETL
+name: ETL and Forecasts
 
 on:
   schedule:
@@ -10,11 +10,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: etl
+  group: etl-and-forecasts
   cancel-in-progress: false
 
 jobs:
-  etl:
+  etl-and-forecasts:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
