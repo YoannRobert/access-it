@@ -3,7 +3,8 @@
 The startlist pages of the races held from the start date are requested
 (nothing is cached), then their Access races and their riders identified in
 the Parquet tables of the transform. A summary is printed; the entries can be
-written to a Parquet file.
+written to a Parquet file. By default, the start date is the day after the last
+race of the transform.
 
 Usage, from the repository root, after a transform:
     python scripts/extract_upcoming_entries.py [--start-date YYYY-MM-DD] [--output PATH]
@@ -15,10 +16,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from access_it.analytics.ranking_tools import get_reference_date
 from access_it.common.log import setup_logging
 from access_it.etl.extract.cache import (
     AFFILIATIONS_PARQUET_FILE, CLUBS_PARQUET_FILE, DEPARTEMENTS_PARQUET_FILE,
-    DEPCOM_PARQUET_FILE, REGCOM_PARQUET_FILE, RIDERS_PARQUET_FILE
+    DEPCOM_PARQUET_FILE, RACES_PARQUET_FILE, REGCOM_PARQUET_FILE, RIDERS_PARQUET_FILE
 )
 from access_it.etl.extract.client import make_client
 from access_it.etl.extract.upcoming_startlists import extract_upcoming_startlist_pages
@@ -36,8 +38,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--start-date", type=iso_date,
-        default=Date.today().isoformat(),
-        help="first race date, as YYYY-MM-DD (default: today)"
+        help=(
+            "first race date, as YYYY-MM-DD "
+            "(default: the day after the last race of the transform)"
+        )
     )
     parser.add_argument(
         "--output", type=Path, help="Parquet file to write the entries to (default: none)"
@@ -45,18 +49,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def extract_upcoming_entries(start_date: str) -> pd.DataFrame:
+def extract_upcoming_entries(start_date: str | None = None) -> pd.DataFrame:
     """Extract the entries of the races held from a start date.
 
     The Parquet tables of the transform are read before any request, so that
     a missing table stops the script at once.
 
     Args:
-        start_date: First race date ('YYYY-MM-DD').
+        start_date: First race date ('YYYY-MM-DD'); if None, the day after the
+            last race of the transform (see get_reference_date).
 
     Returns:
         The entries (see build_upcoming_entries).
     """
+    if start_date is None:
+        races = pd.read_parquet(RACES_PARQUET_FILE)
+        start_date = get_reference_date(races).date().isoformat()
+        print(f"Start date: {start_date} (the day after the last race of the transform)")
     clubs = pd.read_parquet(CLUBS_PARQUET_FILE)
     riders = pd.read_parquet(RIDERS_PARQUET_FILE)
     affiliations = pd.read_parquet(AFFILIATIONS_PARQUET_FILE)
@@ -95,11 +104,12 @@ def print_summary(entries: pd.DataFrame) -> None:
         )
 
 
-def main(start_date: str, output: Path | None = None) -> None:
+def main(start_date: str | None, output: Path | None = None) -> None:
     """Extract the entries of the races held from `start_date`, print them and write them.
 
     Args:
-        start_date: First race date ('YYYY-MM-DD').
+        start_date: First race date ('YYYY-MM-DD'); if None, the day after the
+            last race of the transform.
         output: Parquet file to write the entries to, even without entries;
             nothing is written if None.
     """

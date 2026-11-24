@@ -41,6 +41,25 @@ def test_pages_from_the_start_date_give_the_entries(monkeypatch):
     assert calls == {"start_date": "2026-11-21", "pages": ["page"], "tables": 6}
 
 
+
+def test_start_date_defaults_to_the_day_after_the_last_race(monkeypatch, capsys):
+    races = pd.DataFrame({"race_date": pd.to_datetime(["2026-11-15", "2026-11-22"])})
+    calls = {}
+
+    def fake_read_parquet(path):
+        return races if path == script.RACES_PARQUET_FILE else pd.DataFrame()
+
+    def fake_extract(client, start_date):
+        calls["start_date"] = start_date
+        return []
+
+    monkeypatch.setattr(script.pd, "read_parquet", fake_read_parquet)
+    monkeypatch.setattr(script, "extract_upcoming_startlist_pages", fake_extract)
+    monkeypatch.setattr(script, "build_upcoming_entries", lambda pages, *tables: ENTRIES)
+    script.extract_upcoming_entries()
+    assert calls == {"start_date": "2026-11-23"}
+    assert "Start date: 2026-11-23" in capsys.readouterr().out
+
 def test_summary_gives_one_line_per_race_by_date(capsys):
     script.print_summary(ENTRIES)
     lines = capsys.readouterr().out.splitlines()
