@@ -5,8 +5,8 @@ de la catégorie **Access** (Access 1 à Access 4, Fédération française de cy
 pour les régions **Bretagne** et **Pays de la Loire**.
 
 Le projet couvre toute la chaîne d'un projet de données : collecte (scraping et API),
-ETL exécuté automatiquement, base de données et tableau de bord, puis, à venir, analyse
-exploratoire, modèles de machine learning et API.
+ETL exécuté automatiquement, base de données, tableau de bord, modèle de machine learning et
+prévision automatique des courses à venir, puis, à venir, suivi des modèles et API.
 
 ## État d'avancement
 
@@ -14,8 +14,9 @@ exploratoire, modèles de machine learning et API.
 |---|---|
 | Collecte des données et ETL (extract, transform, load) | fonctionnel |
 | Base PostgreSQL et snapshots S3 | fonctionnel |
-| Exécution programmée de l'ETL (GitHub Actions, lundi, mercredi et vendredi soir) | fonctionnel |
-| Analyse exploratoire et modèles (scikit-learn, XGBoost, MLflow) | à venir |
+| Exécution programmée de l'ETL et de la prévision (GitHub Actions, lundi, mercredi et vendredi soir) | fonctionnel |
+| Modèle de prévision (OpenSkill, XGBoost) et prévision des courses à venir | fonctionnel |
+| Suivi des modèles (MLflow) | à venir |
 | Tableau de bord (Streamlit) sur Hugging Face Spaces | fonctionnel ([ouvrir le tableau de bord](https://yoannrobert-access-it.hf.space/)) |
 | API (FastAPI) | à venir |
 
@@ -34,12 +35,21 @@ flowchart LR
     DB --> S[Export] --> S3[(Snapshots S3)]
     AR[(Archives du cache S3)] -- récupération --> C
     C -- envoi --> AR
+    SL --> UE[Engagés des<br/>courses à venir]
+    P --> UE
+    UE --> FC[Prévision<br/>XGBoost]
+    P --> FC
+    UE --> UF[(Engagés et<br/>prévisions S3)]
+    FC --> UF
 ```
 
 L'ETL complet (`scripts/etl.py`) récupère d'abord les pages du cache archivées sur S3, puis
 enchaîne l'extract, le transform et le load, renvoie le cache sur S3 et exporte un snapshot
-de la base. Il s'exécute automatiquement sur GitHub Actions les lundis, mercredis et
-vendredis, le soir.
+de la base. Le workflow GitHub Actions `ETL and Forecasts` l'exécute automatiquement les
+lundis, mercredis et vendredis, le soir, puis enchaîne la prévision des courses à venir :
+lecture des listes d'engagés à partir du lendemain de la dernière course connue, prévision
+des places de chaque engagé (probabilités de victoire, de top 3, de top 5 et de top 10), puis
+envoi des engagés et des prévisions sur S3.
 
 ### Sources
 
@@ -48,7 +58,8 @@ vendredis, le soir.
   terminées sont aussi interrogées par numéro d'épreuve.
 - **API de la FFC** : régions, comités régionaux et départementaux, clubs.
 - **Site des listes d'engagés** : catégorie Access de chaque coureur engagé, utilisée pour
-  préciser les catégories (adresse définie par la variable `STARTLISTS_URL`).
+  préciser les catégories, et engagés des courses à venir, pour la prévision (adresse définie
+  par la variable `STARTLISTS_URL`).
 
 ### Étapes de l'ETL
 
@@ -108,6 +119,12 @@ Pour lancer le tableau de bord en local, installer aussi ses dépendances :
 pip install -e ".[dashboard]"
 ```
 
+Pour lancer la prévision en local, installer aussi les dépendances du modèle :
+
+```bash
+pip install -e ".[ml]"
+```
+
 ## Configuration
 
 Les variables d'environnement sont lues dans un fichier `.env` à la racine du dépôt (jamais
@@ -146,6 +163,9 @@ Toutes les commandes se lancent depuis la racine du dépôt.
 | `python scripts/download_latest_snapshot.py` | téléchargement du snapshot S3 le plus récent (`-d DOSSIER` ou `-c` pour le cache) |
 | `python scripts/restore_database_from_s3_bucket.py` | restauration de la base depuis un snapshot S3 (`--list`, `--key`, `--yes`) |
 | `python scripts/sync_cache.py {pull,push}` | synchronisation des pages du cache avec S3 (5 archives conservées) |
+| `python scripts/extract_upcoming_entries.py` | engagés des courses à venir, à partir du lendemain de la dernière course (`--start-date`, `--output FICHIER`) |
+| `python scripts/forecast_upcoming_races.py --entries FICHIER` | prévision des places des engagés (`--output FICHIER`) ; demande l'extra `ml` |
+| `python scripts/export_upcoming_entries_and_forecasts_to_s3_bucket.py --entries FICHIER --forecasts FICHIER` | envoi des engagés et des prévisions sur S3 (100 de chaque sorte conservés) |
 | `python scripts/check_startlist_matches.py` | contrôle des identifications de secours des listes d'engagés (lecture seule) |
 | `python scripts/prune_stale_rows.py` | simulation du nettoyage des coureurs obsolètes ; `--apply` pour supprimer |
 | `python -m access_it.etl.load.schema {create,drop,reset}` | création, suppression ou réinitialisation des tables |
@@ -156,8 +176,8 @@ Toutes les commandes se lancent depuis la racine du dépôt.
 Ne lancez pas le load après un extract seul : l'extract remplace les fichiers Parquet des
 clubs et des référentiels, que seul le transform complète. La
 [procédure d'exploitation](docs/exploitation.md) décrit l'exécution sur GitHub Actions, les
-messages de l'ETL, les contrôles bloquants, le nettoyage de la base et l'exploitation du
-tableau de bord.
+messages de l'ETL, les contrôles bloquants, le nettoyage de la base, l'exploitation du
+tableau de bord et la prévision des courses à venir.
 
 Pour le développement du tableau de bord, la commande suivante monte son code dans le
 conteneur et recharge la page à chaque modification :
