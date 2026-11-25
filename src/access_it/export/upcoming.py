@@ -5,8 +5,8 @@ entries (written by scripts/extract_upcoming_entries.py) and the forecasts
 (written by scripts/forecast_upcoming_races.py). Rules:
 
 - the files are uploaded under keys following ENTRIES_KEYS and FORECASTS_KEYS,
-  with the same UTC timestamp, so that the entries and the forecasts of a run
-  can be paired;
+  with the same UTC timestamp (the time of the upload, or a chosen time), so
+  that the entries and the forecasts of a run can be paired;
 - both files are checked first: if one is missing, nothing is uploaded; their
   content is not read, an empty file is uploaded like any other;
 - the entries are uploaded before the forecasts, so that a file of forecasts
@@ -36,7 +36,8 @@ def export_upcoming_entries_and_forecasts(
         entries_path: Path,
         forecasts_path: Path,
         bucket: str,
-        client: S3Client | None = None
+        client: S3Client | None = None,
+        timestamp: datetime | None = None
     ) -> tuple[str, str, list[str]]:
     """Upload the entries and the forecasts of a run to the S3 bucket, then delete the old files.
 
@@ -47,20 +48,25 @@ def export_upcoming_entries_and_forecasts(
         forecasts_path: Parquet file of the forecasts.
         bucket: Name of the bucket.
         client: S3 client (created from the settings if None).
+        timestamp: Time of the keys, converted to UTC (time of the upload if
+            None).
 
     Returns:
         The S3 URI of the uploaded entries, the S3 URI of the uploaded
         forecasts, and the deleted keys (entries first, then forecasts).
 
     Raises:
+        ValueError: If the timestamp has no time zone (nothing is uploaded).
         FileNotFoundError: If the file of the entries or of the forecasts does
             not exist (nothing is uploaded).
     """
+    if timestamp is not None and timestamp.utcoffset() is None:
+        raise ValueError(f"The timestamp has no time zone: {timestamp.isoformat()}")
     for path in (entries_path, forecasts_path):
         if not path.is_file():
             raise FileNotFoundError(f"File not found: {path}")
     client = client or get_s3_client()
-    timestamp = datetime.now(timezone.utc)
+    timestamp = (timestamp or datetime.now(timezone.utc)).astimezone(timezone.utc)
     entries_uri = upload_to_s3(
         entries_path, bucket=bucket, key=ENTRIES_KEYS.build_key(timestamp), client=client
     )

@@ -101,3 +101,29 @@ def test_the_uris_and_the_deleted_keys_are_returned(files):
     assert entries_uri == f"s3://bucket/{entries_key}"
     assert forecasts_uri == f"s3://bucket/{forecasts_key}"
     assert deleted_keys == [old_entries[0]]
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        datetime(2026, 5, 10, 18, tzinfo=timezone.utc),
+        datetime(2026, 5, 10, 20, tzinfo=timezone(timedelta(hours=2))),
+    ],
+    ids=["utc", "utc+2"],
+)
+def test_a_chosen_timestamp_is_used_in_utc_for_both_files(files, timestamp):
+    client = FakeS3Client()
+    export_upcoming_entries_and_forecasts(*files, "bucket", client=client, timestamp=timestamp)
+    assert list(client.objects) == [
+        "entries/entries_20260510T180000Z.parquet",
+        "forecasts/forecasts_20260510T180000Z.parquet",
+    ]
+
+
+def test_a_timestamp_without_time_zone_uploads_nothing(files):
+    client = FakeS3Client()
+    with pytest.raises(ValueError, match="no time zone"):
+        export_upcoming_entries_and_forecasts(
+            *files, "bucket", client=client, timestamp=datetime(2026, 5, 10, 20)
+        )
+    assert client.objects == {}
