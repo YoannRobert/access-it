@@ -49,7 +49,9 @@ de la base. Le workflow GitHub Actions `ETL and Forecasts` l'exécute automatiqu
 lundis, mercredis et vendredis, le soir, puis enchaîne la prévision des courses à venir :
 lecture des listes d'engagés à partir du lendemain de la dernière course connue, prévision
 des places de chaque engagé (probabilités de victoire, de top 3, de top 5 et de top 10), puis
-envoi des engagés et des prévisions sur S3.
+envoi des engagés et des prévisions sur S3. Le notebook
+`notebooks/retroactive_forecasts_2026.ipynb` a envoyé une fois sur S3 les prévisions
+rétroactives de la saison 2026, une paire par semaine.
 
 ### Sources
 
