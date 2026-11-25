@@ -7,8 +7,10 @@ entries (written by scripts/extract_upcoming_entries.py) and the forecasts
 - the files are uploaded under keys following ENTRIES_KEYS and FORECASTS_KEYS,
   with the same UTC timestamp (the time of the upload, or a chosen time), so
   that the entries and the forecasts of a run can be paired;
-- both files are checked first: if one is missing, nothing is uploaded; their
-  content is not read, an empty file is uploaded like any other;
+- both files are checked first: if one is missing, nothing is uploaded;
+- if the file of the forecasts has no row (read from its Parquet metadata),
+  nothing is uploaded either, so that every pair on the bucket has forecasts;
+  the file of the entries is not read;
 - the entries are uploaded before the forecasts, so that a file of forecasts
   proves that the entries of the same timestamp were uploaded too;
 - after both uploads, only the KEEP_FILES most recent files of each kind are
@@ -20,6 +22,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import pyarrow.parquet as pq
 
 from access_it.export.s3 import KeyPattern, delete_old_keys, get_s3_client, upload_to_s3
 
@@ -38,7 +42,7 @@ def export_upcoming_entries_and_forecasts(
         bucket: str,
         client: S3Client | None = None,
         timestamp: datetime | None = None
-    ) -> tuple[str, str, list[str]]:
+    ) -> tuple[str, str, list[str]] | None:
     """Upload the entries and the forecasts of a run to the S3 bucket, then delete the old files.
 
     See the module docstring for the rules.
@@ -53,18 +57,23 @@ def export_upcoming_entries_and_forecasts(
 
     Returns:
         The S3 URI of the uploaded entries, the S3 URI of the uploaded
-        forecasts, and the deleted keys (entries first, then forecasts).
+        forecasts, and the deleted keys (entries first, then forecasts), or
+        None if the file of the forecasts has no row (nothing is uploaded).
 
     Raises:
         ValueError: If the timestamp has no time zone (nothing is uploaded).
         FileNotFoundError: If the file of the entries or of the forecasts does
             not exist (nothing is uploaded).
+        pyarrow.ArrowInvalid: If the file of the forecasts is not a Parquet
+            file (nothing is uploaded).
     """
     if timestamp is not None and timestamp.utcoffset() is None:
         raise ValueError(f"The timestamp has no time zone: {timestamp.isoformat()}")
     for path in (entries_path, forecasts_path):
         if not path.is_file():
             raise FileNotFoundError(f"File not found: {path}")
+    if pq.read_metadata(forecasts_path).num_rows == 0:
+        return None
     client = client or get_s3_client()
     timestamp = (timestamp or datetime.now(timezone.utc)).astimezone(timezone.utc)
     entries_uri = upload_to_s3(

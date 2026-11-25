@@ -3,6 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pandas as pd
+import pyarrow as pa
 import pytest
 
 from access_it.export.s3 import KeyPattern
@@ -43,11 +45,11 @@ def old_keys(pattern: KeyPattern, count: int) -> list[str]:
 
 @pytest.fixture
 def files(tmp_path) -> tuple[Path, Path]:
-    """Files of the entries and of the forecasts of a run."""
+    """Files of the entries (not read, so not a Parquet file) and of the forecasts of a run."""
     entries_path = tmp_path / "entries.parquet"
     forecasts_path = tmp_path / "forecasts.parquet"
     entries_path.write_bytes(b"entries")
-    forecasts_path.write_bytes(b"forecasts")
+    pd.DataFrame({"race_id": ["race"]}).to_parquet(forecasts_path, index=False)
     return entries_path, forecasts_path
 
 
@@ -59,7 +61,7 @@ def test_both_files_get_the_same_timestamp(files):
     assert entries_timestamp is not None
     assert FORECASTS_KEYS.parse_timestamp(forecasts_key) == entries_timestamp
     assert client.objects[entries_key] == b"entries"
-    assert client.objects[forecasts_key] == b"forecasts"
+    assert client.objects[forecasts_key] == files[1].read_bytes()
 
 
 def test_the_entries_are_uploaded_before_the_forecasts(files):
@@ -126,4 +128,21 @@ def test_a_timestamp_without_time_zone_uploads_nothing(files):
         export_upcoming_entries_and_forecasts(
             *files, "bucket", client=client, timestamp=datetime(2026, 5, 10, 20)
         )
+    assert client.objects == {}
+
+
+def test_empty_forecasts_upload_nothing_and_delete_nothing(files):
+    pd.DataFrame({"race_id": pd.Series(dtype=str)}).to_parquet(files[1], index=False)
+    client = FakeS3Client()
+    old_entries = old_keys(ENTRIES_KEYS, KEEP_FILES)
+    client.objects = {key: b"" for key in old_entries}
+    assert export_upcoming_entries_and_forecasts(*files, "bucket", client=client) is None
+    assert list(client.objects) == old_entries
+
+
+def test_an_unreadable_file_of_forecasts_uploads_nothing(files):
+    files[1].write_bytes(b"forecasts")
+    client = FakeS3Client()
+    with pytest.raises(pa.ArrowInvalid):
+        export_upcoming_entries_and_forecasts(*files, "bucket", client=client)
     assert client.objects == {}

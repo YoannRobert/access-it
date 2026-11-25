@@ -1,8 +1,8 @@
 """Export the entries and the forecasts of the upcoming races to the S3 storage.
 
 Both Parquet files are uploaded with the same timestamp, the entries first, and
-the 100 most recent files of each kind are kept (see
-export_upcoming_entries_and_forecasts).
+the 100 most recent files of each kind are kept; nothing is uploaded if the
+file of the forecasts is empty (see export_upcoming_entries_and_forecasts).
 
 Usage, from the repository root, after an extraction of the entries and a forecast:
     python scripts/export_upcoming_entries_and_forecasts_to_s3_bucket.py \
@@ -35,15 +35,19 @@ def parse_args() -> argparse.Namespace:
 def export_upcoming_entries_and_forecasts_to_s3_bucket(
         entries_path: Path, forecasts_path: Path
     ) -> None:
-    """Upload the entries and the forecasts, then delete the old files.
+    """Upload the entries and the forecasts, then delete the old files, unless no race is forecast.
 
     Args:
         entries_path: Parquet file of the entries.
         forecasts_path: Parquet file of the forecasts.
     """
-    entries_uri, forecasts_uri, deleted_keys = export_upcoming_entries_and_forecasts(
+    exported = export_upcoming_entries_and_forecasts(
         entries_path, forecasts_path, bucket=get_settings().s3_bucket
     )
+    if exported is None:
+        print("No forecast: nothing exported to the S3 bucket.")
+        return
+    entries_uri, forecasts_uri, deleted_keys = exported
     print(f"Entries exported to {entries_uri} on the S3 bucket.")
     print(f"Forecasts exported to {forecasts_uri} on the S3 bucket.")
     for deleted_key in deleted_keys:
