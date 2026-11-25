@@ -222,3 +222,6 @@ __marimo__/
 
 # Mac
 .DS_Store
+
+# Local data of the notebooks
+notebooks/data/
