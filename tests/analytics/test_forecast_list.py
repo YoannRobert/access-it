@@ -7,6 +7,7 @@ from access_it.analytics.forecast_list import (
     DAY_RACE_COLUMNS,
     RACE_ENTRY_COLUMNS,
     RACE_RUN_COLUMNS,
+    clean_page_title,
     get_default_forecast_date,
     get_race_entries,
     list_day_races,
@@ -167,6 +168,33 @@ def test_the_races_of_a_day_are_sorted_by_title_then_table_rank():
     assert day_races.columns.tolist() == DAY_RACE_COLUMNS
     assert day_races["race_id"].tolist() == ["vpc-9-1", "vpc-7-2", "vpc-7-10"]
     assert day_races["has_forecast"].tolist() == [False, False, True]
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Andrezé 12 septembre 2026 engagés de courses cyclistes", "Andrezé 12 septembre 2026"),
+    ("Avessac 1er mai 2026 les engagés de courses cyclistes", "Avessac 1er mai 2026"),
+    ("Maumusson 5 juillet 2026 Engagés de courses cyclistes", "Maumusson 5 juillet 2026"),
+    ("Plouigneau 18 avril 2026 les engagées de courses cyclistes", "Plouigneau 18 avril 2026"),
+    ("Baud 11 juillet 2026 engagés de criterium", "Baud 11 juillet 2026"),
+    ("Beaupréau Challenge des Mauges 27 septembre 2026 engagés",
+     "Beaupréau Challenge des Mauges 27 septembre 2026"),
+    ("Bonnétable Les 2 Jours Cyclistes Du Comice 28 et 29 août 2026 engagés",
+     "Bonnétable Les 2 Jours Cyclistes Du Comice 28 et 29 août 2026"),
+    ("Grand Prix A", "Grand Prix A"),
+])
+def test_page_title_loses_the_mention_of_the_entries(title, expected):
+    assert clean_page_title(title) == expected
+
+
+def test_the_races_of_a_day_are_sorted_by_their_cleaned_title():
+    # By raw title, "Vay 15 mars 2026 Grand Prix" would come first
+    races = [
+        make_entries("vpc-1-1", "2026-03-15", RUN_1, page_title="Vay 15 mars 2026 Grand Prix"),
+        make_entries("vpc-2-1", "2026-03-15", RUN_1, page_title="Vay 15 mars 2026 les engagés"),
+    ]
+    race_runs = select_race_runs(make_forecasts(races[0]), pd.concat(races))
+    day_races = list_day_races(race_runs, "2026-03-15")
+    assert day_races["page_title"].tolist() == ["Vay 15 mars 2026", "Vay 15 mars 2026 Grand Prix"]
 
 
 # get_race_entries

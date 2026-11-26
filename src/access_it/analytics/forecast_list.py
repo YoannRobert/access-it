@@ -9,8 +9,10 @@ the run). Rules:
   most recent run of its entries, without probabilities, ranks nor features;
 - the dates offered are the race dates with at least one forecast race; the
   default date is the first of them from today on, or else the last one;
-- the races of a day are sorted by page title, then by rank of their table in
-  the page (the number at the end of the race_id);
+- the page titles lose their final mention of the entries ("engagés", "les
+  engagés de courses cyclistes"...), from this word to the end; the races of a
+  day are sorted by this page title, then by rank of their table in the page
+  (the number at the end of the race_id);
 - the riders entered in a forecast race are sorted by rank of win; those of a
   race without forecast by last name, first name and rider_id; their name,
   club and category come from the rider list.
@@ -19,6 +21,8 @@ The column names of the forecasts are written out, so that the module imports
 neither the features nor the model layer. The computation is free of any
 Streamlit dependency.
 """
+
+import re
 
 from collections.abc import Sequence
 
@@ -34,6 +38,7 @@ RACE_RUN_COLUMNS = [
     "race_id", "race_date", "page_title", "startlist_heading", "run_time", "has_forecast",
     "rider_id", *FORECAST_VALUE_COLUMNS,
 ]
+ENTRIES_MENTION = re.compile(r"\s+(les\s+)?engagée?s\b.*$", re.IGNORECASE)
 DAY_RACE_COLUMNS = ["race_id", "page_title", "startlist_heading", "has_forecast", "run_time"]
 RACE_ENTRY_COLUMNS = [
     "rank_win", "last_name", "first_name", "club", "category", "p_win", "p_podium", "p_top5",
@@ -114,6 +119,19 @@ def get_default_forecast_date(
     return next((date for date in dates if date >= day), dates[-1])
 
 
+def clean_page_title(title: str) -> str:
+    """Page title without its final mention of the entries (see the module docstring).
+
+    Args:
+        title: Title of the page of the startlists.
+
+    Returns:
+        The title cut before "(les) engagé(e)s", in any case, or unchanged without this
+        mention.
+    """
+    return ENTRIES_MENTION.sub("", title).rstrip()
+
+
 def list_day_races(race_runs: pd.DataFrame, race_date: str | pd.Timestamp) -> pd.DataFrame:
     """Races of a day, for the choice of a race.
 
@@ -123,8 +141,9 @@ def list_day_races(race_runs: pd.DataFrame, race_date: str | pd.Timestamp) -> pd
         race_date: Day of the races, as a string or a timestamp.
 
     Returns:
-        One row per race of the day: the DAY_RACE_COLUMNS, sorted by page title,
-        then by rank of the table in the page; empty if no race is held that day.
+        One row per race of the day: the DAY_RACE_COLUMNS, with the page title
+        cleaned by clean_page_title, sorted by this title, then by rank of the
+        table in the page; empty if no race is held that day.
 
     Raises:
         ValueError: If the race date is missing.
@@ -132,6 +151,7 @@ def list_day_races(race_runs: pd.DataFrame, race_date: str | pd.Timestamp) -> pd
     day = to_day(race_date, "race date")
     races = race_runs.loc[race_runs["race_date"] == day, DAY_RACE_COLUMNS]
     races = races.drop_duplicates("race_id")
+    races = races.assign(page_title=races["page_title"].map(clean_page_title))
     table_rank = races["race_id"].str.rsplit("-", n=1).str[-1].astype(int)
     return (
         races.assign(table_rank=table_rank)
