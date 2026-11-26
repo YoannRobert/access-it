@@ -1,4 +1,5 @@
-"""Unit tests of the upload of the files of the upcoming races, with a fake S3 client."""
+"""Unit tests of the upload and download of the files of the upcoming races, with a fake S3
+client."""
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,7 +10,12 @@ import pytest
 
 from access_it.export.s3 import KeyPattern
 from access_it.export.upcoming import (
-    ENTRIES_KEYS, FORECASTS_KEYS, KEEP_FILES, export_upcoming_entries_and_forecasts
+    ENTRIES_KEYS,
+    FORECASTS_KEYS,
+    KEEP_FILES,
+    UpcomingFiles,
+    download_upcoming_entries_and_forecasts,
+    export_upcoming_entries_and_forecasts,
 )
 
 
@@ -18,6 +24,7 @@ class FakeS3Client:
 
     def __init__(self):
         self.objects: dict[str, bytes] = {}
+        self.downloaded: list[str] = []
 
     def upload_file(self, Filename: str, Bucket: str, Key: str) -> None:
         self.objects[Key] = Path(Filename).read_bytes()
@@ -35,6 +42,10 @@ class FakeS3Client:
         for obj in Delete["Objects"]:
             del self.objects[obj["Key"]]
         return {}
+
+    def download_file(self, Bucket: str, Key: str, Filename: str) -> None:
+        self.downloaded.append(Key)
+        Path(Filename).write_bytes(self.objects[Key])
 
 
 def old_keys(pattern: KeyPattern, count: int) -> list[str]:
@@ -146,3 +157,97 @@ def test_an_unreadable_file_of_forecasts_uploads_nothing(files):
     with pytest.raises(pa.ArrowInvalid):
         export_upcoming_entries_and_forecasts(*files, "bucket", client=client)
     assert client.objects == {}
+
+
+# Download
+
+def run_keys(day: int) -> tuple[datetime, str, str]:
+    """Timestamp, forecasts key and entries key of a run on day `day` of January 2026."""
+    timestamp = datetime(2026, 1, day, 19, 30, tzinfo=timezone.utc)
+    return timestamp, FORECASTS_KEYS.build_key(timestamp), ENTRIES_KEYS.build_key(timestamp)
+
+
+def test_the_runs_are_downloaded_from_the_most_recent(tmp_path):
+    (old_time, old_forecasts, old_entries), (new_time, new_forecasts, new_entries) = (
+        run_keys(1), run_keys(2)
+    )
+    client = FakeS3Client()
+    client.objects = {
+        old_entries: b"old entries", old_forecasts: b"old forecasts",
+        new_entries: b"new entries", new_forecasts: b"new forecasts",
+    }
+    runs = download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client)
+    assert runs == [
+        UpcomingFiles(
+            new_time, tmp_path / Path(new_forecasts).name, tmp_path / Path(new_entries).name
+        ),
+        UpcomingFiles(
+            old_time, tmp_path / Path(old_forecasts).name, tmp_path / Path(old_entries).name
+        ),
+    ]
+    assert runs[0].forecasts_path.read_bytes() == b"new forecasts"
+    assert runs[0].entries_path.read_bytes() == b"new entries"
+
+
+def test_forecasts_without_entries_are_returned_alone_with_a_warning(tmp_path, caplog):
+    timestamp, forecasts_key, _ = run_keys(1)
+    client = FakeS3Client()
+    client.objects = {forecasts_key: b"forecasts"}
+    runs = download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client)
+    assert runs == [UpcomingFiles(timestamp, tmp_path / Path(forecasts_key).name, None)]
+    assert f"No entries for the forecasts {forecasts_key}" in caplog.text
+
+
+def test_entries_without_forecasts_are_ignored(tmp_path):
+    _, _, entries_key = run_keys(1)
+    client = FakeS3Client()
+    client.objects = {entries_key: b"entries"}
+    assert download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client) == []
+    assert client.downloaded == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_file_already_present_is_not_downloaded_again(tmp_path):
+    _, forecasts_key, entries_key = run_keys(1)
+    client = FakeS3Client()
+    client.objects = {forecasts_key: b"forecasts", entries_key: b"entries"}
+    download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client)
+    download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client)
+    assert sorted(client.downloaded) == sorted([forecasts_key, entries_key])
+
+
+def test_the_local_files_absent_from_the_bucket_are_deleted(tmp_path):
+    _, old_forecasts, old_entries = run_keys(1)
+    _, forecasts_key, entries_key = run_keys(2)
+    client = FakeS3Client()
+    client.objects = {
+        old_forecasts: b"", old_entries: b"", forecasts_key: b"", entries_key: b"",
+    }
+    download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client)
+    del client.objects[old_forecasts], client.objects[old_entries]
+    (tmp_path / f"{Path(forecasts_key).name}.part").write_bytes(b"orphan")
+    download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client)
+    assert sorted(path.name for path in tmp_path.iterdir()) == sorted(
+        [Path(entries_key).name, Path(forecasts_key).name]
+    )
+
+
+def test_a_failed_download_leaves_no_file_under_its_final_name(tmp_path):
+    _, forecasts_key, _ = run_keys(1)
+
+    class FailingS3Client(FakeS3Client):
+        def download_file(self, Bucket: str, Key: str, Filename: str) -> None:
+            Path(Filename).write_bytes(b"partial")
+            raise ConnectionError("Download interrupted")
+
+    client = FailingS3Client()
+    client.objects = {forecasts_key: b"forecasts"}
+    with pytest.raises(ConnectionError):
+        download_upcoming_entries_and_forecasts("bucket", tmp_path, client=client)
+    assert not (tmp_path / Path(forecasts_key).name).exists()
+
+
+def test_an_empty_bucket_gives_no_run_and_creates_the_directory(tmp_path):
+    dest_dir = tmp_path / "upcoming"
+    assert download_upcoming_entries_and_forecasts("bucket", dest_dir, client=FakeS3Client()) == []
+    assert dest_dir.is_dir()

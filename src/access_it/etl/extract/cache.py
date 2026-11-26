@@ -28,6 +28,7 @@ NATIONAL_RESULTS_DIR = CACHE_DIR / "results_national"
 STARTLISTS_DIR = CACHE_DIR / "startlists"
 DATA_DIR = CACHE_DIR / "data"
 SNAPSHOTS_DIR = CACHE_DIR / "snapshots"
+UPCOMING_DIR = CACHE_DIR / "upcoming"
 
 RACES_PARQUET_FILE = DATA_DIR / "races.parquet"
 REGCOM_PARQUET_FILE = DATA_DIR / "regional_committees.parquet"
