@@ -17,7 +17,7 @@ prévision automatique des courses à venir, puis, à venir, suivi des modèles 
 | Exécution programmée de l'ETL et de la prévision (GitHub Actions, lundi, mercredi et vendredi soir) | fonctionnel |
 | Modèle de prévision (OpenSkill, XGBoost) et prévision des courses à venir | fonctionnel |
 | Suivi des modèles (MLflow) | à venir |
-| Tableau de bord (Streamlit) sur Hugging Face Spaces | fonctionnel ([ouvrir le tableau de bord](https://yoannrobert-access-it.hf.space/)) |
+| Tableau de bord (Streamlit) sur Hugging Face Spaces, dont la page Prévisions | fonctionnel ([ouvrir le tableau de bord](https://yoannrobert-access-it.hf.space/)) |
 | API (FastAPI) | à venir |
 
 ## Architecture
@@ -49,7 +49,8 @@ de la base. Le workflow GitHub Actions `ETL and Forecasts` l'exécute automatiqu
 lundis, mercredis et vendredis, le soir, puis enchaîne la prévision des courses à venir :
 lecture des listes d'engagés à partir du lendemain de la dernière course connue, prévision
 des places de chaque engagé (probabilités de victoire, de top 3, de top 5 et de top 10), puis
-envoi des engagés et des prévisions sur S3. Le notebook
+envoi des engagés et des prévisions sur S3. La page Prévisions du tableau de bord affiche ces
+prévisions course par course. Le notebook
 `notebooks/retroactive_forecasts_2026.ipynb` a envoyé une fois sur S3 les prévisions
 rétroactives de la saison 2026, une paire par semaine.
 
