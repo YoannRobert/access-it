@@ -16,15 +16,15 @@ def paris(year: int, month: int, day: int, hour: int, minute: int = 0) -> dateti
 
 
 @pytest.mark.parametrize("now, expected", [
-    (paris(2026, 11, 10, 3, 15), paris(2026, 11, 10, 6)),
-    (paris(2026, 11, 10, 11, 59), paris(2026, 11, 10, 12)),
-    (paris(2026, 11, 10, 12), paris(2026, 11, 10, 18)),
-    (paris(2026, 11, 10, 18, 1), paris(2026, 11, 11, 0)),
-    (paris(2026, 11, 10, 0), paris(2026, 11, 10, 6)),
-    (paris(2026, 1, 31, 20), paris(2026, 2, 1, 0)),
-    (paris(2026, 12, 31, 23, 59), paris(2027, 1, 1, 0)),
+    (paris(2026, 11, 10, 3, 15), paris(2026, 11, 10, 7)),
+    (paris(2026, 11, 10, 8, 59), paris(2026, 11, 10, 9)),
+    (paris(2026, 11, 10, 9), paris(2026, 11, 10, 11)),
+    (paris(2026, 11, 10, 23, 1), paris(2026, 11, 11, 7)),
+    (paris(2026, 11, 10, 0), paris(2026, 11, 10, 7)),
+    (paris(2026, 1, 31, 23, 30), paris(2026, 2, 1, 7)),
+    (paris(2026, 12, 31, 23, 59), paris(2027, 1, 1, 7)),
 ], ids=[
-    "between_midnight_and_6", "just_before_noon", "on_a_check_time", "after_18",
+    "before_7", "just_before_9", "on_a_check_time", "after_23",
     "at_midnight", "end_of_month", "end_of_year",
 ])
 def test_next_check_time_is_the_next_fixed_hour(now, expected):
@@ -32,8 +32,8 @@ def test_next_check_time_is_the_next_fixed_hour(now, expected):
 
 
 @pytest.mark.parametrize("now, expected, offset_hours", [
-    (paris(2026, 3, 29, 1), paris(2026, 3, 29, 6), 2),
-    (paris(2026, 10, 25, 1), paris(2026, 10, 25, 6), 1),
+    (paris(2026, 3, 29, 1), paris(2026, 3, 29, 7), 2),
+    (paris(2026, 10, 25, 1), paris(2026, 10, 25, 7), 1),
 ], ids=["summer_time", "winter_time"])
 def test_next_check_time_keeps_the_paris_time_on_a_clock_change(now, expected, offset_hours):
     next_check_time = get_next_check_time(now)

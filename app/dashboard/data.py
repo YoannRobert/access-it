@@ -24,7 +24,7 @@ from access_it.export.s3 import download_latest_snapshot, download_snapshot, lis
 from access_it.export.snapshot import read_snapshot_zip
 
 
-CHECK_HOURS = (0, 6, 12, 18)
+CHECK_HOURS = (7, 9, 11, 13, 15, 17, 19, 21, 23)
 PARIS = ZoneInfo("Europe/Paris")
 DEFAULT_REGION = PAYS_DE_LA_LOIRE
 
@@ -80,7 +80,7 @@ def load_snapshot() -> tuple[Path, dict[str, pd.DataFrame]]:
 
 
 def get_next_check_time(now: datetime) -> datetime:
-    """Next check time: the next hour of CHECK_HOURS, or midnight of the next day.
+    """Next check time: the next hour of CHECK_HOURS, or the first of them on the next day.
 
     Args:
         now: Current time, in Paris time.
@@ -88,7 +88,9 @@ def get_next_check_time(now: datetime) -> datetime:
     Returns:
         The first check time strictly after now, in the time zone of now.
     """
-    next_check_time = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    next_check_time = (now + timedelta(days=1)).replace(
+        hour=CHECK_HOURS[0], minute=0, second=0, microsecond=0
+    )
     for hour in CHECK_HOURS:
         check_time = now.replace(hour=hour, minute=0, second=0, microsecond=0)
         if check_time > now:

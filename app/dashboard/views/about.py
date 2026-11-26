@@ -23,8 +23,8 @@ st.markdown(
   classé. Saisons depuis 2023, première année des catégories Access. Seules les courses
   disputées en Bretagne et en Pays de la Loire sont enregistrées : les coureurs d'autres régions
   ne sont suivis que sur ces courses.
-- **Fraîcheur** : le tableau de bord vérifie quatre fois par jour (0 h, 6 h, 12 h et 18 h, heure
-  de Paris) si de nouvelles données sont disponibles. Les calculs sont faits au lendemain de la
+- **Fraîcheur** : le tableau de bord vérifie toutes les deux heures, de 7 h à 23 h (heure de
+  Paris), si de nouvelles données sont disponibles. Les calculs sont faits au lendemain de la
   dernière course enregistrée.
 
 ### Limites

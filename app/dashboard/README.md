@@ -40,7 +40,7 @@ la fiche du coureur ou de la course.
   la FFC (clubs et comités).
 - **Saisons** : depuis 2023, première saison des catégories Access.
 - **Fraîcheur** : le tableau de bord affiche le dernier instantané de la base ; il vérifie
-  quatre fois par jour (0 h, 6 h, 12 h et 18 h, heure de Paris) si un nouvel instantané
+  toutes les deux heures, de 7 h à 23 h (heure de Paris), si un nouvel instantané
   existe. Les calculs sont faits à la date de référence, lendemain de la dernière course
   enregistrée.
 
