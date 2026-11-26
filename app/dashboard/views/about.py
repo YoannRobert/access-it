@@ -27,6 +27,15 @@ st.markdown(
   Paris), si de nouvelles données sont disponibles. Les calculs sont faits au lendemain de la
   dernière course enregistrée.
 
+### Prévisions
+
+Les chances de victoire, de podium, de top 5 et de top 10 sont calculées par un modèle
+d'apprentissage automatique à partir des résultats enregistrés. Les engagés proviennent des
+listes publiées avant chaque course ; seuls ceux reconnus dans les résultats sont pris en
+compte. Les prévisions sont mises à jour trois soirs par semaine. Celles de la saison 2026 ont
+été calculées après coup, avec les seuls résultats connus la veille de chaque course. Une
+prévision n'est jamais une certitude.
+
 ### Limites
 
 - La FFC ne publie pas la catégorie d'un coureur dans une course mixte. Elle est déduite de son

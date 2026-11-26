@@ -4,6 +4,7 @@ from datetime import date
 
 from access_it.common.regions import BRETAGNE, PAYS_DE_LA_LOIRE
 
+FORECASTS_PAGE = "views/forecasts.py"
 SEASON_PAGE = "views/season.py"
 RIDER_PAGE = "views/rider.py"
 HEAD_TO_HEAD_PAGE = "views/head_to_head.py"
@@ -49,7 +50,9 @@ def test_home_page_is_the_default_page_and_links_to_every_page(open_page):
     assert not app.exception
     assert values(app.title) == ["Access it!"]
     linked_pages = {link.proto.page for link in app.get("page_link")}
-    assert linked_pages == {"season", "rankings", "rider", "head-to-head", "race", "about"}
+    assert linked_pages == {
+        "forecasts", "season", "rankings", "rider", "head-to-head", "race", "about"
+    }
 
 
 def test_sidebar_shows_the_date_of_the_last_race(open_page):
@@ -306,3 +309,78 @@ def test_selected_race_of_the_list_closes_the_search(open_page):
     assert not app.exception
     assert app.query_params["race_id"] == "c6"
     assert app.session_state["race_search"] is False
+
+
+
+# Forecasts page (fake runs of conftest.py)
+
+def open_forecasts_day(open_page, race_date: date):
+    """Forecasts page on a race date."""
+    app = open_page(FORECASTS_PAGE)
+    app.date_input(key="forecasts_date").set_value(race_date).run()
+    return app
+
+
+def test_forecasts_page_shows_the_last_date_and_the_riders_by_rank(open_page):
+    app = open_page(FORECASTS_PAGE)
+    assert not app.exception
+    assert values(app.title) == ["Prévisions"]
+    assert app.date_input(key="forecasts_date").value == date(2026, 10, 3)
+    forecasts = table(app, "forecasts_table_vpc-3-1")
+    assert forecasts.value["rider_id"].tolist() == ["r1", "r6"]
+    assert forecasts.value["last_name"].notna().all()
+    assert list(forecasts.proto.column_order) == [
+        "rank_win", "last_name", "first_name", "club", "category",
+        "p_win", "p_podium", "p_top5", "p_top10",
+    ]
+
+
+def test_races_of_a_day_are_listed_with_those_without_forecast(open_page):
+    app = open_forecasts_day(open_page, date(2026, 9, 26))
+    assert not app.exception
+    assert app.selectbox(key="forecasts_race_2026-09-26").options == [
+        "Grand Prix vpc-1-1 – Access 1-2-3-4",
+        "Grand Prix vpc-2-1 – Access 1-2-3-4 (sans prévision)",
+    ]
+
+
+def test_race_without_forecast_shows_a_message_and_its_riders(open_page):
+    app = open_forecasts_day(open_page, date(2026, 9, 26))
+    app.selectbox(key="forecasts_race_2026-09-26").set_value("vpc-2-1").run()
+    assert not app.exception
+    assert values(app.info) == ["Aucune prévision n'est disponible pour cette course."]
+    riders = table(app, "forecasts_table_vpc-2-1")
+    assert list(riders.proto.column_order) == ["last_name", "first_name", "club", "category"]
+    assert sorted(riders.value["rider_id"]) == ["r4", "r5"]
+    assert not app.checkbox
+    assert values(app.caption) == ["Engagés connus le vendredi 25/09/2026 à 21 h 30."]
+
+
+def test_day_without_forecast_race_shows_a_message(open_page):
+    app = open_forecasts_day(open_page, date(2026, 9, 30))
+    assert not app.exception
+    assert values(app.info) == ["Aucune course avec prévision le 30/09/2026."]
+    assert not app.selectbox
+
+
+def test_checked_box_adds_its_column_to_the_table(open_page):
+    app = open_page(FORECASTS_PAGE)
+    app.checkbox(key="forecasts_show_top_n_rate").check().run()
+    assert not app.exception
+    forecasts = table(app, "forecasts_table_vpc-3-1")
+    assert list(forecasts.proto.column_order)[-1] == "top_n_rate"
+    assert forecasts.value["top_n_rate"].isna().tolist() == [False, True]
+    assert forecasts.value["best_place"].isna().tolist() == [False, True]
+
+
+def test_forecasts_page_shows_the_time_of_the_forecast(open_page):
+    app = open_page(FORECASTS_PAGE)
+    assert values(app.caption) == ["Prévision calculée le vendredi 02/10/2026 à 21 h 30."]
+
+
+def test_selected_rider_of_the_forecasts_opens_the_rider_page(open_page):
+    app = open_page(FORECASTS_PAGE)
+    open_selected_row(app, "forecasts_table_vpc-3-1", 1)
+    assert not app.exception
+    assert values(app.title) == ["Coureur"]
+    assert app.query_params["rider_id"] == "r6"

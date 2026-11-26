@@ -21,6 +21,8 @@ française de cyclisme (FFC).
 ## Pages
 
 - **Accueil** : présentation du projet et liens vers les pages.
+- **Prévisions** : chances de victoire, de podium, de top 5 et de top 10 des engagés de
+  chaque course, à choisir par date.
 - **Saison** : courses par mois, par département et par catégories, coureurs les plus titrés,
   changements de catégorie.
 - **Classements** : challenge régional des Pays de la Loire, points de montée, clubs.

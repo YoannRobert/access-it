@@ -2,7 +2,8 @@
 
 Each function takes the path of the snapshot as first argument: Streamlit caches its result
 for this snapshot (st.cache_data), so that a new snapshot is computed again without clearing
-the cache. See the analytics functions for the rules and the columns.
+the cache. get_race_runs takes the runs of the forecasts instead, with the same aim. See the
+analytics functions for the rules and the columns.
 """
 
 import pandas as pd
@@ -14,6 +15,7 @@ from typing import Literal
 
 from access_it.analytics.category_changes import compute_category_changes
 from access_it.analytics.club_rankings import compute_club_rankings
+from access_it.analytics.forecast_list import select_race_runs
 from access_it.analytics.head_to_head import HeadToHead, compute_head_to_head
 from access_it.analytics.promotion_points import compute_promotion_points, compute_promotion_rankings
 from access_it.analytics.race_list import list_races
@@ -26,8 +28,9 @@ from access_it.common.regions import (
     PAYS_DE_LA_LOIRE, get_region_departement_codes, get_regional_committee_id
 )
 from access_it.common.seasons import FIRST_SEASON
+from access_it.export.upcoming import UpcomingFiles
 
-from data import get_snapshot_data, get_snapshot_reference_date
+from data import get_forecast_data, get_snapshot_data, get_snapshot_reference_date
 from settings import LAST_RACES, TOP_N, WINDOW_MONTHS
 
 
@@ -341,3 +344,10 @@ def get_race_summary(snapshot_path: Path, race_id: str) -> RaceSummary:
         rider_categories=tables["rider_categories"],
         race_id=race_id
     )
+
+
+@st.cache_data
+def get_race_runs(upcoming_files: tuple[UpcomingFiles, ...]) -> pd.DataFrame:
+    """Rows of the run shown for each race (see select_race_runs), computed once per set of runs."""
+    forecasts, entries = get_forecast_data(upcoming_files)
+    return select_race_runs(forecasts, entries)

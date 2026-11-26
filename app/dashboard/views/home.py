@@ -4,6 +4,11 @@ import streamlit as st
 
 PAGES = [
     (
+        "views/forecasts.py", "Prévisions",
+        "Les chances de victoire, de podium, de top 5 et de top 10 des engagés des prochaines "
+        "courses.",
+    ),
+    (
         "views/season.py", "Saison",
         "Le bilan d'une saison, avec les courses, les coureurs les plus titrés et les "
         "changements de catégorie.",

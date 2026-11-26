@@ -24,6 +24,7 @@ def navigable_dataframe(
     id_column: str,
     key: str,
     column_config: dict[str, Any] | None = None,
+    column_order: list[str] | None = None,
 ) -> None:
     """Show a table whose selected row leads to the page of its rider or race.
 
@@ -36,10 +37,12 @@ def navigable_dataframe(
         key: Key of the table, built on the criteria of the page, so that the selection is
             cleared when the content of the table changes.
         column_config: Configuration of the columns; build_column_config(df) by default.
+        column_order: Columns shown, in this order; all of them by default.
     """
     event = st.dataframe(
         translate_values(df),
         column_config=column_config or build_column_config(df),
+        column_order=column_order,
         hide_index=True,
         height=table_height(df),
         on_select="rerun",
