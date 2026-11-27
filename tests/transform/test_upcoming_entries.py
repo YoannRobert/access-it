@@ -7,7 +7,8 @@ from access_it.etl.extract.upcoming_startlists import UpcomingStartlistPage
 from access_it.etl.transform.clubs import ClubLookup
 from access_it.etl.transform.upcoming_entries import (
     ENTRIES_COLUMNS, AccessStartlist, build_upcoming_entries, find_access_startlists,
-    find_club_column, find_departement_code, find_name_columns, is_access_startlist_heading
+    find_club_column, find_departement_code, find_name_columns, is_access_startlist_heading,
+    is_cancelled_race_description
 )
 
 CLUBS = ClubLookup(pd.DataFrame({
@@ -53,6 +54,20 @@ def test_access_startlist_heading(heading, expected):
 ])
 def test_departement_code(description, expected):
     assert find_departement_code(description, DEPARTEMENTS) == expected
+
+
+@pytest.mark.parametrize("description, expected", [
+    ("COURSE ANNULÉE. La Lescouëtaise, course cycliste organisée à Lescouët-Gouarec", True),
+    ("Les courses annulees ne seront pas reportées", True),
+    ("Courses annulée à cause des fortes chaleurs", True),
+    ("Course annulées par arrêté préfectoral", True),
+    ("Les épreuves prévues pour les écoles de vélo sont annulées", False),
+    ("Engagés des courses cyclistes organisées à Vallet (44)", False),
+    ("Annulation de l'épreuve à cause des fortes chaleurs", False),
+    ("Course reportée au 20 juillet", False),
+])
+def test_cancelled_race_description(description, expected):
+    assert is_cancelled_race_description(description) is expected
 
 
 def table(**columns: list) -> pd.DataFrame:
@@ -239,6 +254,23 @@ def test_race_below_the_minimum_of_identified_riders_is_left_out():
 def test_pages_outside_the_covered_regions_are_left_out(description, kept):
     entries = build([page("1", startlist_page_html(description, {"ACCESS": rows(12)}))])
     assert (not entries.empty) is kept
+
+
+def test_cancelled_race_page_is_skipped(caplog):
+    caplog.set_level("INFO")
+    entries = build([
+        page("1", startlist_page_html("COURSE ANNULÉE. A Vallet (44)", {"ACCESS": rows(12)})),
+        page("2", startlist_page_html("A Vallet (44)", {"ACCESS": rows(12)})),
+    ])
+    assert entries["page_id"].unique().tolist() == ["2"]
+    assert "Startlist page 1 skipped (cancelled race)" in caplog.text
+
+
+def test_cancelled_race_page_outside_the_covered_regions_is_not_logged(caplog):
+    caplog.set_level("INFO")
+    html = startlist_page_html("COURSE ANNULÉE. A Granville (50)", {"ACCESS": rows(12)})
+    assert build([page("1", html)]).empty
+    assert "cancelled race" not in caplog.text
 
 
 def test_unreadable_page_is_skipped(caplog):

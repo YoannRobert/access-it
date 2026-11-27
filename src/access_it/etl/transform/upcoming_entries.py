@@ -45,6 +45,7 @@ EXCLUDED_HEADING_PATTERN = re.compile(r"open|elite")
 ACCESS_HEADING_PATTERN = re.compile(r"acc?ess?|\ba\s?[1-4]\b")
 NAME_PART_PATTERN = re.compile(r"[^\W\d_]+(?:[ '-][^\W\d_]+)*")
 DEPARTEMENT_CODE_PATTERN = re.compile(r"\((\d{2,3}|2[AB])\)")
+CANCELLED_RACE_PATTERN = re.compile(r"\bcourses? annulees?\b")
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,24 @@ def find_departement_code(description: str, departements: pd.DataFrame) -> str |
                 found_codes.add(code)
                 text = text[:match.start()] + "#" * len(match.group(0)) + text[match.end():]
     return found_codes.pop() if len(found_codes) == 1 else None
+
+
+def is_cancelled_race_description(description: str) -> bool:
+    """Whether the description of a startlist page announces a cancelled race.
+
+    The description is compared without case nor accents. It announces a
+    cancelled race if it holds "course annulée" or "courses annulées" (either
+    word in the singular or the plural) as whole words, e.g. "COURSE ANNULÉE."
+    A cancellation written otherwise ("épreuves annulées", "annulation") is
+    not recognized.
+
+    Args:
+        description: Description of the startlist page.
+
+    Returns:
+        True if the races of the page are announced as cancelled.
+    """
+    return CANCELLED_RACE_PATTERN.search(normalize_string_and_fold_case(description)) is not None
 
 
 def compute_club_rate(s: pd.Series, clubs: ClubLookup) -> float:
@@ -331,7 +350,9 @@ def build_upcoming_entries(
 
     A page that cannot be read is skipped with a warning. A page whose
     departement is found outside the covered regions is left out; a page
-    whose departement is not found is kept. Each Access race of a kept page
+    whose departement is not found is kept. A page whose description announces
+    a cancelled race (see is_cancelled_race_description) is left out with all
+    its tables, and logged. Each Access race of a kept page
     (see find_access_startlists) gives its identified riders (see
     identify_startlist_riders), and is kept if it has at least
     MIN_IDENTIFIED_RIDERS of them.
@@ -368,6 +389,9 @@ def build_upcoming_entries(
             continue
         departement_code = find_departement_code(data["description"], departements)
         if departement_code is not None and departement_code not in covered_codes:
+            continue
+        if is_cancelled_race_description(data["description"]):
+            logger.info(f"Startlist page {page.page_id} skipped (cancelled race)")
             continue
         race_date = pd.Timestamp(page.race_date)
         for startlist in find_access_startlists(data["startlists"], club_lookup):
