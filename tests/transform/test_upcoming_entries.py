@@ -8,7 +8,7 @@ from access_it.etl.transform.clubs import ClubLookup
 from access_it.etl.transform.upcoming_entries import (
     ENTRIES_COLUMNS, AccessStartlist, build_upcoming_entries, find_access_startlists,
     find_club_column, find_departement_code, find_name_columns, is_access_startlist_heading,
-    is_cancelled_race_description
+    is_cancelled_race_description, is_men_or_mixed_heading, is_women_race_title
 )
 
 CLUBS = ClubLookup(pd.DataFrame({
@@ -68,6 +68,36 @@ def test_departement_code(description, expected):
 ])
 def test_cancelled_race_description(description, expected):
     assert is_cancelled_race_description(description) is expected
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Ste Sève 29 mars 2026 les engagées de courses cyclistes", True),
+    ("Classic Féminine 21 juin 2026 ENGAGÉES", True),
+    ("Course 3 mai 2026 l'engagée", True),
+    ("Vallet 22 novembre 2026 engagés", False),
+    ("Route féminine 31 mai 2026 les engagés et engagées", False),
+    ("Ploumagoar 12 avril 2026 les engagé de courses cyclistes", False),
+    ("Bretagne Ladies Tour 29-31 mai 2026 les partantes", False),
+])
+def test_women_race_title(title, expected):
+    assert is_women_race_title(title) is expected
+
+
+@pytest.mark.parametrize("heading, expected", [
+    ("HOMMES ACCESS", True),
+    ("ACCESS 1.2 HOMMES", True),
+    ("Access masculins", True),
+    ("ACCESS GARÇONS", True),
+    ("Course mixte", True),
+    ("ACCESS 3.4 ET FEMMES", True),
+    ("ACCESS 3/4 SAUF FEMMES", True),
+    ("ACCESS", False),
+    ("FEMMES ACCESS", False),
+    ("NOTRE-DAME ACCESS", False),
+    ("ACCESS DEPART 15 H 30", False),
+])
+def test_men_or_mixed_heading(heading, expected):
+    assert is_men_or_mixed_heading(heading) is expected
 
 
 def table(**columns: list) -> pd.DataFrame:
@@ -186,8 +216,12 @@ REGIONAL_COMMITTEES = pd.DataFrame({
 })
 
 
-def startlist_page_html(description: str, tables: dict[str, list[list[str]]]) -> str:
-    """HTML of a startlist page with the given description and tables by heading."""
+def startlist_page_html(
+        description: str,
+        tables: dict[str, list[list[str]]],
+        title: str = "Vallet 22 novembre 2026 engagés"
+    ) -> str:
+    """HTML of a startlist page with the given description, tables by heading and title."""
     tables_html = "".join(
         f"<h3>{heading}</h3><table>"
         + "".join("<tr>" + "".join(f"<td>{c}</td>" for c in row) + "</tr>" for row in rows)
@@ -195,7 +229,7 @@ def startlist_page_html(description: str, tables: dict[str, list[list[str]]]) ->
         for heading, rows in tables.items()
     )
     return (
-        "<h1>Vallet 22 novembre 2026 engagés</h1>"
+        f"<h1>{title}</h1>"
         f'<div class="date">18/11/2026</div><div class="description">{description}</div>'
         '<div id="article"><div class="simpleText"><div class="structured_text_semantique_text">'
         f'<div class="code_html">{tables_html}</div></div></div></div>'
@@ -271,6 +305,30 @@ def test_cancelled_race_page_outside_the_covered_regions_is_not_logged(caplog):
     html = startlist_page_html("COURSE ANNULÉE. A Granville (50)", {"ACCESS": rows(12)})
     assert build([page("1", html)]).empty
     assert "cancelled race" not in caplog.text
+
+
+WOMEN_TITLE = "Ste Sève 29 mars 2026 les engagées de courses cyclistes"
+
+
+def test_women_race_page_is_skipped(caplog):
+    caplog.set_level("INFO")
+    women_html = startlist_page_html("A Vallet (44)", {"ACCESS": rows(12)}, title=WOMEN_TITLE)
+    men_html = startlist_page_html("A Vallet (44)", {"ACCESS": rows(12)})
+    entries = build([page("1", women_html), page("2", men_html)])
+    assert entries["page_id"].unique().tolist() == ["2"]
+    assert "Startlist page 1 skipped (women's race)" in caplog.text
+
+
+def test_women_race_page_keeps_its_men_tables(caplog):
+    caplog.set_level("INFO")
+    tables = {"FEMMES ACCESS": rows(12), "ACCESS": rows(12), "HOMMES ACCESS": rows(12)}
+    html = startlist_page_html("A Vallet (44)", tables, title=WOMEN_TITLE)
+    entries = build([page("1", html)])
+    assert entries["race_id"].unique().tolist() == ["vpc-1-3"]
+    assert (
+        "Startlist page 1: women's race title, only the men's or mixed tables kept"
+        in caplog.text
+    )
 
 
 def test_unreadable_page_is_skipped(caplog):

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from access_it.common.access_categories import is_women_only_name
+from access_it.common.access_categories import WOMEN_PATTERN, is_women_only_name
 from access_it.common.regions import (
     COVERED_REGIONS, get_region_departement_codes, get_regional_committee_id
 )
@@ -46,6 +46,10 @@ ACCESS_HEADING_PATTERN = re.compile(r"acc?ess?|\ba\s?[1-4]\b")
 NAME_PART_PATTERN = re.compile(r"[^\W\d_]+(?:[ '-][^\W\d_]+)*")
 DEPARTEMENT_CODE_PATTERN = re.compile(r"\((\d{2,3}|2[AB])\)")
 CANCELLED_RACE_PATTERN = re.compile(r"\bcourses? annulees?\b")
+WOMEN_ENTRIES_PATTERN = re.compile(r"\bengagees?\b")
+MEN_ENTRIES_PATTERN = re.compile(r"\bengages?\b")
+MEN_OR_MIXED_PATTERN = re.compile(r"\b(hommes?|masculin(?:e|es|s)?|garcons?|mixtes?)\b")
+NOTRE_DAME_PATTERN = re.compile(r"\bnotre[ -]dame\b")
 
 
 @dataclass(frozen=True)
@@ -154,6 +158,48 @@ def is_cancelled_race_description(description: str) -> bool:
         True if the races of the page are announced as cancelled.
     """
     return CANCELLED_RACE_PATTERN.search(normalize_string_and_fold_case(description)) is not None
+
+
+def is_women_race_title(title: str) -> bool:
+    """Whether the title of a startlist page announces a women's race.
+
+    The title is compared without case nor accents. It announces a women's
+    race if it holds "engagée" or "engagées" as a whole word, and neither
+    "engagé" nor "engagés", e.g. "Ste Sève 29 mars 2026 les engagées".
+
+    Args:
+        title: Title of the startlist page.
+
+    Returns:
+        True if the page announces a women's race.
+    """
+    normalized = normalize_string_and_fold_case(title)
+    return (
+        WOMEN_ENTRIES_PATTERN.search(normalized) is not None
+        and MEN_ENTRIES_PATTERN.search(normalized) is None
+    )
+
+
+def is_men_or_mixed_heading(heading: str) -> bool:
+    """Whether the heading of a startlist table designates men or a mixed race.
+
+    The heading is compared without case nor accents, the place names
+    "Notre-Dame" being ignored. It designates men or a mixed race if it holds
+    a men's or mixed word ("hommes", "masculins", "garçons", "mixte"), or a
+    women's word that is_women_only_name does not take as women only (e.g.
+    "ACCESS 3.4 ET FEMMES", "ACCESS 3/4 SAUF FEMMES"). A heading without any
+    of these words, e.g. "ACCESS", does not.
+
+    Args:
+        heading: Heading of the table.
+
+    Returns:
+        True if the table is a men's or mixed race.
+    """
+    normalized = NOTRE_DAME_PATTERN.sub(" ", normalize_string_and_fold_case(heading))
+    if MEN_OR_MIXED_PATTERN.search(normalized) is not None:
+        return True
+    return WOMEN_PATTERN.search(normalized) is not None and not is_women_only_name(heading)
 
 
 def compute_club_rate(s: pd.Series, clubs: ClubLookup) -> float:
@@ -352,7 +398,10 @@ def build_upcoming_entries(
     departement is found outside the covered regions is left out; a page
     whose departement is not found is kept. A page whose description announces
     a cancelled race (see is_cancelled_race_description) is left out with all
-    its tables, and logged. Each Access race of a kept page
+    its tables, and logged. On a page whose title announces a women's race
+    (see is_women_race_title), only the Access races whose heading designates
+    men or a mixed race (see is_men_or_mixed_heading) are kept, and the page
+    is logged, as left out if none is left. Each Access race of a kept page
     (see find_access_startlists) gives its identified riders (see
     identify_startlist_riders), and is kept if it has at least
     MIN_IDENTIFIED_RIDERS of them.
@@ -393,8 +442,18 @@ def build_upcoming_entries(
         if is_cancelled_race_description(data["description"]):
             logger.info(f"Startlist page {page.page_id} skipped (cancelled race)")
             continue
+        access_startlists = find_access_startlists(data["startlists"], club_lookup)
+        if is_women_race_title(data["title"]):
+            access_startlists = [s for s in access_startlists if is_men_or_mixed_heading(s.heading)]
+            if not access_startlists:
+                logger.info(f"Startlist page {page.page_id} skipped (women's race)")
+                continue
+            logger.info(
+                f"Startlist page {page.page_id}: women's race title, "
+                "only the men's or mixed tables kept"
+            )
         race_date = pd.Timestamp(page.race_date)
-        for startlist in find_access_startlists(data["startlists"], club_lookup):
+        for startlist in access_startlists:
             rider_ids = identify_startlist_riders(
                 startlist, race_date, club_lookup, rider_lookup, affiliation_lookup
             )
