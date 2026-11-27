@@ -53,6 +53,10 @@ envoi des engagés et des prévisions sur S3. La page Prévisions du tableau de 
 prévisions course par course. Le notebook
 `notebooks/retroactive_forecasts_2026.ipynb` a envoyé une fois sur S3 les prévisions
 rétroactives de la saison 2026, une paire par semaine.
+Le notebook `notebooks/forecast_comparison_2026.ipynb` compare ces prévisions aux
+classements officiels : sur 282 courses, le vainqueur figure dans la liste de 10 du modèle
+dans 57 % des cas, contre 47 % pour la baseline, sans écart significatif avec une prévision
+faite à partir des seuls classés.
 
 ### Sources
 
