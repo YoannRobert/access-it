@@ -2,7 +2,7 @@ name: ETL and Forecasts
 
 on:
   schedule:
-    - cron: '17 13 * * 1,3,5'
+    - cron: '17 11 * * 1,3,5'
       timezone: 'Europe/Paris'
   workflow_dispatch:
 
